@@ -7,7 +7,7 @@ defined_routines = []
 start_group = 0
 round_error = False
 warnings = True
-memory_instructions = ["READ", "WRITE", "MPTR", "RPTR"]
+memory_instructions = ["INITMEM", "MREAD", "MWRITE", "MFUNC", "MPTR", "MRESET"]  # these were outdated
 instructions = commands.INSTRUCTIONS
 ALIASES = {
     "MEMREG": f"C{gdobj.MEMREG}", 
