@@ -1,0 +1,39 @@
+_init: 
+    DISPLAY C1, 0 
+    DISPLAY C2, 1
+    DISPLAY C3, 2
+    DISPLAY C4, 3
+    DISPLAY C5, 4
+
+add_marker:  ; move the value to be added in here
+    MOV C5, C1
+
+add_if_mod_3:
+    MOV C3, C1  ; clone to temp var
+    FLDIV C3, 3
+    MUL C3, 3
+    SUB C3, C1, C3
+    SE add_marker, C3, 0
+
+add_if_mod_5:
+    MOV C4, C1  ; clone to temp var
+    FLDIV C4, 5
+    MUL C4, 5
+    SUB C4, C1, C4
+    SE add_marker, C4, 0
+    SPAWN rest_of_loop  ; this is here to prevent a race condition 
+
+rest_of_loop:
+    ADD C2, C5
+    SL increment, C1, 999 ; while c1 < 1000
+
+increment:
+    ADD C1, 1
+    MOV C5, 0
+    SPAWN add_if_mod_3
+    SPAWN add_if_mod_5
+
+_start:
+    MOV C1, 1
+    
+    SPAWN increment

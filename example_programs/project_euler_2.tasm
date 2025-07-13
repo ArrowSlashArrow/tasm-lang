@@ -1,0 +1,28 @@
+_init: 
+    DISPLAY C1 ; sum
+    DISPLAY C2 ; current fib number
+    DISPLAY C3 ; previous fib number
+    DISPLAY C4 ; 2nd previous fib number
+    DISPLAY C5 ; temp var for mod % 2 result
+
+add:
+    ADD C1, C2
+
+loop:
+    ; next fibonacci number
+    MOV C4, C3
+    MOV C3, C2
+    ADD C2, C3, C4
+    
+    ; compute c2 % 2 into c5
+    MOV C5, C2
+    FLDIV C5, 2
+    MUL C5, 2
+    SUB C5, C2
+    SE add, C5, 0
+    NOP ; prevent race conditions
+    SL loop, C2, 4000000
+
+_start:
+    MOV C2, 1
+    SPAWN loop

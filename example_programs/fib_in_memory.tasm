@@ -1,0 +1,30 @@
+; attempts to calculate the fibonacci sequence with only 1 counter outside of ram. 
+; could do it completely inside of ram but i only have 1 pointer.
+
+_init:
+    DISPLAY C1
+    DISPLAY MEMREG
+    DISPLAY PTRPOS
+    MALLOC 50
+    INITMEM 0,1
+
+fib:
+    ; read the prevous two values
+    MREAD
+    MFUNC
+    MOV C1, MEMREG
+
+    MPTR 1
+    MFUNC
+
+    ; write sum
+    ADD MEMREG, C1
+    MWRITE 
+    MPTR 1
+    MFUNC
+    MPTR -1
+
+    SL fib, PTRPOS, 50
+
+_start:
+    SPAWN fib

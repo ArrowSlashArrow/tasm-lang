@@ -1,0 +1,6 @@
+_init:
+    DISPLAY C234
+
+_start:
+    ADD C234, 1
+    SPAWN _start

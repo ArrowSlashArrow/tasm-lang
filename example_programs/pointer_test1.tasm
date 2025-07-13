@@ -1,0 +1,14 @@
+_init:
+    MALLOC 32
+    DISPLAY MEMREG
+
+next:
+    MFUNC
+    DIV MEMREG, 2
+    MPTR 1
+    SL next, PTRPOS, 32
+
+_start:
+    MWRITE
+    MOV MEMREG, 2147483647
+    SPAWN next

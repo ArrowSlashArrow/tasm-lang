@@ -1,0 +1,22 @@
+_init:
+    DISPLAY C1 ; sum of squares
+    DISPLAY C2 ; unsquared sum 
+    DISPLAY C3 ; iterator index (i)
+    DISPLAY C4 ; Auxiliary square variable
+
+loop:
+    ADD C3, 1 ; increment
+
+    MOV C4, C3
+    MUL C4, C4
+    ADD C1, C4 ; add squared to c1
+    ADD C2, C3 ; add unsquared to c2
+
+    FL loop, finish, C3, 100 ; looooooooooooooop
+
+finish:
+    MUL C2, C2 ; square the sum
+    SUB C2, C1 ; store result in c2
+
+_start:
+    SPAWN loop

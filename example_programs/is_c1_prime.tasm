@@ -1,0 +1,30 @@
+_init:
+    DISPLAY C1 ; checking if this is prime
+    DISPLAY C2 ; check factor
+    DISPLAY C3 ; max factor
+    DISPLAY C4 ; aux mod var
+    DISPLAY C5 ; 1 = prime, 2 = not prime
+
+next_iteration:
+    ADD C2, 2
+    FLDIV C4, C1, C2
+    MUL C4, C2
+    SUB C4, C1
+    FGE next_iteration, prime, C3, C2
+
+not_prime:
+    MOV C5, 2
+
+prime:
+    MOV C5, 1
+
+_start:
+    MOV C1, 997 ; move starting values
+    MOV C2, 1
+    DIV C3, C1, 2
+
+    ; c4 = c1 % 2 -> filter out all evens
+    FLDIV C4, C1, 2
+    MUL C4, 2
+    SUB C4, C1
+    FE not_prime, next_iteration, C4, 0
