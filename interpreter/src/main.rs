@@ -452,16 +452,27 @@ fn main() {
 
     // init
     let init_routine = namespace.routines.get("_init").unwrap();
+    let mut malloced = false;
+    let mut idx = 0;
     for instruction in init_routine.instructions.clone().into_iter() {
         let command = instruction.command.as_str();
         let args: Vec<String> = instruction.args;
         match command {
             "MALLOC" => {
+                if malloced {
+                    println!("[Instruction {idx} in _init] You cannot allocate memory twice.");
+                    return
+                }
                 let length = args[0].parse::<i32>().unwrap();
                 memory_start = 9998 - length;
                 memory_size = length;
+                malloced = true;
             },
             "INITMEM" => {
+                if !malloced {
+                    println!("[Instruction {idx} in _init] You cannot initialise unallocated memory. Please MALLOC first.");
+                    return
+                }
                 let new_state = args[0].split(",");
                 let mut index = 0;
                 for number in new_state {
@@ -476,6 +487,7 @@ fn main() {
             },
             _ => {}
         }
+        idx += 1;
     }
     
     let mut tick: u64 = 0;
