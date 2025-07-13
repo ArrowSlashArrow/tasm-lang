@@ -1,6 +1,10 @@
 # VSCode settings
 .vscode
 
+# my programs
+programs
+namespace.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
