@@ -84,9 +84,11 @@ impl Display for Counter {
 }
 
 fn new_active(active_groups: &mut HashMap<i32, i32>, group: i32) {
+    // pointer is set to -1 because it gets incremented to 0 immediately after
     active_groups.insert(group, -1);
 }
 
+// returns a routine object if a routine with a group exists, otherwise returns none
 fn get_routine(namespace: &Namespace, group: i32) -> Option<Routine> {
     for (_, routine) in namespace.clone().routines.into_iter() {
         if routine.group == group {
@@ -96,6 +98,7 @@ fn get_routine(namespace: &Namespace, group: i32) -> Option<Routine> {
     None
 }
 
+// simulate GD clamp
 fn clamp(value: f64, isfloat: bool) -> f64 {
     if isfloat {
         if value > 9999999.0 {
@@ -117,9 +120,8 @@ fn get(counter: &Counter, counters: &[i32], timers: &[f32]) -> f64 {
     }
 }
 
-// counter = counter <op> copy (0: =, 1: +, 2: -, 3: *, 4: /)
+// counter = counter <op> value; op table: (0: =, 1: +, 2: -, 3: *, 4: /)
 fn gsetv(counter: &Counter, rhsvalue: f64, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
-    
     let lhs = get(&counter, &counters, &timers);
     let result = match op {
         0 => rhsvalue,
@@ -146,7 +148,7 @@ fn gsetv(counter: &Counter, rhsvalue: f64, op: i32, counters: &[i32], timers: &[
     clamp(result, counter.timer)
 }
 
-// counter = counter <op> copy (0: =, 1: +, 2: -, 3: *, 4: /)
+// counter = counter <op> rhs (0: =, 1: +, 2: -, 3: *, 4: /)
 fn gsetc(counter: &Counter, rhs: &Counter, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
     
     let lhs = get(&counter, &counters, &timers);
@@ -235,10 +237,12 @@ fn gset2c(result: &Counter, lhs_counter: Counter, value: f64, op: i32, counters:
     clamp(newvalue, result.timer)
 }
 
+// display the state in a nice way
 fn show_state(
     counters: &[i32], 
     timers: &[f32], 
     displayed_counters: &Vec<Counter>, 
+    instructions: &Vec<Instruction>,
     memory_start: i32,
     memory_size: i32, 
     memory_mode: i32, 
@@ -258,17 +262,19 @@ fn show_state(
     let memreg = counters[9998];
     let ptrpos = counters[9999];
 
+    // display memory if there is any
     if memory_size > 0 {
         let memcell_text_width = (memory_size - 1).to_string().len();
         let memcell_width = 16 + memcell_text_width;
+        let first_memcell_width = memcell_width - 1;
+        // amount of columns to display
         let columns = std::cmp::min((memory_size as f64 / rows as f64).ceil() as u16, width / memcell_width as u16);
 
-        let left = ((memcell_text_width as f64) / 2.0 + 3.0).ceil() as usize;
-        let right = ((memcell_text_width as f64 + 1.0) / 2.0 + 3.0).ceil() as usize;
-
-        let first_column = format!("{CORNER}{} MEMORY {}{CORNER}{CLEAR_LINE_AFTER_CURSOR}", &HORIZONTAL.repeat(left), &HORIZONTAL.repeat(right));
+        // top/bottom segments (first for first, next for all subsequent)
+        let first_column = format!("{CORNER}{0:*^first_memcell_width$}{CORNER}{CLEAR_LINE_AFTER_CURSOR}", " MEMORY ").replace("*", HORIZONTAL);
         let next_column = HORIZONTAL.repeat(memcell_width - 1) + CORNER;
-
+        
+        // determine what memory addresses to show on what lines
         let mut lines: Vec<Vec<usize>> = vec![];
         for i in 0..memory_size {
             if i >= rows {
@@ -278,8 +284,10 @@ fn show_state(
             }
         }
 
+        // build the string for one specific memory address
         let build_memcell_str =|i: i32| {
             if i != ptr_pos {
+                // addr: value
                 format!(
                     " {i:0>width$}: {0}{GRAY}{1:0>14} {VERTICAL}",
                     if counters[(memory_start + i) as usize] < 0 {"-"} else {" "},
@@ -287,6 +295,7 @@ fn show_state(
                     width = memcell_text_width
                 )
             } else {
+                // highlight if pointer is here
                 format!(
                     "{YELLOW} {BG_GREY}{0}> {1}{GRAY}{2:0>21}{RESET} {VERTICAL}",
                     " ".repeat(memcell_text_width),
@@ -296,10 +305,12 @@ fn show_state(
             }
         };
 
+        // top border of memory display
         out_str += &format!("{first_column}{}\n", next_column.repeat(columns as usize - 1usize));
         
         let mut i = 0;
         for line in lines.iter() {
+            // add the memory cell strings for each line
             let mut column = "".to_string();
             for memcell in line.iter() {
                 column += &build_memcell_str(*memcell as i32)
@@ -307,6 +318,7 @@ fn show_state(
             if i == memory_size % rows && memory_size % rows != 0 {
                 let mut beginning = format!("{VERTICAL}{column}");
                 beginning.pop();
+                // add the bottom of the last row if it cuts off early
                 out_str += &format!("{beginning}{CORNER}{next_column}{CLEAR_LINE_AFTER_CURSOR}\n")
             } else {
                 out_str += &format!("{VERTICAL}{column}{CLEAR_LINE_AFTER_CURSOR}\n")
@@ -314,8 +326,11 @@ fn show_state(
             
             i += 1;
         }
-
+        
+        // add the bottom of the memory cell display
         let mut bottom_row = format!("{CORNER}{}", next_column.repeat((memory_size / rows) as usize));
+        
+        // the corner of the register / pointer / writemode display
         if bottom_row.len() < 25 {
             bottom_row += &format!("{}{CORNER}", HORIZONTAL.repeat(24 - bottom_row.len()))
         } else {
@@ -323,6 +338,8 @@ fn show_state(
                 bottom_row.as_mut_vec()[24] = b'+';
             }
         }
+
+        // add the bottom right corner of the main memory cell display
         if columns == 1 {
             unsafe {
                 bottom_row.as_mut_vec()[18] = b'+';
@@ -334,7 +351,8 @@ fn show_state(
             2 => format!("{RED}WRITE"),
             _ => "?????".to_string()
         };
-
+        
+        // build the register / pointer / writemode display
         out_str += &format!("{bottom_row}{CLEAR_LINE_AFTER_CURSOR}\n");
         out_str += &format!(
             "{VERTICAL} Register: {0}{GRAY}{1:0>14} {VERTICAL}{CLEAR_LINE_AFTER_CURSOR}\n", 
@@ -351,7 +369,7 @@ fn show_state(
         let mut right_len_int = 0;
         let mut float_lengths: Vec<usize> = vec![];
         
-
+        // determine how wide the dispaly should be
         for counter in displayed_counters.iter() {
             if counter.timer {
                 float_lengths.push(std::cmp::min((timers[counter.id as usize] % 1.0).to_string().len(), 2usize))
@@ -365,6 +383,7 @@ fn show_state(
         let right_len_float = if float_lengths.len() > 0 {*float_lengths.iter().max().unwrap() as i32} else{-1};
         let length = (6 + left_len as i32 + right_len_int as i32 + right_len_float) as usize;
 
+        // top border
         out_str += &format!("{CORNER}{0:*^length$}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n", " COUNTERS ").replace('*', HORIZONTAL);
 
         let mut right_padding = false;
@@ -374,6 +393,7 @@ fn show_state(
             }
         }
         
+        // then display
         for counter in displayed_counters.iter() {
             let value = get(counter, &counters, &timers);
             let counter_str = format!("{}{}", if counter.timer {"T"} else {"C"}, counter.id);
@@ -384,29 +404,69 @@ fn show_state(
                 out_str += &format!("{} {VERTICAL}{CLEAR_LINE_AFTER_CURSOR}\n", if right_padding {"   "} else {""});
             }
         }
+
+        // bottom border
         out_str += &format!("{CORNER}{0}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n", "-".repeat(length))
     }
 
+    if instructions.len() > 0 {
+        let caption = " Instructions this tick ";
+
+        let mut instruction_lines = vec![];
+        let mut display_width = 0;
+        for instruction in instructions {
+            // format instruction as it is in the file
+            let mut line = format!("{} ", instruction.command);
+            for arg in &instruction.args {
+                line += &format!("{arg}, ");
+            }
+            // remove last comma
+            line.pop();
+            line.pop();
+
+            if line.len() > display_width {
+                display_width = line.len()
+            }
+            instruction_lines.push(line);
+        }
+
+        display_width = std::cmp::max(display_width, caption.len());
+
+        // top border
+        out_str += &format!("{CLEAR_LINE_AFTER_CURSOR}\n{CORNER}{HORIZONTAL}{caption:*<display_width$}{HORIZONTAL}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n").replace("*", HORIZONTAL);
+
+        for line in instruction_lines {
+            out_str += &format!("{VERTICAL} {line: <display_width$} {VERTICAL}{CLEAR_LINE_AFTER_CURSOR}\n");
+        }
+
+        // bottom border
+        out_str += &format!("{CORNER}{}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n", HORIZONTAL.repeat(display_width + 2usize));
+        
+        out_str += &format!("{CLEAR_LINE_AFTER_CURSOR}\n");
+    }
+
+    // time and speed dispaly
     if !fast {
         out_str += &format!(
-            "Time: {:.3}s{CLEAR_LINE_AFTER_CURSOR}\nSimulation speed: {:.2}Hz ({:.2}x) {}{CLEAR_LINE_AFTER_CURSOR}", 
-            tick as f64 / 240.0, 
-            1000.0 / delay, 
-            1000.0 / delay / 240.0,
-            if paused {"[PAUSED]"} else {""}
+            "Time: {:.3}s / {tick} ticks{CLEAR_LINE_AFTER_CURSOR}\nSimulation speed: {:.2}Hz ({:.2}x) {}{CLEAR_LINE_AFTER_CURSOR}", 
+            tick as f64 / 240.0,             // time in seconds
+            1000.0 / delay,                  // simulation steps per second
+            1000.0 / delay / 240.0,          // how much faster it is than GD
+            if paused {"[PAUSED]"} else {""} // paused?
         );
     } else {
         let delay = tick_time.as_nanos() as f64 / 1000000.0;
         out_str += &format!(
-            "Time: {:.3}s{CLEAR_LINE_AFTER_CURSOR}\nRunning simulation as fast as possible: {:.2}Hz ({:.2}x) @ {delay:.4}ms / tick {}{CLEAR_LINE_AFTER_CURSOR}", 
-            tick as f64 / 240.0, 
-            1000.0 / delay, 
-            1000.0 / delay / 240.0,
-            if paused {"[PAUSED]"} else {""}
+            "Time: {:.3}s / {tick} ticks{CLEAR_LINE_AFTER_CURSOR}\nRunning simulation as fast as possible: {:.2}Hz ({:.2}x) @ {delay:.4}ms / tick {}{CLEAR_LINE_AFTER_CURSOR}", 
+            tick as f64 / 240.0,             // time in seconds
+            1000.0 / delay,                  // simulation steps per second
+            1000.0 / delay / 240.0,          // how much faster it is than GD
+            if paused {"[PAUSED]"} else {""} // paused?
         );
     }
     out_str += CONTROLS_STRING;
-    out_str += &format!("{CLEAR_ALL_AFTER_CURSOR}{SHOW_CURSOR}\n");
+    // clear all after to prevent weird overdraw
+    out_str += &format!("{CLEAR_ALL_AFTER_CURSOR}{SHOW_CURSOR}\n"); 
 
     stdout().write_all(out_str.as_bytes()).unwrap();
     stdout().flush().unwrap();
@@ -426,7 +486,8 @@ fn main() {
 
     let fast = argv.contains(&"--fast".to_string());
 
-    let namespace: Namespace = serde_json::from_value(
+    // read raw namespace to object
+    let raw_namespace: Namespace = serde_json::from_value(
         serde_json::from_str(&file).expect("Could not parse json.")
     ).unwrap();
 
@@ -440,20 +501,24 @@ fn main() {
     let mut ptr_pos: i32 = 0;
 
     let mut active_groups: HashMap<i32, i32> = HashMap::new();
-    if !namespace.routines.contains_key("_start") {
+
+    // check start routine
+    if !raw_namespace.routines.contains_key("_start") {
         // you should be including the _start routine.
         println!("No _start routine found. this program refuses to interpret such code.");
         return;
     }
-    active_groups.insert(namespace.routines.get("_start").unwrap().group, 0);
+    active_groups.insert(raw_namespace.routines.get("_start").unwrap().group, 0);
 
-    // this value equals 2^(1/5) -> 5x increase speed = 2x speed overall
+    // this value equals 2^(1/5) -> 5x increase speed button pressed = 2x speed overall
     let speed_multiplier = 1.148698355;
 
     // init
-    let init_routine = namespace.routines.get("_init").unwrap();
+    let init_routine = raw_namespace.routines.get("_init").unwrap();
     let mut malloced = false;
     let mut idx = 0;
+
+    // process init routine
     for instruction in init_routine.instructions.clone().into_iter() {
         let command = instruction.command.as_str();
         let args: Vec<String> = instruction.args;
@@ -478,6 +543,10 @@ fn main() {
                 for number in new_state {
                     counters[(memory_start + index) as usize] = number.parse::<i32>().unwrap();
                     index += 1;
+                    if index >= memory_size {
+                        println!("[Instruction {idx} in _init] You cannot initialise more slots of memory than you allocated.");
+                        return
+                    }
                 }
             },
             "DISPLAY" => {
@@ -489,17 +558,58 @@ fn main() {
         }
         idx += 1;
     }
-    
+
+    let mut routines: HashMap<String, Routine> = HashMap::new();
+
+    // replace all the MEMSIZE with memory_size
+    for (name, routine) in raw_namespace.routines.iter() {
+        let old_instrs = &routine.instructions;
+        let group = &routine.group;
+        let mut instructions: Vec<Instruction> = vec![];
+
+        for instruction in old_instrs.iter() {
+            let mut new_args: Vec<String> = vec![];
+            for arg in instruction.args.clone() {
+                if arg == "MEMSIZE" {
+                    new_args.push(memory_size.to_string());
+                } else {
+                    new_args.push(arg.clone());
+                }
+            }
+            instructions.push(
+                Instruction { 
+                    command: instruction.command.clone(), 
+                    idx: instruction.idx, 
+                    args: new_args 
+                }
+            )
+        }
+        routines.insert(
+            name.clone(),
+            Routine {
+                group: *group,
+                instructions: instructions
+            }
+        );
+    }
+
+    let namespace = Namespace { 
+        routines: routines
+    };
+
+
     let mut tick: u64 = 0;
     let mut previous_inputs: HashSet<KeyCode> = HashSet::new();
     let mut prev_tick_time = Duration::new(0, 0);
     let mut tick_time = Duration::new(0, 0);
+    let mut current_instructions: Vec<Instruction> = vec![];
     while !active_groups.is_empty() {
         let start_tick_time = Instant::now();
         show_state(
             &counters, 
             &timers, 
             &displayed_counters, 
+            &current_instructions,
             memory_start, 
             memory_size, 
             memory_mode, 
@@ -549,17 +659,22 @@ fn main() {
         for _ in 0..steps {
             // let tick_start = Instant::now();
             tick += 1;
-            let mut current_instructions: Vec<Instruction> = vec![];
+            current_instructions.clear();
+            
             for (group, ptr) in active_groups.iter() {
                 // find instruction (group.instructions[ptr])
                 let routine = get_routine(&namespace, *group).unwrap();
                 current_instructions.push(routine.instructions[*ptr as usize].clone());
             }
             
+            // process all instructions
             for instruction in current_instructions.clone().into_iter() {
                 let command = instruction.command.as_str();
                 let mode = instruction.idx;
                 let args: Vec<String> = instruction.args;
+
+                // i had to fight the borrow checker for these closures
+                // but it was worth it to remove duplicate code
 
                 let mut arithmetic = |op| {
                     let result = Counter::new(&args[0]);

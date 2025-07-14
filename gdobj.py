@@ -14,6 +14,7 @@ spawn_delay_enabled = True
 bit_packing_enabled = True
 timewarp_trigger = False
 memory_block_pos = [45, 165]
+memory_size = 0
 MEMREG = 9998
 PTRPOS = 9999
 params = {
@@ -643,6 +644,7 @@ def mov_num(item, number, **kwargs):
     dX = 1 if kwargs["squish"] else 30
     itemtype, id = unpack_item(item)
     number = int(number)
+    # bitpacker
     if number > 16777216 and bit_packing_enabled:
         used_extra_objects += 2
         big = number // 65536
@@ -683,1129 +685,288 @@ def mov_num(item, number, **kwargs):
             0, 3, 1, 0, 0, 0, 0
         )
 
-def mov_counter(item, original, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(item)
-    original_itemtype, original_id = unpack_item(original)
-
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        original_id,
-        0,
-        original_itemtype,
-        1,
-        result_id,  # result id
-        result_itemtype,  # result type
-        1,
-        0,
-        3,
-        1,
-        0,
-        0,
-        0,
-        0
-    )
-
 ################## ARITHMETIC
 
-def add_num(item, number, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    itemtype, id = unpack_item(item)
-    return item_edit_trigger_str(
-        xpos,
-        ypos + kwargs.get("yoffset", 0),
-        1, kwargs.get("yscale", 1), 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        0,
-        0,
-        0,
-        0,
-        id,
-        itemtype,
-        number,
-        1,
-        3,
-        1,
-        0,
-        0,
-        0,
-        0
-    )
-
-def add_counter(item, original, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(item)
-    original_itemtype, original_id = unpack_item(original)
+def arithmetic_2counters(result, item1, operator, **kwargs):
+    xpos, ypos, group = unpack_kwargs(**kwargs)
+    result_itemtype, result_id = unpack_item(result)
+    original_itemtype, original_id = unpack_item(item1)
 
     return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        original_id,
-        0,
-        original_itemtype,
-        1,
-        result_id,  # result id
-        result_itemtype,  # result type
-        1,
-        1,
-        3,
-        1,
-        0,
-        0,
-        0,
-        0
+        xpos, ypos, 1, 1, 0, [group], True, False, True,
+        original_id, 0, original_itemtype, 1,
+        result_id, result_itemtype,
+        1, min(operator, 4), 3, 1, 0, 0, int(operator == 5) * 2, 0
     )
-
-def add2(result, item1, item2, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
+    
+def arithmetic_2counters_num(result, item1, mod, operator, **kwargs):
+    xpos, ypos, group = unpack_kwargs(**kwargs)
+    result_itemtype, result_id = unpack_item(result)
+    original_itemtype, original_id = unpack_item(item1)
 
     return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        second_id,
-        first_itemtype,
-        second_itemtype,
-        result_id,
-        result_itemtype,
-        1,
-        0,
-        3,
-        1,
-        0,
-        0,
-        0,
-        0
+        xpos, ypos, 1, 1, 0, [group], True, False, True,
+        original_id, 0, original_itemtype, 1,
+        result_id, result_itemtype,
+        mod, min(operator, 4), 3, 1, 0, 0, int(operator == 5) * 2, 0
     )
-
-def sub_num(item, number, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    itemtype, id = unpack_item(item)
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        0,
-        0,
-        0,
-        0,
-        id,
-        itemtype,
-        number,
-        2,  # assign operator
-        3,  # mod operator
-        1,  # id operator
-        0,
-        0,
-        0,
-        0
-    )
-
-def sub_counter(item, original, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(item)
-    original_itemtype, original_id = unpack_item(original)
+    
+def arithmetic_counter_num(result, num, operator, **kwargs):
+    xpos, ypos, group = unpack_kwargs(**kwargs)
+    result_itemtype, result_id = unpack_item(result)
 
     return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        original_id,
-        0,
-        original_itemtype,
-        1,
-        result_id,  # result id
-        result_itemtype,  # result type
-        1,
-        2, # assign operator
-        3, # mod operator
-        1, # id operator
-        0,
-        0,
-        0,
-        0
+        xpos, ypos, 1, 1, 0, [group], True, False, True,
+        0, 0, 0, 0, result_id, result_itemtype, num,
+        min(operator, 4), 3, 1, 0, 0, int(operator == 5) * 2, 0
     )
 
-def sub2(result, item1, item2, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
+def arithmetic_3counters(result, item1, item2, operator, **kwargs):
+    xpos, ypos, group = unpack_kwargs(**kwargs)
+    result_itemtype, result_id = unpack_item(result)
+    item1_itemtype, item1_id = unpack_item(item1)
+    item2_itemtype, item2_id = unpack_item(item2)
 
     return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        second_id,
-        first_itemtype,
-        second_itemtype,
-        result_id,
-        result_itemtype,
-        1,
-        0, # assign operator
-        3, # mod operator
-        2, # id operator
-        0,
-        0,
-        0,
-        0
+        xpos, ypos, 1, 1, 0, [group], True, False, True,
+        item1_id, item2_id, item1_itemtype, item2_itemtype,
+        result_id, result_itemtype,
+        1, min(operator, 4), 3, 1, 0, 0, int(operator == 5) * 2, 0
     )
+    
 
-def mul_num(item, number, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    itemtype, id = unpack_item(item)
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        0,
-        0,
-        0,
-        0,
-        id,
-        itemtype,
-        number,
-        3,  # assign operator
-        3,  # mod operator
-        1,  # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def mov_counter(*args, **kwargs):
+    return arithmetic_2counters(*args, 0, **kwargs)
+    
+def add_num(*args, **kwargs):
+    return arithmetic_counter_num(*args, 1, **kwargs)
 
-def mul_counter(item, original, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(item)
-    original_itemtype, original_id = unpack_item(original)
+def add_counter(*args, **kwargs):
+    return arithmetic_2counters(*args, 1, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        original_id,
-        0,
-        original_itemtype,
-        1,
-        result_id,  # result id
-        result_itemtype,  # result type
-        1,
-        3, # assign operator
-        3, # mod operator
-        1, # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def add2(*args, **kwargs):
+    return arithmetic_3counters(*args, 1, **kwargs)
+    
+def sub_num(*args, **kwargs):
+    return arithmetic_counter_num(*args, 2, **kwargs)
 
-def mul2(result, item1, item2, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
+def sub_counter(*args, **kwargs):
+    return arithmetic_2counters(*args, 2, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        second_id,
-        first_itemtype,
-        second_itemtype,
-        result_id,
-        result_itemtype,
-        1,
-        0, # assign operator
-        3, # mod operator
-        3, # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def sub2(*args, **kwargs):
+    return arithmetic_3counters(*args, 2, **kwargs)
 
-def mul2num(result, item1, num, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
+def mul_num(*args, **kwargs):
+    return arithmetic_counter_num(*args, 3, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        0,
-        first_itemtype,
-        1,
-        result_id,
-        result_itemtype,
-        num,
-        0, # assign operator
-        3, # mod operator
-        3, # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def mul_counter(*args, **kwargs):
+    return arithmetic_2counters(*args, 3, **kwargs)
 
-def div_num(item, number, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    itemtype, id = unpack_item(item)
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        0,
-        0,
-        0,
-        0,
-        id,
-        itemtype,
-        number,
-        4,  # assign operator
-        3,  # mod operator
-        1,  # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def mul2(*args, **kwargs):
+    return arithmetic_3counters(*args, 3, **kwargs)
 
-def div_counter(item, original, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(item)
-    original_itemtype, original_id = unpack_item(original)
+def mul2num(*args, **kwargs):
+    return arithmetic_3counters(*args, 3, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        original_id,
-        0,
-        original_itemtype,
-        1,
-        result_id,  # result id
-        result_itemtype,  # result type
-        1,
-        4, # assign operator
-        3, # mod operator
-        1, # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def div_num(*args, **kwargs):
+    return arithmetic_counter_num(*args, 4, **kwargs)
 
-def div2(result, item1, item2, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
+def div_counter(*args, **kwargs):
+    return arithmetic_2counters(*args, 4, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        second_id,
-        first_itemtype,
-        second_itemtype,
-        result_id,
-        result_itemtype,
-        1,
-        0, # assign operator
-        3, # mod operator
-        4, # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def div2(*args, **kwargs):
+    return arithmetic_3counters(*args, 4, **kwargs)
 
-def div2num(result, item1, num, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
+def div2num(*args, **kwargs):
+    return arithmetic_3counters(*args, 4, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        0,
-        first_itemtype,
-        1,
-        result_id,
-        result_itemtype,
-        num,
-        0, # assign operator
-        4, # mod operator
-        4, # id operator
-        0,
-        0,
-        0,
-        0
-    )
+def fldiv_num(*args, **kwargs):
+    return arithmetic_counter_num(*args, 5, **kwargs)
 
-def fldiv_num(item, number, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    itemtype, id = unpack_item(item)
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        0,
-        0,
-        0,
-        0,
-        id,
-        itemtype,
-        number,
-        4,  # assign operator
-        3,  # mod operator
-        1,  # id operator
-        0,
-        2,
-        0,
-        0
-    )
+def fldiv_counter(*args, **kwargs):
+    return arithmetic_2counters(*args, 5, **kwargs)
 
-def fldiv_counter(item, original, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(item)
-    original_itemtype, original_id = unpack_item(original)
+def fldiv2(*args, **kwargs):
+    return arithmetic_3counters(*args, 5, **kwargs)
 
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        original_id,
-        0,
-        original_itemtype,
-        1,
-        result_id,  # result id
-        result_itemtype,  # result type
-        1,
-        4, # assign operator
-        3, # mod operator
-        1, # id operator
-        0,
-        2,
-        0,
-        0
-    )
+def fldiv2num(*args, **kwargs):
+    return arithmetic_3counters(*args, 5, **kwargs)
 
-def fldiv2(result, item1, item2, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        second_id,
-        first_itemtype,
-        second_itemtype,
-        result_id,
-        result_itemtype,
-        1,
-        0, # assign operator
-        3, # mod operator
-        4, # id operator
-        0,
-        2,
-        0,
-        0
-    )
-
-def fldiv2num(result, item1, num, **kwargs):
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 75
-    result_itemtype, result_id = unpack_item(result) 
-    first_itemtype, first_id = unpack_item(item1) 
-
-    return item_edit_trigger_str(
-        xpos,
-        ypos,
-        1, 1, 0, [kwargs["group"]],
-        True, False, True,  # ItemID1, ...
-        first_id,
-        0,
-        first_itemtype,
-        1,
-        result_id,
-        result_itemtype,
-        num,
-        0, # assign operator
-        4, # mod operator
-        4, # id operator
-        0,
-        2,
-        0,
-        0
-    )
 
 ################## ITEM COMPARE
 
-def spawn_equals_item(trueID, item1, item2, **kwargs):
+def spawn_item(trueID, item1, item2, operator, **kwargs):
     global used_extra_objects, used_extra_groups
     used_extra_groups = 1
     used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
+    
+    # init some values
+    xpos, ypos, group = unpack_kwargs(**kwargs)
     first_itemtype, first_id = unpack_item(item1) 
     second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
+    
+    # then the triggers
+    return compare_trigger_str(
+        xpos, ypos, 1, 0.5, 0, [group], True, False, True, 
         kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 0, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
+        3, 3, operator, 0, 0, 0, 0, 0
+    ) + spawn_trigger_str(
         xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
         trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
     )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_equals_num(trueID, item1, num, **kwargs):
+    
+def spawn_num(trueID, item1, num, operator, **kwargs):
     global used_extra_objects, used_extra_groups
     used_extra_groups = 1
     used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
+    
+    # init some values
+    xpos, ypos, group = unpack_kwargs(**kwargs)
     first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
+    
+    # then the triggers
+    return compare_trigger_str(
+        xpos, ypos, 1, 0.5, 0, [group], True, False, True, 
         kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 0, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
+        3, 3, operator, 0, 0, 0, 0, 0
+    ) + spawn_trigger_str(
         xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
         trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
     )
 
-    return item_compare_str + spawn_trigger
 
-def spawn_nequals_item(trueID, item1, item2, **kwargs):
+def spawn_equals_item(*args, **kwargs):
+    return spawn_item(*args, 0, **kwargs)
+
+def spawn_equals_num(*args, **kwargs):
+    return spawn_num(*args, 0, **kwargs)
+
+def spawn_greater_item(*args, **kwargs):
+    return spawn_item(*args, 1, **kwargs)
+
+def spawn_greater_num(*args, **kwargs):
+    return spawn_num(*args, 1, **kwargs)
+
+def spawn_gequals_item(*args, **kwargs):
+    return spawn_item(*args, 2, **kwargs)
+
+def spawn_gequals_num(*args, **kwargs):
+    return spawn_num(*args, 2, **kwargs)
+
+def spawn_less_item(*args, **kwargs):
+    return spawn_item(*args, 3, **kwargs)
+
+def spawn_less_num(*args, **kwargs):
+    return spawn_num(*args, 3, **kwargs)
+
+def spawn_lequals_item(*args, **kwargs):
+    return spawn_item(*args, 4, **kwargs)
+
+def spawn_lequals_num(*args, **kwargs):
+    return spawn_num(*args, 4, **kwargs)
+
+def spawn_nequals_item(*args, **kwargs):
+    return spawn_item(*args, 5, **kwargs)
+
+def spawn_nequals_num(*args, **kwargs):
+    return spawn_num(*args, 5, **kwargs)
+
+
+def fork_item(trueID, falseID, item1, item2, operator, **kwargs):
     global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
+    used_extra_groups = 2
+    used_extra_objects = 2
+    
+    # unpack values
+    xpos, ypos, group = unpack_kwargs(**kwargs)
+    nextfree = kwargs["nextfree"]
+    
     first_itemtype, first_id = unpack_item(item1) 
     second_itemtype, second_id = unpack_item(item2)
+    
     item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 5, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_nequals_num(trueID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 5, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_less_item(trueID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 3, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_less_num(trueID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 3, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_lequals_item(trueID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 4, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_lequals_num(trueID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 4, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_greater_item(trueID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 1, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_greater_num(trueID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 1, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_gequals_item(trueID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 2, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def spawn_gequals_num(trueID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 82.5
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 2, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn trigger 
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger
-
-def fork_equals_item(trueID, falseID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 0, # operator
+        xpos, ypos, 1, 0.3, 0, [group], True, False, True, 
+        nextfree, nextfree + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
+        3, 3, operator,
         0, 0, 0, 0, 0
     )
 
     # spawn triggers
     spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
+        xpos, ypos - 10, 1, 0.3, 0, [nextfree], True, False, True, 
         trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
     )
     second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
+        xpos, ypos - 20, 1, 0.3, 0, [nextfree + 1], True, False, True, 
         falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
     )
 
     return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_equals_num(trueID, falseID, item1, num, **kwargs):
+    
+def fork_num(trueID, falseID, item1, num, operator, **kwargs):
     global used_extra_objects, used_extra_groups
     used_extra_groups = 2
     used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
+    
+    # unpack values
+    xpos, ypos, group = unpack_kwargs(**kwargs)
+    nextfree = kwargs["nextfree"]
     first_itemtype, first_id = unpack_item(item1) 
+    
     item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 0, # operator
+        xpos, ypos, 1, 0.3, 0, [group], True, False, True, 
+        nextfree, nextfree + 1, first_id, 0, first_itemtype, 1, 1, float(num),
+        3, 3, operator, # operator
         0, 0, 0, 0, 0
     )
 
     # spawn triggers
     spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
+        xpos, ypos - 10, 1, 0.3, 0, [nextfree], True, False, True, 
         trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
     )
     second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
+        xpos, ypos - 20, 1, 0.3, 0, [nextfree + 1], True, False, True, 
         falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
     )
 
     return item_compare_str + spawn_trigger + second_spawn_trigger
 
-def fork_nequals_item(trueID, falseID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 5, # operator
-        0, 0, 0, 0, 0
-    )
+def fork_equals_item(*args, **kwargs):
+    return fork_item(*args, 0, **kwargs)
 
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
+def fork_equals_num(*args, **kwargs):
+    return fork_num(*args, 0, **kwargs)
 
-    return item_compare_str + spawn_trigger + second_spawn_trigger
+def fork_greater_item(*args, **kwargs):
+    return fork_item(*args, 1, **kwargs)
 
-def fork_nequals_num(trueID, falseID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 5, # operator
-        0, 0, 0, 0, 0
-    )
+def fork_greater_num(*args, **kwargs):
+    return fork_num(*args, 1, **kwargs)
 
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
+def fork_gequals_item(*args, **kwargs):
+    return fork_item(*args, 2, **kwargs)
 
-    return item_compare_str + spawn_trigger + second_spawn_trigger
+def fork_gequals_num(*args, **kwargs):
+    return fork_num(*args, 2, **kwargs)
 
-def fork_less_item(trueID, falseID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 3, # operator
-        0, 0, 0, 0, 0
-    )
+def fork_less_item(*args, **kwargs):
+    return fork_item(*args, 3, **kwargs)
 
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
+def fork_less_num(*args, **kwargs):
+    return fork_num(*args, 3, **kwargs)
 
-    return item_compare_str + spawn_trigger + second_spawn_trigger
+def fork_lequals_item(*args, **kwargs):
+    return fork_item(*args, 4, **kwargs)
 
-def fork_less_num(trueID, falseID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 3, # operator
-        0, 0, 0, 0, 0
-    )
+def fork_lequals_num(*args, **kwargs):
+    return fork_num(*args, 4, **kwargs)
 
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
+def fork_nequals_item(*args, **kwargs):
+    return fork_item(*args, 5, **kwargs)
 
-    return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_lequals_item(trueID, falseID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 4, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_lequals_num(trueID, falseID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 4, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_greater_item(trueID, falseID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 1, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_greater_num(trueID, falseID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 1, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_gequals_item(trueID, falseID, item1, item2, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    second_itemtype, second_id = unpack_item(item2)
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
-        3, 3, 2, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger + second_spawn_trigger
-
-def fork_gequals_num(trueID, falseID, item1, num, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
-    # acutal item compare
-    xpos = 105 + (1 if kwargs["squish"] else 30) * float(kwargs["index"])
-    ypos = kwargs["group"] * 30 + 85
-    first_itemtype, first_id = unpack_item(item1) 
-    item_compare_str = compare_trigger_str(
-        xpos, ypos, 1, 0.3, 0, [kwargs["group"]], True, False, True, 
-        kwargs["nextfree"], kwargs["nextfree"] + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, 2, # operator
-        0, 0, 0, 0, 0
-    )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [kwargs["nextfree"] + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
-    return item_compare_str + spawn_trigger + second_spawn_trigger
+def fork_nequals_num(*args, **kwargs):
+    return fork_num(*args, 5, **kwargs)
 
 ################## THREADING / CONTROL FLOW
 
@@ -1851,7 +1012,8 @@ def initmem(numbers, **kwargs):
 
 def malloc(amount, **kwargs):
     # uses 4 + 4amount groups
-    global malloc_count, used_extra_groups, pointer_group, read_group, write_group, reset_block, starting_counter
+    global malloc_count, used_extra_groups, pointer_group, read_group, write_group, reset_block, starting_counter, memory_size
+    memory_size = amount
     
     x_offset = memory_block_pos[0]
     y_offset = memory_block_pos[1] + kwargs["subroutine_count"] * 30
@@ -1956,7 +1118,7 @@ def malloc(amount, **kwargs):
 
 def mfunc(**kwargs):
     global used_extra_objects
-    used_extra_objects += 2  # give it time to register the collision
+    used_extra_objects += 2 if kwargs["squish"] else 0 # give it time to register the collision
     xpos, ypos, group = unpack_kwargs(**kwargs)
     return move_trigger_str(
         xpos, ypos, 1, 1, 0, [group], True, False, True, 0, 30, 0, pointer_group
@@ -2053,5 +1215,6 @@ def unpack_kwargs(**kwargs):
     group = kwargs["group"]
     return xpos, ypos, group
 
-# yes, there's a better way to do this
-# however, i can't be bothered to refactor this
+# 05/07: yes, there's a better way to do this
+# 05/07: however, i can't be bothered to refactor this
+# 13/07: the time has come to remove 800 lines of copy paste

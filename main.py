@@ -80,6 +80,7 @@ def main():
     bit_packing = "--disable-bit-packing"
     interpret = "--interpret" in argv
     display_namespace = "--show-namespace" in argv
+    nowrite = "--no-write" in argv
     
     level_index = 0
     for arg_idx, arg in enumerate(argv):
@@ -190,22 +191,23 @@ def main():
     if append:  # overwrites level if not appending
         new_objs = old_objs + str(new_objs)
     
-    print("Encrypting level...")
-    # concat new objs to data
-    combined_data = header + new_objs
-    encrypted = encrypt_level_string(combined_data)
+    if not nowrite:
+        print("Encrypting level...")
+        # concat new objs to data
+        combined_data = header + new_objs
+        encrypted = encrypt_level_string(combined_data)
 
-    level[level_data_idx].text = encrypted.decode()
-    level[level_name_idx].text = os.path.basename(file)
-    
-    os.remove(decoded_path)
+        level[level_data_idx].text = encrypted.decode()
+        level[level_name_idx].text = os.path.basename(file)
+        
+        os.remove(decoded_path)
+        print("Encrypting savefile...")
+        xml_str = '<?xml version="1.0"?>' + ET.tostring(levels_root, encoding="unicode")
 
-    print("Encrypting savefile...")
-    xml_str = '<?xml version="1.0"?>' + ET.tostring(levels_root, encoding="unicode")
-
-    encrypted_savefile = encrypt_savefile_str(xml_str.encode("utf-8"))
-    if "--no-write" not in argv:
+        encrypted_savefile = encrypt_savefile_str(xml_str.encode("utf-8"))
         open(local_levels, "wb").write(encrypted_savefile)
+    else:
+        os.remove(decoded_path)
 
 try:
     if __name__ == "__main__":

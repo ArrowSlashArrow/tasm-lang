@@ -11,7 +11,9 @@ memory_instructions = ["INITMEM", "MREAD", "MWRITE", "MFUNC", "MPTR", "MRESET"] 
 instructions = commands.INSTRUCTIONS
 ALIASES = {
     "MEMREG": f"C{gdobj.MEMREG}", 
-    "PTRPOS": f"C{gdobj.PTRPOS}"}
+    "PTRPOS": f"C{gdobj.PTRPOS}",
+}
+INTSTRS = ["MEMSIZE"]
 
 def display_err_msg(line, index, err_msg, routine="", warning=False):
     global errors
@@ -37,6 +39,8 @@ def is_int(x: str):
 def is_num(x: str):
     global round_error
     round_error = False
+    if x in INTSTRS:
+        return True
     try:
         n = float(x)
         if n < -16_777_216 or n > 16_777_216:
@@ -280,6 +284,8 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
             for arg in args:
                 if arg in routines: # replace routine names with their corresponding groups
                     arg_list.append(routines.index(arg) + group_offset)
+                elif arg == "MEMSIZE":
+                    arg_list.append(gdobj.memory_size)
                 elif arg != "":
                     arg_list.append(arg)
                     
