@@ -74,7 +74,7 @@ def counter_object_str(
     secondsOnly: bool,
     specialMode: int # -3..0: attempts / points / maintime / none
 ):
-    string = f"1,1615,2,{x},3,{y}"
+    string = f"1,1615,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -84,6 +84,7 @@ def counter_object_str(
         string += f",128,{xscale}"
     if yscale != 1:
         string += f",129,{yscale}"
+    
 
     # specifics
     if ID > 0:
@@ -117,7 +118,7 @@ def spawn_trigger_str(
     spawnOrdered: bool,
     previewDisable: bool,
 ):
-    string = f"1,1268,2,{x},3,{y}"
+    string = f"1,1268,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -170,7 +171,7 @@ def persistent_trigger_str(
     targetAll: bool,
     reset: bool
 ):
-    string = f"1,3641,2,{x},3,{y}"
+    string = f"1,3641,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -232,7 +233,7 @@ def compare_trigger_str(
     LeftSignMode: int,    # 0..2: ["None", "Absolute", "Negative"]
     RightSignMode: int    # 0..2: ["None", "Absolute", "Negative"]
 ):
-    string = f"1,3620,2,{x},3,{y}"
+    string = f"1,3620,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -315,7 +316,7 @@ def item_edit_trigger_str(
     IDSignMode: int,      # 0..2: ["None", "Absolute", "Negative"]
     AllSignMode: int      # 0..2: ["None", "Absolute", "Negative"]
 ):
-    string = f"1,3619,2,{x},3,{y}"
+    string = f"1,3619,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -372,7 +373,7 @@ def text_object_str(
     text: str,            # &str
     kerning: int          # i32
 ):
-    string = f"1,914,2,{x},3,{y}"
+    string = f"1,914,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -404,7 +405,7 @@ def stop_trigger_str(
     stopMode: int, # ["stop", "pause", "resume"] 
     controlID: bool, # time in seconds
 ):
-    string = f"1,1616,2,{x},3,{y}"
+    string = f"1,1616,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -443,7 +444,7 @@ def collision_block_str(
     BlockID: int, # u16
     dynamicBlock: bool
 ):
-    string = f"1,1816,2,{x},3,{y}"
+    string = f"1,1816,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,2"
@@ -477,7 +478,7 @@ def collision_trigger_str(
     TargetID: int,
     ActivateGroup: bool
 ):
-    string = f"1,1815,2,{x},3,{y}"
+    string = f"1,1815,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,2"
@@ -518,7 +519,7 @@ def toggle_trigger_str(
     TargetID: int,
     ActivateGroup: bool
 ):
-    string = f"1,1049,2,{x},3,{y}"
+    string = f"1,1049,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,2"
@@ -565,7 +566,7 @@ def move_trigger_str(
     targetMode: bool = False,
     aim: int = 0
 ):
-    string = f"1,901,2,{x},3,{y}"
+    string = f"1,901,2,{x},3,{y},64,1,67,1" # dont fade, dont enter
     if groups:
         string += ",57," + ".".join([str(g) for g in groups])
     string += ",155,1"
@@ -796,43 +797,60 @@ def fldiv2num(*args, **kwargs):
 ################## ITEM COMPARE
 
 def spawn_item(trueID, item1, item2, operator, **kwargs):
-    global used_extra_objects, used_extra_groups
+    global used_extra_groups
     used_extra_groups = 1
-    used_extra_objects = 1
     
     # init some values
     xpos, ypos, group = unpack_kwargs(**kwargs)
     first_itemtype, first_id = unpack_item(item1) 
     second_itemtype, second_id = unpack_item(item2)
     
+    nextfree = kwargs["nextfree"]
+    needs_spawn = kwargs["lengths"][trueID] > 1
+    
+    spawn_trigger = ""
+    compare_truegroup = trueID
+    if needs_spawn:
+        spawn_trigger = spawn_trigger_str(
+            xpos, ypos - 7.5, 1, 0.5, 0, [nextfree], True, False, True, 
+            trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+        )
+        compare_truegroup = nextfree
+        used_extra_groups += 1
+    
+    
     # then the triggers
     return compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [group], True, False, True, 
-        kwargs["nextfree"], 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
+        xpos, ypos + 7.5, 1, 0.5, 0, [group], True, False, True, 
+        compare_truegroup, 0, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
         3, 3, operator, 0, 0, 0, 0, 0
-    ) + spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
+    ) + spawn_trigger
     
 def spawn_num(trueID, item1, num, operator, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 1
-    used_extra_objects = 1
+    global used_extra_groups
     
     # init some values
     xpos, ypos, group = unpack_kwargs(**kwargs)
     first_itemtype, first_id = unpack_item(item1) 
+    nextfree = kwargs["nextfree"]
+    needs_spawn = kwargs["lengths"][trueID] > 1
+    
+    spawn_trigger = ""
+    compare_truegroup = trueID
+    if needs_spawn:
+        spawn_trigger = spawn_trigger_str(
+            xpos, ypos - 7.5, 1, 0.5, 0, [nextfree], True, False, True, 
+            trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+        )
+        compare_truegroup = nextfree
+        used_extra_groups += 1
     
     # then the triggers
     return compare_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [group], True, False, True, 
-        kwargs["nextfree"], 0, first_id, 0, first_itemtype, 1, 1, float(num),
+        xpos, ypos + 7.5, 1, 0.5, 0, [group], True, False, True, 
+        compare_truegroup, 0, first_id, 0, first_itemtype, 1, 1, float(num),
         3, 3, operator, 0, 0, 0, 0, 0
-    ) + spawn_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [kwargs["nextfree"]], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
+    ) + spawn_trigger
 
 
 def spawn_equals_item(*args, **kwargs):
@@ -873,9 +891,7 @@ def spawn_nequals_num(*args, **kwargs):
 
 
 def fork_item(trueID, falseID, item1, item2, operator, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
+    global used_extra_groups
     
     # unpack values
     xpos, ypos, group = unpack_kwargs(**kwargs)
@@ -884,52 +900,80 @@ def fork_item(trueID, falseID, item1, item2, operator, **kwargs):
     first_itemtype, first_id = unpack_item(item1) 
     second_itemtype, second_id = unpack_item(item2)
     
+    true_needs_spawn = kwargs["lengths"][trueID] > 1
+    false_needs_spawn = kwargs["lengths"][falseID] > 1
+    
+    compare_truegroup = trueID
+    spawn_trigger = ""
+    if true_needs_spawn:
+        compare_truegroup = nextfree
+        spawn_trigger = spawn_trigger_str(
+            xpos, ypos + 10, 1, 0.3, 0, [nextfree], True, False, True, 
+            trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+        ) 
+        used_extra_groups += 1
+        
+    compare_falsegroup = falseID
+    second_spawn_trigger = ""
+    if false_needs_spawn:
+        compare_falsegroup = nextfree + used_extra_groups
+        second_spawn_trigger = spawn_trigger_str(
+            xpos, ypos - 10, 1, 0.3, 0, [nextfree + used_extra_groups], True, False, True, 
+            falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+        ) 
+        used_extra_groups += 1
+    
     item_compare_str = compare_trigger_str(
         xpos, ypos, 1, 0.3, 0, [group], True, False, True, 
-        nextfree, nextfree + 1, first_id, second_id, first_itemtype, second_itemtype, 1, 1,
+        compare_truegroup, 
+        compare_falsegroup, 
+        first_id, second_id, first_itemtype, second_itemtype, 1, 1,
         3, 3, operator,
         0, 0, 0, 0, 0
     )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [nextfree], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [nextfree + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
+    
     return item_compare_str + spawn_trigger + second_spawn_trigger
     
 def fork_num(trueID, falseID, item1, num, operator, **kwargs):
-    global used_extra_objects, used_extra_groups
-    used_extra_groups = 2
-    used_extra_objects = 2
+    global used_extra_groups
     
     # unpack values
     xpos, ypos, group = unpack_kwargs(**kwargs)
     nextfree = kwargs["nextfree"]
     first_itemtype, first_id = unpack_item(item1) 
     
+    true_needs_spawn = kwargs["lengths"][trueID] > 1
+    false_needs_spawn = kwargs["lengths"][falseID] > 1
+    
+    compare_truegroup = trueID
+    spawn_trigger = ""
+    if true_needs_spawn:
+        compare_truegroup = nextfree
+        spawn_trigger = spawn_trigger_str(
+            xpos, ypos + 10, 1, 0.3, 0, [nextfree], True, False, True, 
+            trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+        ) 
+        used_extra_groups += 1
+        
+    compare_falsegroup = falseID
+    second_spawn_trigger = ""
+    if false_needs_spawn:
+        compare_falsegroup = nextfree + used_extra_groups
+        second_spawn_trigger = spawn_trigger_str(
+            xpos, ypos + 10, 1, 0.3, 0, [nextfree + used_extra_groups], True, False, True, 
+            trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+        ) 
+        used_extra_groups += 1
+    
     item_compare_str = compare_trigger_str(
         xpos, ypos, 1, 0.3, 0, [group], True, False, True, 
-        nextfree, nextfree + 1, first_id, 0, first_itemtype, 1, 1, float(num),
-        3, 3, operator, # operator
+        compare_truegroup, 
+        compare_falsegroup, 
+        first_id, 0, first_itemtype, 1, 1, float(num),
+        3, 3, operator,
         0, 0, 0, 0, 0
     )
-
-    # spawn triggers
-    spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 10, 1, 0.3, 0, [nextfree], True, False, True, 
-        trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-    second_spawn_trigger = spawn_trigger_str(
-        xpos, ypos - 20, 1, 0.3, 0, [nextfree + 1], True, False, True, 
-        falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
-    )
-
+    
     return item_compare_str + spawn_trigger + second_spawn_trigger
 
 def fork_equals_item(*args, **kwargs):

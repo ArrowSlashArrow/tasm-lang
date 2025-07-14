@@ -251,6 +251,10 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
     objs = [""]
     next_free = len(routines)
     
+    lengths = {
+        routine["group"]: len(routine["instructions"]) for routine in namespace.values()
+    }
+    
     # used for that one time iw anted to see if groups > 10000 worked
     group_offset = 0
     start_block = gdobj.ioblock(routines.index("_start") + group_offset, 0, "start", override=True) if "_start" in routines else ""
@@ -293,6 +297,7 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
             handler = instructions[command]["args"][fn_index - 1][1]
             # arg_list: args supplied in the instruction
             # group: what group the current object is part of
+            # lengths: lengths dict, used for optimization in compare triggers
             # index: index of object in this routine's instruction
             # squish: compress object position?
             # nextfree: next group that is not occupied
@@ -302,6 +307,7 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
             result_str = handler(
                 *arg_list, 
                 group=group, 
+                lengths=lengths,
                 index=index, 
                 squish=squish, 
                 nextfree=next_free + group_offset,
@@ -314,6 +320,7 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
             if result_str == "\0":
                 continue
             
+            
             objs.append(result_str)
             # dbg print
             # print(command, *arg_list, group, "->", result_str)
@@ -325,9 +332,8 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
         return ""
     
     # starting objs   
-    if group_offset > 100:
-        barrier_block2 = f"1,1,2,105,3,{30 * group_offset},155,2,57,1337;"
-    
+    if group_offset > 100:  # used to teleport to the triggers
+        barrier_block2 = f"1,1,2,105,3,{30 * group_offset},155,2,57,99;"
     
     editor_infotext = gdobj.text_object_str(
         195, 45, 0.25, 0.25, 0, [], "go to the editor for details", 0
@@ -339,7 +345,7 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
     if group_offset > 100:
         objs.append(barrier_block2)
     if squish and gdobj.timewarp_trigger:
-        time_warp = "1,1935,2,-75,3,15,155,1,13,1,36,1,120,5;"
+        time_warp = "1,1935,2,-75,3,15,155,1,13,1,36,1,120,5,64,1,67,1;"
         objs.append(time_warp)
     
     obj_str = ";" + "".join(objs)
