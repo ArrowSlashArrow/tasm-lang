@@ -2,12 +2,13 @@
 Here lies the documentation for all of the tasm instructions.
   
 # Guide
-.tasm is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators.
+TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in 2.2. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  
   
 Features:
- - Asynchronous
- - Turing-complete
- - Fast resulting triggers
+* Asynchronous
+* Turing-complete
+* Fast resulting triggers
+* Has a memory system
   
 To create a program, first make a `.tasm` file.
 In the new file, create two subroutines:
@@ -37,27 +38,27 @@ _init:
     DISPLAY C1 ; show the c1 counter
   
 add:
-    ADD C3, C1, C2 ; c3 = c1 + c2
+    ADD C3, C1, C2 ; add c1 and c2, store the result in c3
   
 _start:
     MOV C1, 2 ; set c1 to 2
-    MOV C2, 3 ; add 1 to c1
+    MOV C2, 3 ; set c2 to 3
     SPAWN add ; spawn the add subroutine
 ```
   
-To compile the program, run `python main.py <file>` here `<file>` is the name of your program file. This will **OVERWRITE** the first level in your new levels if you do not add the `--append` option. Alternatively, you can make a new temporary level.
+To compile the program, run `python main.py <file>` where `<file>` is the name of your program file. This will **OVERWRITE** the first level in your new levels if you do not add the `--append` option. Alternatively, you can make a new temporary level.
 All of the options are displayed by appending `-h` to the command.
   
 The resulting level should have the name of the program file, and is by default at the top.
   
 # Notes
-* Counters are 32-bit signed ints. You can assign them to any number with item edit triggers, however the input values in those are stored as 32-bit floats, so larger numbers (specifically above 2^24) are incorrectly rounded due to floating point imprecision. They store values higher than 999,999,999 even if they display 999,999,999.
-* To assign counters to really high numbers, use bit packing: Assign it the greater 16 bits, multiply by 65536, assign it the lesser 16 bits. Example 1000 \* 65536 + 1 yields 65536001 every time with no mistakes. This takes 3 instructions instead of 1. **THE MOV COMMAND ALREADY DOES THIS IF YOU ARE MOVING A NUMBER GREATER THAN 1,048,576. you can disable this with the flag `--no-bit-packing`.**
+* Counters are 32-bit signed ints. You can assign them to any number with item edit triggers, however the input values in those are stored as 32-bit floats, so larger numbers (specifically above 2^24) are incorrectly rounded due to floating point imprecision. Counters store values higher than 999,999,999 even if they display 999,999,999.
+* To assign counters to really high numbers, use bit packing: Assign it the greater 16 bits, multiply by 65536, assign it the lesser 16 bits. Example 1000 \* 65536 + 1 yields 65536001 every time with no mistakes. This takes 3 instructions instead of 1. **THE `MOV` COMMAND ALREADY DOES THIS IF YOU ARE MOVING A NUMBER GREATER THAN 1,048,576. you can disable this with the flag `--no-bit-packing`.**
 * Timers are useful to store floats, however their maximum value is 9,999,999.0
-* Aliases exist for special counters: MEMREG (memory register value) for c9998, PTRPOS (address of pointer) for c9999, MEMSIZE (memory size) for c9997.
-* The geometry dash "CPU" is very different to a normal one: it only processes a maximum of 240 instruction per second per group, however it can run as many group in parallel as necessary.
+* Aliases exist for special counters: MEMREG (memory register value) for c9998, PTRPOS (address of pointer) for c9999.
+* The geometry dash "CPU" is very different to a normal one: it only processes a maximum of 120 instructions per second per group (active routine), however it can run as many groups in parallel as necessary.
 * The limit for block IDs, counter IDs, and groups is 9999, and any objects with corresponding values higher than that of the limit are not functional.
-* The interpreter is a powerful tool that can be used to test your code in a way that does not require the launch of Geomtery Dash. To use it, add the `--interpret` flag to the end of your run command. The interpreter requires a \_start routine.
+* The interpreter is a powerful tool that can be used to test your code in a way that does not require the launch of Geomtery Dash to run a .tasm file. To use it, add the `--interpret` flag to the end of your run command. The interpreter requires a \_start routine.
 * The compiler is designed to compile to GD only on Windows as of right now. This may be subject to change in the future.
 * Feel free to reach out to me on discord: @arrowslasharrow to ask me any questions!
 
