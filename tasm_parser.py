@@ -9,10 +9,12 @@ round_error = False
 warnings = True
 memory_instructions = ["INITMEM", "MREAD", "MWRITE", "MFUNC", "MPTR", "MRESET"]  # these were outdated
 instructions = commands.INSTRUCTIONS
+# these are vars
 ALIASES = {
     "MEMREG": f"C{gdobj.MEMREG}", 
     "PTRPOS": f"C{gdobj.PTRPOS}",
 }
+# these are constants
 INTSTRS = ["MEMSIZE"]
 
 def display_err_msg(line, index, err_msg, routine="", warning=False):

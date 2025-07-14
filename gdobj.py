@@ -1080,7 +1080,7 @@ def malloc(amount, **kwargs):
     reset_block = nextfree
     # add reset object (where the pointer block goes when you call RPTR)
     out_str += f"1,1,2,{x_offset},3,{y_offset - 30},128,0.5,129,0.5,57,{nextfree};"
-        # pointer block
+    # pointer block
     out_str += collision_block_str(
         x_offset, y_offset - 30, 0.8, 0.8, 0, [nextfree + 1], POINTERID, True
     )
@@ -1168,49 +1168,42 @@ def mfunc(**kwargs):
         xpos, ypos, 1, 1, 0, [group], True, False, True, 0, 30, 0, pointer_group
     )
     
-def mread(**kwargs):
+def switch_mem_mode(read, **kwargs):
     xpos, ypos, group = unpack_kwargs(**kwargs)
     ypos += 7.5
     return toggle_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [group], True, False, True, read_group, True 
+        xpos, ypos, 1, 0.5, 0, [group], True, False, True, read_group, read 
     ) + toggle_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [group], True, False, True, write_group, False
+        xpos, ypos - 15, 1, 0.5, 0, [group], True, False, True, write_group, not read
     )
+    
+def mread(**kwargs):
+    return switch_mem_mode(True, **kwargs)
 
 def mwrite(**kwargs):
-    xpos, ypos, group = unpack_kwargs(**kwargs)
-    ypos += 7.5
-    return toggle_trigger_str(
-        xpos, ypos, 1, 0.5, 0, [group], True, False, True, read_group, False 
-    ) + toggle_trigger_str(
-        xpos, ypos - 15, 1, 0.5, 0, [group], True, False, True, write_group, True
-    )
+    return switch_mem_mode(False, **kwargs)
 
 def mptr(amount, **kwargs):
     xpos, ypos, group = unpack_kwargs(**kwargs)
-    new_kwargs = kwargs
-    new_kwargs["yoffset"] = -7.5
-    new_kwargs["yscale"] = 0.5
+    item_edit_kwargs = kwargs
+    item_edit_kwargs["yoffset"] = -7.5
+    item_edit_kwargs["yscale"] = 0.5
     ypos += 7.5
     out = move_trigger_str(
         xpos, ypos, 1, 0.5, 0, [group], True, False, True, int(amount) * 30, 0, 0, pointer_group
-    ) + add_num(f"C{PTRPOS}", int(amount), **new_kwargs)
-    # + item_edit_trigger_str(  # update pointer location
-    #     xpos, ypos - 15, 1, 0.5, 0, [group], True, False, True, 0, 0, 1, 1, 
-    #     PTRPOS, 1, int(amount), 1, 3, 1, 0, 0, 0, 0
-    # )
+    ) + add_num(f"C{PTRPOS}", int(amount), **item_edit_kwargs)
     
     return out
 
 def mreset(**kwargs):
     xpos, ypos, group = unpack_kwargs(**kwargs)
-    ypos += 7.5
+    ypos += 7.5   
+    item_edit_kwargs = kwargs
+    item_edit_kwargs["yoffset"] = -7.5
+    item_edit_kwargs["yscale"] = 0.5
     return move_trigger_str(
         xpos, ypos, 1, 0.5, 0, [group], True, False, True, 0, 0, 0, pointer_group, True, reset_block
-    ) + item_edit_trigger_str(  # update pointer location
-        xpos, ypos - 15, 1, 0.5, 0, [group], True, False, True, 0, 0, 1, 1, 
-        PTRPOS, 1, 0, 0, 3, 1, 0, 0, 0, 0
-    )
+    ) + mov_num(f"C{PTRPOS}", 0, **item_edit_kwargs)
 
 ################## I/O
 
@@ -1221,6 +1214,7 @@ def ioblock(spawngroup, position, text, **kwargs):
     if position in io_blocks:
         print(f"WARNING: There is already an IOBlock at position {position}. This one will be skipped.")
         return ""
+    
     io_blocks.append(position)
     xpos, ypos = 75 + int(position) * 30, 75
     return text_object_str(

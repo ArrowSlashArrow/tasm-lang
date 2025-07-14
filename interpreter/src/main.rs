@@ -3,6 +3,10 @@ use serde::Deserialize;
 use crossterm::{event::{self, Event, KeyCode}, terminal};
 use std::{fs, env, process, fmt::{Formatter, Display, Result}};
 
+// same as those defined in gdobj.py
+const MEMREG: usize = 9998;
+const PTRPOS: usize = 9999;
+
 const CORNER: &str = "+";
 const HORIZONTAL: &str = "-";
 const VERTICAL: &str = "|";
@@ -259,8 +263,8 @@ fn show_state(
     // clear screen
     let mut out_str = format!("{HIDE_CURSOR}{RESET_CURSOR_POS}");
 
-    let memreg = counters[9998];
-    let ptrpos = counters[9999];
+    let memreg = counters[MEMREG];
+    let ptrpos = counters[PTRPOS];
 
     // display memory if there is any
     if memory_size > 0 {
@@ -529,7 +533,7 @@ fn main() {
                     return
                 }
                 let length = args[0].parse::<i32>().unwrap();
-                memory_start = 9998 - length;
+                memory_start = MEMREG as i32 - length;
                 memory_size = length;
                 malloced = true;
             },
@@ -543,7 +547,7 @@ fn main() {
                 for number in new_state {
                     counters[(memory_start + index) as usize] = number.parse::<i32>().unwrap();
                     index += 1;
-                    if index >= memory_size {
+                    if index > memory_size {
                         println!("[Instruction {idx} in _init] You cannot initialise more slots of memory than you allocated.");
                         return
                     }
@@ -759,10 +763,10 @@ fn main() {
                     "MFUNC"  => {
                         match memory_mode {
                             1 => { // read
-                                counters[9998] = counters[(memory_start + ptr_pos) as usize];
+                                counters[MEMREG] = counters[(memory_start + ptr_pos) as usize];
                             },
                             2 => { // write
-                                counters[(memory_start + ptr_pos) as usize] = counters[9998];
+                                counters[(memory_start + ptr_pos) as usize] = counters[MEMREG];
                             },
                             _ => {}
                         }
@@ -795,7 +799,7 @@ fn main() {
                 } else if ptr_pos >= memory_size {
                     ptr_pos = memory_size - 1
                 }
-                counters[9999] = ptr_pos;
+                counters[PTRPOS] = ptr_pos;
             }
 
             // move all group pointers forward
