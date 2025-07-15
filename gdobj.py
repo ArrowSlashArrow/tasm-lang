@@ -646,7 +646,7 @@ def mov_num(item, number, **kwargs):
     itemtype, id = unpack_item(item)
     number = int(number)
     # bitpacker
-    if number > 16777216 and bit_packing_enabled:
+    if number > 16777216 and bit_packing_enabled and itemtype == 1:  # dont pack bits if float
         used_extra_objects += 2
         big = number // 65536
         small = number % 65536
@@ -667,7 +667,7 @@ def mov_num(item, number, **kwargs):
             65536,  # number
             3, 3, 1, 0, 0, 0, 0
         ) + item_edit_trigger_str(
-            xpos + dX, ypos, 1, 1, 0, [group],
+            xpos + dX * 2, ypos, 1, 1, 0, [group],
             True, False, True,  # ItemID1, ...
             0, 0, 0, 0,
             id,  # result id

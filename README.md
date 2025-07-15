@@ -5,10 +5,10 @@ Here lies the documentation for all of the tasm instructions.
 TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in 2.2. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  
   
 Features:
-* Asynchronous
-* Turing-complete
-* Fast resulting triggers
-* Has a memory system
+* Asynchronous execution
+* Turing-complete instruction set
+* Optimised trigger placement and group usage
+* Built-in memory system
   
 To create a program, first make a `.tasm` file.
 In the new file, create two subroutines:
@@ -91,22 +91,22 @@ The result is stored in the first argument.
   
 ## Compares
 `SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`
-SE: Spawns routine if a == b
-SNE: Spawns routine if a != b
-SL: Spawns routine if a < b
-SLE: Spawns routine if a <= b
-SG: Spawns routine if a > b
-SGE: Spawns routine if a >= b
-Does not pause the current group.
+* SE: Spawns routine if a == b
+* SNE: Spawns routine if a != b
+* SL: Spawns routine if a < b
+* SLE: Spawns routine if a <= b
+* SG: Spawns routine if a > b
+* SGE: Spawns routine if a >= b
+* Does not pause the current group.
   
 `FE`, `FNE`, `FL`, `FLE`, `FG`, `FE` all accept: `<routine> <routine> <item> <number>`, `<routine> <routine> <item> <item>`
-FE: Spawns first routine if a == b otherwise spawns the second routine.
-FNE: Spawns first routine if a != b otherwise spawns the second routine.
-FL: Spawns first routine if a < b otherwise spawns the second routine.
-FLE: Spawns first routine if a <= b otherwise spawns the second routine.
-FG: Spawns first routine if a > b otherwise spawns the second routine.
-FGE: Spawns first routine if a >= b otherwise spawns the second routine.
-Does not pause the current group.
+* FE: Spawns first routine if a == b otherwise spawns the second routine.
+* FNE: Spawns first routine if a != b otherwise spawns the second routine.
+* FL: Spawns first routine if a < b otherwise spawns the second routine.
+* FLE: Spawns first routine if a <= b otherwise spawns the second routine.
+* FG: Spawns first routine if a > b otherwise spawns the second routine.
+* FGE: Spawns first routine if a >= b otherwise spawns the second routine.
+* Does not pause the current group.
   
 ## Memory
 ### INITMEM

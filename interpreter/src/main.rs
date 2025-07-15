@@ -61,6 +61,14 @@ struct Counter {
     timer: bool
 }
 
+#[derive(Eq, Hash, PartialEq, Debug)]
+struct ActiveGroup {
+    group: i32,
+    name: String,
+    idx: isize,  // idx of current instruction
+    wait: i32    // how much to wait (decremented each tick)
+}
+
 impl Counter {
     fn new<T: AsRef<str>>(s: T) -> Self {
         let inp = s.as_ref();
@@ -87,9 +95,18 @@ impl Display for Counter {
     }
 }
 
-fn new_active(active_groups: &mut HashMap<i32, i32>, group: i32) {
+fn new_active(active_groups: &mut HashMap<i32, ActiveGroup>, namespace: &Namespace, name: &str) {
+    let group = namespace.routines.get(name).unwrap().group;
     // pointer is set to -1 because it gets incremented to 0 immediately after
-    active_groups.insert(group, -1);
+    active_groups.insert(
+        group, 
+        ActiveGroup { 
+            group: group, 
+            name: name.to_string(),
+            idx: -1, 
+            wait: 0 
+        }        
+    );
 }
 
 // returns a routine object if a routine with a group exists, otherwise returns none
@@ -246,7 +263,7 @@ fn show_state(
     counters: &[i32], 
     timers: &[f32], 
     displayed_counters: &Vec<Counter>, 
-    instructions: &Vec<Instruction>,
+    instructions: &HashMap<String, Instruction>,
     memory_start: i32,
     memory_size: i32, 
     memory_mode: i32, 
@@ -418,9 +435,9 @@ fn show_state(
 
         let mut instruction_lines = vec![];
         let mut display_width = 0;
-        for instruction in instructions {
+        for (group, instruction) in instructions {
             // format instruction as it is in the file
-            let mut line = format!("{} ", instruction.command);
+            let mut line = format!("{}: {} ", group, instruction.command);
             for arg in &instruction.args {
                 line += &format!("{arg}, ");
             }
@@ -504,7 +521,7 @@ fn main() {
     let mut memory_mode: i32 = 0;  // MREAD / MWRITE
     let mut ptr_pos: i32 = 0;
 
-    let mut active_groups: HashMap<i32, i32> = HashMap::new();
+    let mut active_groups: HashMap<i32, ActiveGroup> = HashMap::new();
 
     // check start routine
     if !raw_namespace.routines.contains_key("_start") {
@@ -512,7 +529,17 @@ fn main() {
         println!("No _start routine found. this program refuses to interpret such code.");
         return;
     }
-    active_groups.insert(raw_namespace.routines.get("_start").unwrap().group, 0);
+    active_groups.insert(
+        raw_namespace.routines.get("_start").unwrap().group,
+        ActiveGroup { 
+            group: raw_namespace.routines.get("_start").unwrap().group, 
+            name: "_start".to_string(),
+            idx: 0, 
+            wait: 0 
+        }
+    );
+
+    // active groups is correct here
 
     // this value equals 2^(1/5) -> 5x increase speed button pressed = 2x speed overall
     let speed_multiplier = 1.148698355;
@@ -601,19 +628,22 @@ fn main() {
         routines: routines
     };
 
-
     let mut tick: u64 = 0;
+    let mut exit_next_tick = false;
     let mut previous_inputs: HashSet<KeyCode> = HashSet::new();
     let mut prev_tick_time = Duration::new(0, 0);
     let mut tick_time = Duration::new(0, 0);
-    let mut current_instructions: Vec<Instruction> = vec![];
-    while !active_groups.is_empty() {
+    let mut current_instructions: HashMap<i32, Instruction> = HashMap::new();
+    let mut current_instructions_names: HashMap<String, Instruction> = HashMap::new();
+
+    loop {
         let start_tick_time = Instant::now();
+       
         show_state(
             &counters, 
             &timers, 
             &displayed_counters, 
-            &current_instructions,
+            &current_instructions_names,
             memory_start, 
             memory_size, 
             memory_mode, 
@@ -665,17 +695,27 @@ fn main() {
             tick += 1;
             current_instructions.clear();
             
-            for (group, ptr) in active_groups.iter() {
+            for (group, group_obj) in active_groups.iter_mut() {
                 // find instruction (group.instructions[ptr])
-                let routine = get_routine(&namespace, *group).unwrap();
-                current_instructions.push(routine.instructions[*ptr as usize].clone());
+                if group_obj.wait == 0 {
+                    let routine = get_routine(&namespace, *group).unwrap();
+                    current_instructions.insert(*group, routine.instructions[group_obj.idx as usize].clone());
+                } else {
+                    group_obj.wait -= 1;
+                    current_instructions.insert(*group, Instruction {command: "WAITING ".to_string(), idx: 0, args: vec![]});
+                }
             }
+
+            current_instructions_names = current_instructions
+                .iter()
+                .map(|(idx, instr)| (active_groups.get(idx).expect(format!("{tick}: no {idx} in {active_groups:?} {current_instructions:?}").as_str()).name.clone(), instr.clone())).collect::<HashMap<String, Instruction>>();
+                
             
             // process all instructions
-            for instruction in current_instructions.clone().into_iter() {
+            for (parent_group, instruction) in current_instructions.iter_mut() {
                 let command = instruction.command.as_str();
                 let mode = instruction.idx;
-                let args: Vec<String> = instruction.args;
+                let args: Vec<String> = (*instruction.args).to_vec();
 
                 // i had to fight the borrow checker for these closures
                 // but it was worth it to remove duplicate code
@@ -728,11 +768,11 @@ fn main() {
                         5 => lhs != value,
                         _ => false
                     } {
-                        new_active(&mut active_groups, namespace.routines.get(&args[0]).unwrap().group);
+                        new_active(&mut active_groups, &namespace, &args[0]);
                     }
                 };
 
-                let forks = |compare: i32, counters: &mut [i32], timers: &mut [f32], active_groups: &mut HashMap<i32, i32>| {
+                let forks = |compare: i32, counters: &mut [i32], timers: &mut [f32], active_groups: &mut HashMap<i32, ActiveGroup>| {
                     let value = match mode {
                         1 => args[3].parse::<f64>().unwrap(),
                         2 => get(&Counter::new(&args[3]), &counters, &timers),
@@ -748,19 +788,23 @@ fn main() {
                         5 => lhs != value,
                         _ => false
                     } {
-                        new_active(active_groups, namespace.routines.get(&args[0]).unwrap().group);
+                        new_active(active_groups, &namespace, &args[0]);
                     } else {
-                        new_active(active_groups, namespace.routines.get(&args[1]).unwrap().group);
+                        new_active(active_groups, &namespace, &args[1]);
                     }
                 };
 
                 match command {
-                    "SPAWN"  => new_active(&mut active_groups, namespace.routines.get(&args[0]).unwrap().group),
+                    "SPAWN"  => new_active(&mut active_groups, &namespace, &args[0]),
                     "MREAD"  => memory_mode = 1,
                     "MWRITE" => memory_mode = 2,
                     "MPTR"   => ptr_pos += args[0].parse::<i32>().unwrap(),
                     "MRESET" => ptr_pos = 0,
                     "MFUNC"  => {
+                        // look up group
+                        if let Some(group) = active_groups.get_mut(parent_group) {
+                            group.wait = 2
+                        }; // simulate wait time in GD
                         match memory_mode {
                             1 => { // read
                                 counters[MEMREG] = counters[(memory_start + ptr_pos) as usize];
@@ -802,23 +846,31 @@ fn main() {
                 counters[PTRPOS] = ptr_pos;
             }
 
+            if exit_next_tick {
+                return
+            }
+
             // move all group pointers forward
             let mut remove_groups: Vec<i32> = vec![];
-            for (group, ptr) in active_groups.iter_mut() {
-                *ptr += 1;
+            for (group, group_obj) in active_groups.iter_mut() {
+                if group_obj.wait == 0 {
+                    group_obj.idx += 1;
+                }
                 let routine = get_routine(&namespace, *group).unwrap();
-                if routine.instructions.len() <= *ptr as usize {
+                if routine.instructions.len() <= group_obj.idx as usize {
                     remove_groups.push(*group);
                 }
             }
             
             // group is not active if it has reached the end of its instruction set
-            for group in remove_groups.iter() {
-                active_groups.remove(&group);
+            for group_pos in remove_groups.iter() {
+                active_groups.remove(group_pos);
             }
             
             prev_tick_time = tick_time;
             tick_time = start_tick_time.elapsed();
+
+            exit_next_tick = active_groups.is_empty();
 
             // wait logic
             let now = Instant::now();
