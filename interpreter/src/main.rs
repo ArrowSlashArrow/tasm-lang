@@ -3,6 +3,8 @@ use serde::Deserialize;
 use crossterm::{event::{self, Event, KeyCode}, terminal};
 use std::{fs, env, process, fmt::{Formatter, Display, Result}};
 
+const TICKRATE: f64 = 288.0;
+
 // same as those defined in gdobj.py
 const MEMREG: usize = 9998;
 const PTRPOS: usize = 9999;
@@ -128,7 +130,10 @@ fn clamp(value: f64, isfloat: bool) -> f64 {
             return value
         }
     } else {
-        let newvalue = value.clamp(-2147483648.0, 2147483647.0);
+        let mut newvalue = value.clamp(-2147483648.0, 2147483648.0);
+        if newvalue > std::i32::MAX as f64 {
+            newvalue = std::i32::MIN as f64
+        } // simulate GD underflow
         return newvalue
     }
 }
@@ -273,6 +278,7 @@ fn show_state(
     fast: bool,
     paused: bool,
     tick_time: Duration,
+    instruction_box_size: usize
 ) {
     
     let (width, _) = terminal::size().expect("unable to get terminal size");
@@ -430,11 +436,12 @@ fn show_state(
         out_str += &format!("{CORNER}{0}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n", "-".repeat(length))
     }
 
-    if instructions.len() > 0 {
+    if instruction_box_size > 0 {
         let caption = " Instructions this tick ";
 
         let mut instruction_lines = vec![];
         let mut display_width = 0;
+        let mut instruction_count = 0;
         for (group, instruction) in instructions {
             // format instruction as it is in the file
             let mut line = format!("{}: {} ", group, instruction.command);
@@ -449,9 +456,16 @@ fn show_state(
                 display_width = line.len()
             }
             instruction_lines.push(line);
+            instruction_count += 1;
         }
 
         display_width = std::cmp::max(display_width, caption.len());
+
+        // fill in extra lines (to prevent the box resizing every frame and giving the user a seizure)
+        
+        for _ in 0..(instruction_box_size - instruction_count) {
+            instruction_lines.push(" ".repeat(display_width));
+        }
 
         // top border
         out_str += &format!("{CLEAR_LINE_AFTER_CURSOR}\n{CORNER}{HORIZONTAL}{caption:*<display_width$}{HORIZONTAL}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n").replace("*", HORIZONTAL);
@@ -466,22 +480,27 @@ fn show_state(
         out_str += &format!("{CLEAR_LINE_AFTER_CURSOR}\n");
     }
 
-    // time and speed dispaly
+    // time and speed display
+    // there is a discrepancy between what is show and what actaully happens in GD
+    // GD will consistently compute an extra trick every 5 frames (x1.2 speed)
+    // why this happens, i have no idea. but it seems to be consistent across setups
+    // but this means that the GD CPU is 288Hz instead of 240Hz. how interesting.
     if !fast {
+        let delay = f64::max(tick_time.as_nanos() as f64 / 1000000.0, delay);
         out_str += &format!(
             "Time: {:.3}s / {tick} ticks{CLEAR_LINE_AFTER_CURSOR}\nSimulation speed: {:.2}Hz ({:.2}x) {}{CLEAR_LINE_AFTER_CURSOR}", 
-            tick as f64 / 240.0,             // time in seconds
+            tick as f64 / TICKRATE, // time in seconds
             1000.0 / delay,                  // simulation steps per second
-            1000.0 / delay / 240.0,          // how much faster it is than GD
+            1000.0 / delay / TICKRATE, // how much faster it is than GD
             if paused {"[PAUSED]"} else {""} // paused?
         );
     } else {
         let delay = tick_time.as_nanos() as f64 / 1000000.0;
         out_str += &format!(
             "Time: {:.3}s / {tick} ticks{CLEAR_LINE_AFTER_CURSOR}\nRunning simulation as fast as possible: {:.2}Hz ({:.2}x) @ {delay:.4}ms / tick {}{CLEAR_LINE_AFTER_CURSOR}", 
-            tick as f64 / 240.0,             // time in seconds
+            tick as f64 / TICKRATE, // time in seconds
             1000.0 / delay,                  // simulation steps per second
-            1000.0 / delay / 240.0,          // how much faster it is than GD
+            1000.0 / delay / TICKRATE, // how much faster it is than GD
             if paused {"[PAUSED]"} else {""} // paused?
         );
     }
@@ -497,7 +516,7 @@ fn main() {
     // let start = Instant::now();
 
     let mut paused = false;
-    let default_delay = 4.166667f64; // default speed of geometry dash 
+    let default_delay = 1000.0 / TICKRATE;
     let mut delay = default_delay; // how much time to wait between ticks in ms
     let mut _extra_steps = 0;
 
@@ -520,6 +539,7 @@ fn main() {
     let mut memory_size: i32 = 0;
     let mut memory_mode: i32 = 0;  // MREAD / MWRITE
     let mut ptr_pos: i32 = 0;
+    let mut max_instr_len: usize = 0;
 
     let mut active_groups: HashMap<i32, ActiveGroup> = HashMap::new();
 
@@ -631,7 +651,6 @@ fn main() {
     let mut tick: u64 = 0;
     let mut exit_next_tick = false;
     let mut previous_inputs: HashSet<KeyCode> = HashSet::new();
-    let mut prev_tick_time = Duration::new(0, 0);
     let mut tick_time = Duration::new(0, 0);
     let mut current_instructions: HashMap<i32, Instruction> = HashMap::new();
     let mut current_instructions_names: HashMap<String, Instruction> = HashMap::new();
@@ -652,7 +671,8 @@ fn main() {
             delay,
             fast,
             paused,
-            prev_tick_time
+            tick_time,
+            max_instr_len
         );
         _extra_steps = 0;
 
@@ -677,7 +697,7 @@ fn main() {
                     };
                     // min value is default delay / 64
                     // max value is default delay * 64
-                    delay = delay.clamp(0.0651041, 266.666667);
+                    delay = delay.clamp(default_delay / 64.0, default_delay * 64.0);
                     previous_inputs.insert(keystroke.code);
                 } else {
                     previous_inputs.remove(&keystroke.code);
@@ -704,6 +724,10 @@ fn main() {
                     group_obj.wait -= 1;
                     current_instructions.insert(*group, Instruction {command: "WAITING ".to_string(), idx: 0, args: vec![]});
                 }
+            }
+
+            if current_instructions.len() > max_instr_len {
+                max_instr_len =  current_instructions.len();
             }
 
             current_instructions_names = current_instructions
@@ -867,7 +891,6 @@ fn main() {
                 active_groups.remove(group_pos);
             }
             
-            prev_tick_time = tick_time;
             tick_time = start_tick_time.elapsed();
 
             exit_next_tick = active_groups.is_empty();

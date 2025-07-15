@@ -10,6 +10,9 @@ next_iteration:
     FLDIV C4, C1, C2
     MUL C4, C2
     SUB C4, C1
+    FE not_prime, loop_checker, C4, 0
+
+loop_checker:
     FGE next_iteration, prime, C3, C2
 
 not_prime:

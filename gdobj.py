@@ -709,7 +709,7 @@ def arithmetic_2counters_num(result, item1, mod, operator, **kwargs):
         xpos, ypos, 1, 1, 0, [group], True, False, True,
         original_id, 0, original_itemtype, 1,
         result_id, result_itemtype,
-        mod, min(operator, 4), 3, 1, 0, 0, int(operator == 5) * 2, 0
+        mod, 0, min(operator, 4), 1, 0, int(operator == 5) * 2, 0, 0
     )
     
 def arithmetic_counter_num(result, num, operator, **kwargs):
@@ -732,7 +732,7 @@ def arithmetic_3counters(result, item1, item2, operator, **kwargs):
         xpos, ypos, 1, 1, 0, [group], True, False, True,
         item1_id, item2_id, item1_itemtype, item2_itemtype,
         result_id, result_itemtype,
-        1, min(operator, 4), 3, 1, 0, 0, int(operator == 5) * 2, 0
+        1, 0, 3, min(operator, 4), 0, int(operator == 5) * 2, 0, 0
     )
     
 
@@ -767,7 +767,7 @@ def mul2(*args, **kwargs):
     return arithmetic_3counters(*args, 3, **kwargs)
 
 def mul2num(*args, **kwargs):
-    return arithmetic_3counters(*args, 3, **kwargs)
+    return arithmetic_2counters_num(*args, 3, **kwargs)
 
 def div_num(*args, **kwargs):
     return arithmetic_counter_num(*args, 4, **kwargs)
@@ -779,7 +779,7 @@ def div2(*args, **kwargs):
     return arithmetic_3counters(*args, 4, **kwargs)
 
 def div2num(*args, **kwargs):
-    return arithmetic_3counters(*args, 4, **kwargs)
+    return arithmetic_2counters_num(*args, 4, **kwargs)
 
 def fldiv_num(*args, **kwargs):
     return arithmetic_counter_num(*args, 5, **kwargs)
@@ -791,7 +791,7 @@ def fldiv2(*args, **kwargs):
     return arithmetic_3counters(*args, 5, **kwargs)
 
 def fldiv2num(*args, **kwargs):
-    return arithmetic_3counters(*args, 5, **kwargs)
+    return arithmetic_2counters_num(*args, 5, **kwargs)
 
 
 ################## ITEM COMPARE
@@ -961,7 +961,7 @@ def fork_num(trueID, falseID, item1, num, operator, **kwargs):
         compare_falsegroup = nextfree + used_extra_groups
         second_spawn_trigger = spawn_trigger_str(
             xpos, ypos + 10, 1, 0.3, 0, [nextfree + used_extra_groups], True, False, True, 
-            trueID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
+            falseID, 0.0042, 0, False, True, False  # 0.0042 = 1/240
         ) 
         used_extra_groups += 1
     
