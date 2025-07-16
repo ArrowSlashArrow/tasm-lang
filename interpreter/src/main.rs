@@ -28,7 +28,7 @@ const RESET_CURSOR_POS: &str = "\x1b[H";
 const CLEAR_LINE_AFTER_CURSOR: &str = "\x1b[0K";
 const CLEAR_ALL_AFTER_CURSOR: &str = "\x1b[0J";
 
-const CONTROLS_STRING: &str = "
+const CONTROLS_STRING: &str = "          \x1b[0K
 ------- Controls -------                 \x1b[0K
 Space : play/pause                       \x1b[0K
     > : advance to next step while paused\x1b[0K
@@ -38,6 +38,10 @@ Space : play/pause                       \x1b[0K
     q : exit                             \x1b[0K
 "; // the clear line after cursor chars are here because you cannot format! a constant str
 
+const DISCLAIMER: &str = "\x1b[0K
+WARNING: This interpreter maybe not be fully accurate for every single program. \x1b[0K
+GD randomly speeds up certain groups/triggers, especially if these groups are running concurrently. \x1b[0K
+";
 
 #[derive(Debug, Deserialize, Clone)]
 struct Namespace {
@@ -505,6 +509,7 @@ fn show_state(
         );
     }
     out_str += CONTROLS_STRING;
+    out_str += DISCLAIMER;
     // clear all after to prevent weird overdraw
     out_str += &format!("{CLEAR_ALL_AFTER_CURSOR}{SHOW_CURSOR}\n"); 
 

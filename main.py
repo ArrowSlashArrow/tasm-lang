@@ -34,7 +34,8 @@ options = {
     "--no-warn": "disable warning messages?",
     "--no-routine-text": "exclude routine text markers from level?",
     "--show-namespace": "[dbg] print instructions of each routine?",
-    "--fast": "compress the objects in the level? (results in faster spawn excution time). speeds up execute time in the interpreter as well",
+    "--slow": "option to disable squishing of objects in the actual level. helpful for debugging",
+    "--superfast": "option to run the interpreter as fast as possible",
     "--no-write": "disable writing output to save file?",
     "--read-only": "only read the level contents?",
     "--disable-bit-packing": "disables bit packing for large numbers when compiling.",
@@ -75,7 +76,8 @@ def main():
     append = "--append" in argv
     no_warnings = "--no-warn" in argv
     level_dbg_text = "--routine-text" not in argv
-    fast = "--fast" in argv
+    fast = "--slow" not in argv
+    superfast = "--superfast" in argv
     read_only = "--read-only" in argv
     bit_packing = "--disable-bit-packing"
     interpret = "--interpret" in argv
@@ -170,7 +172,7 @@ def main():
         json.dump({"routines": namespace}, open("namespace.json", "w"), indent=4)
         try:
             executable = "interpreter\\target\\debug\\interpreter.exe" if "--runner" in argv else "interpreter.exe"
-            process = subprocess.Popen([executable, "namespace.json", "--fast" if fast else ""])  # compiled rust program
+            process = subprocess.Popen([executable, "namespace.json", "--fast" if superfast else ""])  # compiled rust program
             process.wait()
         except KeyboardInterrupt:
             process.send_signal(signal.SIGINT)
