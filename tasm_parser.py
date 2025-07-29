@@ -75,7 +75,8 @@ types = {
     "number": is_num, 
     "counter": is_counter,
     "item": is_item,
-    "routine": lambda x: x in defined_routines
+    "routine": lambda x: x in defined_routines,
+    "group": lambda x: x in defined_routines or is_int(x)
 }
 
 
@@ -248,7 +249,7 @@ def determine_groups(routines, display_namespace=False):
     return names
 
 
-def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
+def parse_namespace(namespace, group_offset=0, coll_block_offset=0, routine_text=False, squish=True, warnings=True):
     routines = list(namespace.keys())
     objs = [""]
     next_free = len(routines)
@@ -258,9 +259,9 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
     }
     
     # used for that one time iw anted to see if groups > 10000 worked
-    group_offset = 0
     start_block = gdobj.ioblock(routines.index("_start") + group_offset, 0, "start", override=True) if "_start" in routines else ""
     
+    gdobj.coll_block_offset = coll_block_offset
     for routine_index, data in enumerate(namespace.values()):
         group = data["group"]
         routine_instructions = data["instructions"]
@@ -313,6 +314,7 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
                 index=index, 
                 squish=squish, 
                 nextfree=next_free + group_offset,
+                group_offset=group_offset,
                 subroutine_count=len(routines) # used only in malloc
             )
             
@@ -339,7 +341,7 @@ def parse_namespace(namespace, routine_text=False, squish=True, warnings=True):
     
     editor_infotext = gdobj.text_object_str(
         195, 45, 0.25, 0.25, 0, [], "go to the editor for details", 0
-    )
+    )[0:0]
 
     # trim objects array and compile string
     objs = [obj for obj in objs if obj != ""] + [start_block, editor_infotext]

@@ -102,7 +102,15 @@ impl Display for Counter {
 }
 
 fn new_active(active_groups: &mut HashMap<i32, ActiveGroup>, namespace: &Namespace, name: &str) {
-    let group = namespace.routines.get(name).unwrap().group;
+    let group = {
+        // account for the groups that are not referenced by routine name
+        if let Ok(group_id) = name.parse::<i32>() {
+            group_id
+        } else {
+            namespace.routines.get(name).unwrap().group
+        }
+    };
+
     // pointer is set to -1 because it gets incremented to 0 immediately after
     active_groups.insert(
         group, 
@@ -570,7 +578,10 @@ fn main() {
     let speed_multiplier = 1.148698355;
 
     // init
-    let init_routine = raw_namespace.routines.get("_init").unwrap();
+    let init_routine = match raw_namespace.routines.get("_init") {
+        Some(value) => value,
+        None => &Routine {group: -1, instructions: vec![]}
+    };
     let mut malloced = false;
     let mut idx = 0;
 

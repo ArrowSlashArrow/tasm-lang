@@ -3,7 +3,7 @@ from deserialiser import *
 from serialiser import *
 from parser import *
 from rich import traceback as tb, console as cns
-import sys, time, tasm_parser, pygetwindow, gdobj, json, subprocess, signal
+import sys, time, tasm_parser, pygetwindow, gdobj, json, subprocess, signal, win32gui
 
 console = cns.Console()
 argv = sys.argv
@@ -37,6 +37,8 @@ options = {
     "--slow": "option to disable squishing of objects in the actual level. helpful for debugging",
     "--superfast": "option to run the interpreter as fast as possible",
     "--no-write": "disable writing output to save file?",
+    "--group-offset <offset>": "start at group <offset>. default is 0",
+    "--coll-block-offset <offset>": "start collision blocks at <offset>. default is 0",
     "--read-only": "only read the level contents?",
     "--disable-bit-packing": "disables bit packing for large numbers when compiling.",
     "--index <index>": "write to <index>th level in savefile. default is 0.",
@@ -85,12 +87,26 @@ def main():
     nowrite = "--no-write" in argv
     
     level_index = 0
+    group_offset = 0
+    coll_block_offset = 0
     for arg_idx, arg in enumerate(argv):
         if arg == "--index":
             try:
                 level_index = int(argv[arg_idx + 1])
             except:
                 print("Invalid index supplied.")
+                return
+        if arg == "--group-offset":
+            try:
+                group_offset = int(argv[arg_idx + 1])
+            except:
+                print("Invalid group offset supplied.")
+                return
+        if arg == "--coll-block-offset":
+            try:
+                coll_block_offset = int(argv[arg_idx + 1])
+            except:
+                print("Invalid collision block offset supplied.")
                 return
     
     
@@ -103,10 +119,17 @@ def main():
     if not interpret:
         # wait for gd window to be closed
         count = 1
-        while any(pygetwindow.getWindowsWithTitle("Geometry Dash")):
-            print("\x1b[KPlease close geometry dash." + "." * (count % 3), end="\r")
+        
+        while True:
+            result = pygetwindow.getWindowsWithTitle("Geometry Dash")
+            if not any(result):
+                break
+            # show the title of the window (because sometimes it isn't GD)
+            windows_str = ", ".join([win32gui.GetWindowText(r._hWnd) for r in result])
+            print(f"\x1b[KPlease close {windows_str}." + "." * (count % 3), end="\r")
             time.sleep(1 / 3)
             count += 1
+            
         del count
         print()
 
@@ -183,7 +206,14 @@ def main():
     print(f"Serialising objects to '{os.path.basename(file)}'...")
     
     # get the new objects as a string
-    new_objs = parse_namespace(namespace, level_dbg_text, fast, not no_warnings)
+    new_objs = parse_namespace(
+        namespace, 
+        group_offset,
+        coll_block_offset,
+        level_dbg_text, 
+        fast, 
+        not no_warnings
+    )
     
     errors = tasm_parser.errors
     if errors > 0:

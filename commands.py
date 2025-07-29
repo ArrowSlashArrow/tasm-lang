@@ -60,7 +60,7 @@ INSTRUCTIONS = {
     "IOBLOCK": {
         "allowed": ["_init"],
         "args": [
-            [["routine", "int", "str"], ioblock]
+            [["group", "int", "str"], ioblock]
         ]
     },
     "NOP": {
@@ -122,91 +122,91 @@ INSTRUCTIONS = {
     "SPAWN": {
         "allowed": "*",
         "args": [
-            [["routine"], spawn_group]
+            [["group"], spawn_group],
         ]
     },
     "SE": {
         "allowed": "*",
         "args": [
-            [["routine", "item", "number"], spawn_equals_num],
-            [["routine", "item", "item"], spawn_equals_item]
+            [["group", "item", "number"], spawn_equals_num],
+            [["group", "item", "item"], spawn_equals_item]
         ]
     },
     "SNE": {
         "allowed": "*",
         "args": [
-            [["routine", "item", "number"], spawn_nequals_num],
-            [["routine", "item", "item"], spawn_nequals_item]
+            [["group", "item", "number"], spawn_nequals_num],
+            [["group", "item", "item"], spawn_nequals_item]
         ]
     },
     "SL": {
         "allowed": "*",
         "args": [
-            [["routine", "item", "number"], spawn_less_num],
-            [["routine", "item", "item"], spawn_less_item]
+            [["group", "item", "number"], spawn_less_num],
+            [["group", "item", "item"], spawn_less_item]
         ]
     },
     "SLE": {
         "allowed": "*",
         "args": [
-            [["routine", "item", "number"], spawn_lequals_num],
-            [["routine", "item", "item"], spawn_lequals_item]
+            [["group", "item", "number"], spawn_lequals_num],
+            [["group", "item", "item"], spawn_lequals_item]
         ]
     },
     "SG": {
         "allowed": "*",
         "args": [
-            [["routine", "item", "number"], spawn_greater_num],
-            [["routine", "item", "item"], spawn_greater_item]
+            [["group", "item", "number"], spawn_greater_num],
+            [["group", "item", "item"], spawn_greater_item]
         ]
     },
     "SGE": {
         "allowed": "*",
         "args": [
-            [["routine", "item", "number"], spawn_gequals_num],
-            [["routine", "item", "item"], spawn_gequals_item]
+            [["group", "item", "number"], spawn_gequals_num],
+            [["group", "item", "item"], spawn_gequals_item]
         ]
     },
     "FE": {
         "allowed": "*",
         "args": [
-            [["routine", "routine", "item", "number"], fork_equals_num],
-            [["routine", "routine", "item", "item"], fork_equals_item]
+            [["group", "group", "item", "number"], fork_equals_num],
+            [["group", "group", "item", "item"], fork_equals_item]
         ]
     },
     "FNE": {
         "allowed": "*",
         "args": [
-            [["routine", "routine", "item", "number"], fork_nequals_num],
-            [["routine", "routine", "item", "item"], fork_nequals_item]
+            [["group", "group", "item", "number"], fork_nequals_num],
+            [["group", "group", "item", "item"], fork_nequals_item]
         ]
     },
     "FL": {
         "allowed": "*",
         "args": [
-            [["routine", "routine", "item", "number"], fork_less_num],
-            [["routine", "routine", "item", "item"], fork_less_item]
+            [["group", "group", "item", "number"], fork_less_num],
+            [["group", "group", "item", "item"], fork_less_item]
         ]
     },
     "FLE": {
         "allowed": "*",
         "args": [
-            [["routine", "routine", "item", "number"], fork_lequals_num],
-            [["routine", "routine", "item", "item"], fork_lequals_item]
+            [["group", "group", "item", "number"], fork_lequals_num],
+            [["group", "group", "item", "item"], fork_lequals_item]
         ]
     },
     "FG": {
         "allowed": "*",
         "args": [
-            [["routine", "routine", "item", "number"], fork_greater_num],
-            [["routine", "routine", "item", "item"], fork_greater_item]
+            [["group", "group", "item", "number"], fork_greater_num],
+            [["group", "group", "item", "item"], fork_greater_item]
         ]
     },
     "FGE": {
         "allowed": "*",
         "args": [
-            [["routine", "routine", "item", "number"], fork_gequals_num],
-            [["routine", "routine", "item", "item"], fork_gequals_item]
+            [["group", "group", "item", "number"], fork_gequals_num],
+            [["group", "group", "item", "item"], fork_gequals_item]
         ]
     },
 }

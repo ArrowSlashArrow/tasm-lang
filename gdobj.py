@@ -7,6 +7,7 @@ pointer_group = 0
 write_group = 0
 read_group = 0
 reset_block = 0
+coll_block_offset = 0
 io_blocks = []
 starting_counter = 0
 spawn_ordered_enabled = True
@@ -800,13 +801,13 @@ def spawn_item(trueID, item1, item2, operator, **kwargs):
     global used_extra_groups
     used_extra_groups = 1
     
-    # init some values
+    trueID = int(trueID)
     xpos, ypos, group = unpack_kwargs(**kwargs)
     first_itemtype, first_id = unpack_item(item1) 
     second_itemtype, second_id = unpack_item(item2)
     
     nextfree = kwargs["nextfree"]
-    needs_spawn = kwargs["lengths"][trueID] > 1
+    needs_spawn = kwargs["lengths"].get(trueID - kwargs["group_offset"], 0) > 1
     
     spawn_trigger = ""
     compare_truegroup = trueID
@@ -829,11 +830,11 @@ def spawn_item(trueID, item1, item2, operator, **kwargs):
 def spawn_num(trueID, item1, num, operator, **kwargs):
     global used_extra_groups
     
-    # init some values
+    trueID = int(trueID)
     xpos, ypos, group = unpack_kwargs(**kwargs)
     first_itemtype, first_id = unpack_item(item1) 
     nextfree = kwargs["nextfree"]
-    needs_spawn = kwargs["lengths"][trueID] > 1
+    needs_spawn = kwargs["lengths"].get(trueID - kwargs["group_offset"], 0) > 1
     
     spawn_trigger = ""
     compare_truegroup = trueID
@@ -1062,13 +1063,17 @@ def malloc(amount, **kwargs):
     x_offset = memory_block_pos[0]
     y_offset = memory_block_pos[1] + kwargs["subroutine_count"] * 30
     
+    # # NOT FOR PRODUCTION
+    # MEMREG = kwargs["group_offset"] + int(amount) + 551  # 551 if framebuffer otherwise 1
+    # PTRPOS = MEMREG + 1
+    
     amount = int(amount)
     starting_counter = MEMREG - amount
     
     # block ids (padding and pointer)
-    LEFTID = 9997
-    RIGHTID = 9998
-    POINTERID = 9999
+    LEFTID = amount + 1 + coll_block_offset
+    RIGHTID = amount + 2 + coll_block_offset
+    POINTERID = amount + 3 + coll_block_offset
     
     # you CANNOT have malloc more than once
     malloc_count += 1
@@ -1094,16 +1099,17 @@ def malloc(amount, **kwargs):
     # memory cells
     for idx, counter in enumerate(range(starting_counter, MEMREG)):
         item_group = nextfree
-        
+        coll_block_id = idx + 1 + coll_block_offset
         xpos = idx * 30 + x_offset
         # add a memcell
+        
         used_extra_groups += 1
         collision_block = collision_block_str(
-            xpos, y_offset, 1, 1, 0, [], idx + 1, False
+            xpos, y_offset, 1, 1, 0, [], coll_block_id, False
         )
         collision_trigger = collision_trigger_str(
-            x_offset - 71.25, y_offset + (idx + 1) * 7.5 - 18.75, 0.25, 0.25, 0, [], idx + 1, POINTERID, 
-            item_group, True
+            x_offset - 71.25, y_offset + (idx + 1) * 7.5 - 18.75, 0.25, 0.25, 0, [], 
+            coll_block_id, POINTERID, item_group, True
         ) # all collision triggers x should be < 0 to be initialised immediately
         write_item = item_edit_trigger_str(  # write register to this memory location
             xpos, y_offset + 30, 1, 1, 0, [item_group, write_group],
@@ -1122,6 +1128,13 @@ def malloc(amount, **kwargs):
         ) 
         out_str += collision_block + collision_trigger + write_item + read_item + counter_obj + pos_reset
         nextfree += 1
+    
+    # MEMREG and PTRPOS counter objs
+    out_str += counter_object_str(
+        amount * 30 + x_offset, y_offset - 60, 0.4, 0.4, -30, [], MEMREG, False, 0, False, 0
+    ) + counter_object_str(
+        (amount + 1) * 30 + x_offset, y_offset - 60, 0.4, 0.4, -30, [], PTRPOS, False, 0, False, 0
+    )
     
     # padding blocks
     out_str += collision_block_str(
