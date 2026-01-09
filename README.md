@@ -1,5 +1,8 @@
 # .tasm Documentation
 Here lies the documentation for all of the tasm instructions.
+
+# Rewrite notice
+I am working on a rust rewrite and polish of this program. For now, the python verion is still available, however it will soon be deprecated.
   
 # Guide
 TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in 2.2. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  
@@ -78,16 +81,19 @@ If there are three arguments, the third is subtracted from the second instead.
 The result is stored in the first argument.
   
 ### MUL
-Arguments: `MUL <item> <number>`, `MUL <item> <item>`, `MUL <item> <item> <item>`
-Multiplies the second argument by the first argument.
-If there are three arguments, the second and third are multiplied instead.
-The result is stored in the first argument.
+Arguments: `MUL <item> <number>`, `MUL <item> <item>`, `MUL <item> <item> <item>`, `MUL <item> <item> <number>`  
+Multiplies the second argument by the first argument.  
+If there are three arguments, the second and third are multiplied instead.  
+The result is stored in the first argument.  
   
 ### DIV
-Arguments: `DIV <item> <number>`, `DIV <item> <item>`, `DIV <item> <item> <item>`
-Divides the second argument by the first argument.
-If there are three arguments, the second is divided by the third instead.
-The result is stored in the first argument.
+Arguments: `DIV <item> <number>`, `DIV <item> <item>`, `DIV <item> <item> <item>`, `DIV <item> <item> <number>`  
+Divides the second argument by the first argument.  
+If there are three arguments, the second is divided by the third instead.  
+The result is stored in the first argument.  
+
+### FLDIV
+Same as `DIV`, except the result is rounded down.
   
 ## Compares
 `SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`

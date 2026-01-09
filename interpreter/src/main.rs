@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, io::{stdout, Write}, time::{Duration, Instant}};
+use std::{collections::{HashMap, HashSet}, io::{Write, stdout}, time::{Duration, Instant}};
 use serde::Deserialize;
 use crossterm::{event::{self, Event, KeyCode}, terminal};
 use std::{fs, env, process, fmt::{Formatter, Display, Result}};
@@ -56,8 +56,8 @@ struct Routine {
 
 #[derive(Debug, Deserialize, Clone)]
 struct Instruction {
-    command: String,
-    idx: i32,
+    instr: String,
+    fn_idx: i32,
     args: Vec<String>
 }
 
@@ -76,14 +76,26 @@ struct ActiveGroup {
 }
 
 impl Counter {
-    fn new<T: AsRef<str>>(s: T) -> Self {
+    fn new<T: AsRef<str>>(s: T, float_memreg: bool) -> Self {
         let inp = s.as_ref();
+        if inp == "PTRPOS" {
+            return Counter { id: 9999, timer: false }
+        } else if inp == "MEMREG" {
+            return Counter { id: 9998, timer: float_memreg}
+        }
         let pref = inp.chars().next().unwrap();
         let id = match inp.char_indices().nth(1) {
             Some((i, _)) => {&inp[i..]},
             None => ""
         };
-        Counter {id: id.parse::<i32>().unwrap(), timer: pref == 'T'}
+        Counter {id: match id.parse::<i32>() {
+            Ok(n) => n,
+            Err(e) => {
+                println!("{e} on {}", &s.as_ref());
+                
+                panic!("type shit")
+            }
+        }, timer: pref == 'T'}
     }
 }
 
@@ -284,6 +296,7 @@ fn show_state(
     memory_start: i32,
     memory_size: i32, 
     memory_mode: i32, 
+    using_float_mem: bool,
     ptr_pos: i32,
     tick: u64,
     delay: f64,
@@ -325,22 +338,42 @@ fn show_state(
 
         // build the string for one specific memory address
         let build_memcell_str =|i: i32| {
-            if i != ptr_pos {
-                // addr: value
-                format!(
-                    " {i:0>width$}: {0}{GRAY}{1:0>14} {VERTICAL}",
-                    if counters[(memory_start + i) as usize] < 0 {"-"} else {" "},
-                    format!("{RESET}{}", counters[(memory_start + i) as usize].abs().to_string()),
-                    width = memcell_text_width
-                )
+            if using_float_mem {
+                if i != ptr_pos {
+                    // addr: value
+                    format!(
+                        " {i:0>width$}: {0}{GRAY}{1:0>14} {VERTICAL}",
+                        if timers[(memory_start + i) as usize] < 0.0 {"-"} else {" "},
+                        format!("{RESET}{:.8}", timers[(memory_start + i) as usize].abs().to_string()),
+                        width = memcell_text_width
+                    )
+                } else {
+                    // highlight if pointer is here
+                    format!(
+                        "{YELLOW} {BG_GREY}{0}> {1}{GRAY}{2:0>21}{RESET} {VERTICAL}",
+                        " ".repeat(memcell_text_width),
+                        if timers[(memory_start + i) as usize] < 0.0 {"-"} else {" "},
+                        format!("{YELLOW}{:.8}", timers[(memory_start + i) as usize].abs().to_string())
+                    )
+                }
             } else {
-                // highlight if pointer is here
-                format!(
-                    "{YELLOW} {BG_GREY}{0}> {1}{GRAY}{2:0>21}{RESET} {VERTICAL}",
-                    " ".repeat(memcell_text_width),
-                    if counters[(memory_start + i) as usize] < 0 {"-"} else {" "},
-                    format!("{YELLOW}{}", counters[(memory_start + i) as usize].abs().to_string())
-                )
+                if i != ptr_pos {
+                    // addr: value
+                    format!(
+                        " {i:0>width$}: {0}{GRAY}{1:0>14} {VERTICAL}",
+                        if counters[(memory_start + i) as usize] < 0 {"-"} else {" "},
+                        format!("{RESET}{}", counters[(memory_start + i) as usize].abs().to_string()),
+                        width = memcell_text_width
+                    )
+                } else {
+                    // highlight if pointer is here
+                    format!(
+                        "{YELLOW} {BG_GREY}{0}> {1}{GRAY}{2:0>21}{RESET} {VERTICAL}",
+                        " ".repeat(memcell_text_width),
+                        if counters[(memory_start + i) as usize] < 0 {"-"} else {" "},
+                        format!("{YELLOW}{}", counters[(memory_start + i) as usize].abs().to_string())
+                    )
+                }
             }
         };
 
@@ -456,7 +489,7 @@ fn show_state(
         let mut instruction_count = 0;
         for (group, instruction) in instructions {
             // format instruction as it is in the file
-            let mut line = format!("{}: {} ", group, instruction.command);
+            let mut line = format!("{}: {} ", group, instruction.instr);
             for arg in &instruction.args {
                 line += &format!("{arg}, ");
             }
@@ -473,11 +506,13 @@ fn show_state(
 
         display_width = std::cmp::max(display_width, caption.len());
 
-        // fill in extra lines (to prevent the box resizing every frame and giving the user a seizure)
+        instruction_lines.sort();
         
+        // fill in extra lines (to prevent the box resizing every frame and giving the user a seizure)
         for _ in 0..(instruction_box_size - instruction_count) {
             instruction_lines.push(" ".repeat(display_width));
         }
+
 
         // top border
         out_str += &format!("{CLEAR_LINE_AFTER_CURSOR}\n{CORNER}{HORIZONTAL}{caption:*<display_width$}{HORIZONTAL}{CORNER}{CLEAR_LINE_AFTER_CURSOR}\n").replace("*", HORIZONTAL);
@@ -553,6 +588,7 @@ fn main() {
     let mut memory_mode: i32 = 0;  // MREAD / MWRITE
     let mut ptr_pos: i32 = 0;
     let mut max_instr_len: usize = 0;
+    let mut using_float_mem = false;
 
     let mut active_groups: HashMap<i32, ActiveGroup> = HashMap::new();
 
@@ -587,7 +623,7 @@ fn main() {
 
     // process init routine
     for instruction in init_routine.instructions.clone().into_iter() {
-        let command = instruction.command.as_str();
+        let command = instruction.instr.as_str();
         let args: Vec<String> = instruction.args;
         match command {
             "MALLOC" => {
@@ -600,6 +636,17 @@ fn main() {
                 memory_size = length;
                 malloced = true;
             },
+            "FMALLOC" => {
+                if malloced {
+                    println!("[Instruction {idx} in _init] You cannot allocate memory twice.");
+                    return
+                }
+                let length = args[0].parse::<i32>().unwrap();
+                memory_start = MEMREG as i32 - length;
+                memory_size = length;
+                malloced = true;
+                using_float_mem = true;
+            },
             "INITMEM" => {
                 if !malloced {
                     println!("[Instruction {idx} in _init] You cannot initialise unallocated memory. Please MALLOC first.");
@@ -608,7 +655,11 @@ fn main() {
                 let new_state = args[0].split(",");
                 let mut index = 0;
                 for number in new_state {
-                    counters[(memory_start + index) as usize] = number.parse::<i32>().unwrap();
+                    if using_float_mem {
+                        timers[(memory_start + index) as usize] = number.parse::<f32>().unwrap();
+                    } else{
+                        counters[(memory_start + index) as usize] = number.parse::<i32>().unwrap();
+                    }
                     index += 1;
                     if index > memory_size {
                         println!("[Instruction {idx} in _init] You cannot initialise more slots of memory than you allocated.");
@@ -618,7 +669,7 @@ fn main() {
             },
             "DISPLAY" => {
                 displayed_counters.push(
-                    Counter::new(args[0].as_str())
+                    Counter::new(args[0].as_str(), using_float_mem)
                 )
             },
             _ => {}
@@ -645,8 +696,8 @@ fn main() {
             }
             instructions.push(
                 Instruction { 
-                    command: instruction.command.clone(), 
-                    idx: instruction.idx, 
+                    instr: instruction.instr.clone(), 
+                    fn_idx: instruction.fn_idx, 
                     args: new_args 
                 }
             )
@@ -682,6 +733,7 @@ fn main() {
             memory_start, 
             memory_size, 
             memory_mode, 
+            using_float_mem,
             ptr_pos, 
             tick,
             delay,
@@ -738,7 +790,7 @@ fn main() {
                     current_instructions.insert(*group, routine.instructions[group_obj.idx as usize].clone());
                 } else {
                     group_obj.wait -= 1;
-                    current_instructions.insert(*group, Instruction {command: "WAITING ".to_string(), idx: 0, args: vec![]});
+                    current_instructions.insert(*group, Instruction {instr: "WAITING ".to_string(), fn_idx: 0, args: vec![]});
                 }
             }
 
@@ -753,30 +805,30 @@ fn main() {
             
             // process all instructions
             for (parent_group, instruction) in current_instructions.iter_mut() {
-                let command = instruction.command.as_str();
-                let mode = instruction.idx;
+                let command = instruction.instr.as_str();
+                let mode = instruction.fn_idx;
                 let args: Vec<String> = (*instruction.args).to_vec();
 
                 // i had to fight the borrow checker for these closures
                 // but it was worth it to remove duplicate code
 
                 let mut arithmetic = |op| {
-                    let result = Counter::new(&args[0]);
+                    let result = Counter::new(&args[0], using_float_mem);
                     let resulting_value = match mode {
                         1 => { // item = num
                             gsetv(&result, args[1].parse::<f64>().unwrap(), op, &mut counters, &mut timers)
                         },
                         2 => { // item = item
-                            let rhs = Counter::new(&args[1]);
+                            let rhs = Counter::new(&args[1], using_float_mem);
                             gsetc(&result, &rhs, op, &mut counters, &mut timers)
                         },
                         3 => {
-                            let lhs = Counter::new(&args[1]);
-                            let rhs = Counter::new(&args[2]);
+                            let lhs = Counter::new(&args[1], using_float_mem);
+                            let rhs = Counter::new(&args[2], using_float_mem);
                             gset2(&result, lhs, rhs, op, &mut counters, &mut timers)
                         },
                         4 => {
-                            let lhs = Counter::new(&args[1]);
+                            let lhs = Counter::new(&args[1], using_float_mem);
                             let rhs = args[2].parse::<f64>().unwrap();
                             gset2c(&result, lhs, rhs, op, &mut counters, &mut timers)
                         }
@@ -795,10 +847,10 @@ fn main() {
                 let mut spawns = |compare: i32, counters: &mut [i32], timers: &mut [f32]| {
                     let value = match mode {
                         1 => args[2].parse::<f64>().unwrap(),
-                        2 => get(&Counter::new(&args[2]), &counters, &timers),
+                        2 => get(&Counter::new(&args[2], using_float_mem), &counters, &timers),
                         _ => 0.0
                     };
-                    let lhs = get(&Counter::new(&args[1]), &counters, &timers);
+                    let lhs = get(&Counter::new(&args[1], using_float_mem), &counters, &timers);
                     if match compare {
                         0 => lhs == value,
                         1 => lhs > value,
@@ -815,10 +867,10 @@ fn main() {
                 let forks = |compare: i32, counters: &mut [i32], timers: &mut [f32], active_groups: &mut HashMap<i32, ActiveGroup>| {
                     let value = match mode {
                         1 => args[3].parse::<f64>().unwrap(),
-                        2 => get(&Counter::new(&args[3]), &counters, &timers),
+                        2 => get(&Counter::new(&args[3], using_float_mem), &counters, &timers),
                         _ => 0.0
                     };
-                    let lhs = get(&Counter::new(&args[2]), &counters, &timers);
+                    let lhs = get(&Counter::new(&args[2], using_float_mem), &counters, &timers);
                     if match compare {
                         0 => lhs == value,
                         1 => lhs > value,
@@ -845,16 +897,31 @@ fn main() {
                         if let Some(group) = active_groups.get_mut(parent_group) {
                             group.wait = 2
                         }; // simulate wait time in GD
-                        match memory_mode {
-                            1 => { // read
-                                counters[MEMREG] = counters[(memory_start + ptr_pos) as usize];
-                            },
-                            2 => { // write
-                                counters[(memory_start + ptr_pos) as usize] = counters[MEMREG];
-                            },
-                            _ => {}
+                        if using_float_mem{
+                            match memory_mode {
+                                1 => { // read
+                                    timers[MEMREG] = timers[(memory_start + ptr_pos) as usize];
+                                },
+                                2 => { // write
+                                    timers[(memory_start + ptr_pos) as usize] = timers[MEMREG];
+                                },
+                                _ => {}
+                            }
+                        } else {
+                            match memory_mode {
+                                1 => { // read
+                                    counters[MEMREG] = counters[(memory_start + ptr_pos) as usize];
+                                },
+                                2 => { // write
+                                    counters[(memory_start + ptr_pos) as usize] = counters[MEMREG];
+                                },
+                                _ => {}
+                            }
                         }
                     }
+                    "BREAKPOINT" => {
+                        paused = true;
+                    },
                     "NOP"    => {},
                     "MOV"    => arithmetic(0),
                     "ADD"    => arithmetic(1),

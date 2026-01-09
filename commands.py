@@ -69,6 +69,12 @@ INSTRUCTIONS = {
             [[], nop]
         ]
     },
+    "BREAKPOINT": {
+        "allowed": "*",
+        "args": [
+            [[], nop]
+        ]
+    },
     "MOV": {  # moves arg1 into arg 0 (copy)
         "allowed": "*",
         "args": [

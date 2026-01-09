@@ -39,6 +39,8 @@ options = {
     "--no-write": "disable writing output to save file?",
     "--group-offset <offset>": "start at group <offset>. default is 0",
     "--coll-block-offset <offset>": "start collision blocks at <offset>. default is 0",
+    # "--counter-offset <offset>": "start counter ids at <offset>. default is 0",
+    "--mem-ptr-pos <offset>": "mem ptr conter id is <offset>. this is the last id used by the memory block. default is 9999",
     "--read-only": "only read the level contents?",
     "--disable-bit-packing": "disables bit packing for large numbers when compiling.",
     "--index <index>": "write to <index>th level in savefile. default is 0.",
@@ -69,7 +71,7 @@ def display_help_text():
     
 def main():
     # help text
-    if "-h" in argv or len(argv) == 1:
+    if "-h" in argv or "--help" in argv or len(argv) == 1:
         display_help_text()
         return
     
@@ -89,6 +91,7 @@ def main():
     level_index = 0
     group_offset = 0
     coll_block_offset = 0
+    counter_offset = 0
     for arg_idx, arg in enumerate(argv):
         if arg == "--index":
             try:
@@ -107,6 +110,22 @@ def main():
                 coll_block_offset = int(argv[arg_idx + 1])
             except:
                 print("Invalid collision block offset supplied.")
+                return
+        # if arg == "--counter-offset":
+        #     try:
+        #         counter_offset = int(argv[arg_idx + 1])
+        #     except:
+        #         print("Invalid counter id offset supplied.")
+        #         return
+        if arg == "--mem-ptr-pos":
+            try:
+                gdobj.PTRPOS = int(argv[arg_idx + 1])
+                if gdobj.PTRPOS > 9999:
+                    raise ValueError
+                gdobj.update_memreg_id()
+                tasm_parser.update_aliases()
+            except:
+                print("Invalid mem ptr pos specified (int, max = 9999).")
                 return
     
     
@@ -204,12 +223,15 @@ def main():
     
     # put the program back into the level
     print(f"Serialising objects to '{os.path.basename(file)}'...")
+
+    
     
     # get the new objects as a string
     new_objs = parse_namespace(
         namespace, 
         group_offset,
         coll_block_offset,
+        counter_offset,
         level_dbg_text, 
         fast, 
         not no_warnings
@@ -239,8 +261,10 @@ def main():
         encrypted_savefile = encrypt_savefile_str(xml_str.encode("utf-8"))
         open(local_levels, "wb").write(encrypted_savefile)
     else:
-        os.remove(decoded_path)
-
+        try:
+            os.remove(decoded_path)
+        except:
+            pass
 try:
     if __name__ == "__main__":
         main()

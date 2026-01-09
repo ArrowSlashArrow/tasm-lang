@@ -249,7 +249,7 @@ def determine_groups(routines, display_namespace=False):
     return names
 
 
-def parse_namespace(namespace, group_offset=0, coll_block_offset=0, routine_text=False, squish=True, warnings=True):
+def parse_namespace(namespace, group_offset=0, coll_block_offset=0, counter_offset=0, routine_text=False, squish=True, warnings=True):
     routines = list(namespace.keys())
     objs = [""]
     next_free = len(routines)
@@ -293,6 +293,8 @@ def parse_namespace(namespace, group_offset=0, coll_block_offset=0, routine_text
                     arg_list.append(routines.index(arg) + group_offset)
                 elif arg == "MEMSIZE":
                     arg_list.append(gdobj.memory_size)
+                elif is_item(arg):
+                    arg_list.append(arg[0] + str(int(arg[1:]) + counter_offset))
                 elif arg != "":
                     arg_list.append(arg)
                     
@@ -318,8 +320,8 @@ def parse_namespace(namespace, group_offset=0, coll_block_offset=0, routine_text
                 subroutine_count=len(routines) # used only in malloc
             )
             
-            if result_str == "" and warnings:
-                print(f"WARNING: {command} with {" ".join(args[0])} does not have a builder function and will NOT generate an object.")
+            # if result_str == "" and warnings:
+                # print(f"WARNING: {command} with {" ".join(args[0])} does not have a builder function and will NOT generate an object.")
             
             if result_str == "\0":
                 continue
