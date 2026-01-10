@@ -54,7 +54,7 @@ All of the options are displayed by appending `-h` to the command.
   
 The resulting level should have the name of the program file, and is by default at the top.
   
-# Notes
+# Notes 
 * Counters are 32-bit signed ints. You can assign them to any number with item edit triggers, however the input values in those are stored as 32-bit floats, so larger numbers (specifically above 2^24) are incorrectly rounded due to floating point imprecision. Counters store values higher than 999,999,999 even if they display 999,999,999.
 * To assign counters to really high numbers, use bit packing: Assign it the greater 16 bits, multiply by 65536, assign it the lesser 16 bits. Example 1000 \* 65536 + 1 yields 65536001 every time with no mistakes. This takes 3 instructions instead of 1. **THE `MOV` COMMAND ALREADY DOES THIS IF YOU ARE MOVING A NUMBER GREATER THAN 1,048,576. you can disable this with the flag `--no-bit-packing`.**
 * Timers are useful to store floats, however their maximum value is 9,999,999.0

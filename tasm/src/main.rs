@@ -19,8 +19,19 @@ struct Args {
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
+    let file = fs::read_to_string(args.infile).unwrap();
 
-    let in_file = fs::read(args.infile)?;
+    let tasm = lexer::parse_file(file);
+
+    match tasm {
+        Ok(t) => println!("Parsed file with 0 errors."),
+        Err(e) => {
+            println!("Parsed file with {} errors:", e.len());
+            for err in e {
+                println!("{err}");
+            }
+        }
+    }
 
     Ok(())
 }

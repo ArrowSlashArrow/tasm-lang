@@ -1,1 +1,3 @@
-- WAIT <int> in favour of NOP
+ - serialise instructions
+ - add spawn delay + remap support to asm
+ - replace NOP with WAIT \<x>
