@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.54", features = ["derive"] }
+gdlib = "0.2.7"
+regex = "1.12.2"

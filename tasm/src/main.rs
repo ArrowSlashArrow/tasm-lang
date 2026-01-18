@@ -1,8 +1,10 @@
 use std::fs;
 
-use anyhow::Error;
+use anyhow::{Error, anyhow};
 use clap::Parser;
 
+pub mod core;
+pub mod instr;
 pub mod lexer;
 
 #[derive(Parser)]
@@ -21,17 +23,19 @@ fn main() -> Result<(), Error> {
     let args = Args::parse();
     let file = fs::read_to_string(args.infile).unwrap();
 
-    let tasm = lexer::parse_file(file);
-
-    match tasm {
-        Ok(t) => println!("Parsed file with 0 errors."),
+    let tasm = match lexer::parse_file(file) {
+        Ok(t) => {
+            println!("Parsed file with 0 errors.");
+            t
+        }
         Err(e) => {
-            println!("Parsed file with {} errors:", e.len());
-            for err in e {
+            for err in e.iter() {
                 println!("{err}");
             }
+            println!("Parsed file with {} errors.", e.len());
+            return Err(anyhow!("bad tasm"));
         }
-    }
+    };
 
     Ok(())
 }
