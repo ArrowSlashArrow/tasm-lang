@@ -37,44 +37,45 @@
 //! Following that, all routines are indexed and their group determined.
 //! Finally, all instructions are parsed in each group sequentially.
 
-use regex::Regex;
-
 use crate::{
-    core::{ENTRY_POINT, Instruction, Routine, Tasm, TasmParseError, TasmValue, TasmValueType},
+    core::{
+        ENTRY_POINT, INIT_ROUTINE, Instruction, Routine, Tasm, TasmParseError, TasmPrimitive,
+        TasmValue, TasmValueType, get_instr_type,
+    },
     instr::INSTR_SPEC,
 };
 
 // todo: dynamic load from commands file
 pub const INSTRUCTIONS: &[&str] = &[
-    "INITMEM",
+    "INITMEM", // init
     "MALLOC",
     "FMALLOC",
-    "MFUNC",
+    "MFUNC", // memory
     "MREAD",
     "MWRITE",
     "MPTR",
     "MRESET",
-    "MOV",
-    "DISPLAY",
+    "DISPLAY", // init
     "IOBLOCK",
-    "BREAKPOINT",
-    "NOP",
+    "BREAKPOINT", // debug
+    "NOP",        // wait
     "WAIT",
-    "TSPAWN",
+    "TSPAWN", // timer
     "TSTART",
     "TSTOP",
-    "SRAND",
+    "SRAND", // process
     "FRAND",
     "RET",
     "STOP",
     "SPAWN",
-    "PERS",
-    "ADD",
+    "PERS", // init
+    "ADD",  // arithmetic
     "SUB",
     "MUL",
     "DIV",
     "FLDIV",
-    "SE",
+    "MOV",
+    "SE", // comparison
     "SNE",
     "SL",
     "SLE",
@@ -99,7 +100,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
     let mut errors = vec![];
 
     let mut indent_size = 0;
-    for (idx, raw_line) in file.lines().into_iter().enumerate() {
+    for (line_idx, raw_line) in file.lines().into_iter().enumerate() {
         let line = raw_line.split(";").next().unwrap();
         if raw_line.trim().is_empty() {
             continue;
@@ -130,84 +131,112 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
             } else if indentation != indent_size {
                 errors.push(TasmParseError::InconsistentIndent((
                     "Inconsistent indentation amount".into(),
-                    idx + 1,
+                    line_idx + 1,
                     indentation,
                     indent_size,
                 )));
             }
 
             // 0 is the cmd (MUST be there), 1.. are args (optional)
-            let mut instr_split = line.trim().clone().split(" ");
-
-            // this (ident) should never be blank, due to all blank lines being skipped.
-            let instr = instr_split.next().unwrap();
-            if !INSTRUCTIONS.contains(&instr) {
-                errors.push(TasmParseError::InvalidInstruction((instr.into(), idx)));
+            let trimmed_line = line.trim();
+            if trimmed_line == "" {
+                continue; // skip blank line
             }
-            let mut erroneous_instr = false;
-            let args: Vec<TasmValue> = instr_split
-                .into_iter()
-                .filter_map(|v| match TasmValue::to_value(v) {
-                    Ok(t) => Some(t),
-                    Err(e) => {
-                        errors.push(e);
-                        erroneous_instr = true;
-                        None
-                    }
-                })
-                .collect();
 
-            let arg_signature = &args
+            let instr;
+            let args: Vec<TasmValue>;
+            if let Some(pos) = trimmed_line.trim().find(" ") {
+                instr = &trimmed_line[..pos];
+
+                let mut erroneous_instr = false;
+                args = trimmed_line[pos + 1..]
+                    .split(',')
+                    .filter_map(|v| match TasmValue::to_value(v.trim()) {
+                        Ok(t) => Some(t),
+                        Err(e) => {
+                            // error if unable to parse argument value
+                            errors.push(e);
+                            erroneous_instr = true;
+                            None
+                        }
+                    })
+                    .collect();
+                if erroneous_instr {
+                    errors.push(TasmParseError::InvalidInstruction((
+                        "Failed to parse instruction: invalid argset".into(),
+                        line_idx + 1,
+                    )));
+                }
+            } else {
+                // no args or extras (everything after | )
+                instr = trimmed_line;
+                args = vec![];
+            }
+
+            if !INSTRUCTIONS.contains(&instr) {
+                // error due to unrecognized instruction
+                errors.push(TasmParseError::InvalidInstruction((instr.into(), line_idx)));
+            }
+
+            let args_signature = args
                 .iter()
                 .map(|a| a.get_type())
-                .collect::<Vec<TasmValueType>>()[..];
-
-            if erroneous_instr {
-                errors.push(TasmParseError::InvalidInstruction((
-                    "Failed to parse instruction: invalid argset".into(),
-                    idx + 1,
-                )));
-            }
+                .collect::<Vec<TasmPrimitive>>();
 
             // the args are now valid tasm values,
             // so we can find the matching argset in instr.rs to get handler
 
-            let (_, allowed_regex, handlers) = match INSTR_SPEC
-                .iter()
-                .find(|(ident, allowed, handlers)| ident == &instr)
-            {
-                Some(spec) => spec,
-                None => {
-                    errors.push(TasmParseError::InvalidInstruction((
-                        format!("Instruction {instr} has no argument handler."),
-                        idx,
-                    )));
-                    continue;
-                }
-            };
+            let (_, init_exclusive, handlers) =
+                match INSTR_SPEC.iter().find(|(ident, _, _)| ident == &instr) {
+                    Some(spec) => spec,
+                    None => {
+                        errors.push(TasmParseError::InvalidInstruction((
+                            format!("Instruction {instr} has no argument handler."),
+                            line_idx,
+                        )));
+                        continue;
+                    }
+                };
 
             // check if this isntruction is allowed in the routine
-            let re = Regex::new(*allowed_regex).unwrap();
-            if !re.is_match(instr) {
+            if *init_exclusive && instr != INIT_ROUTINE {
                 errors.push(TasmParseError::InvalidInstruction((
                     format!(
-                        "Instruction {instr} is not allowed in routine {}.",
-                        curr_routine.ident
+                        "Instruction {instr} is not allowed in routine {} because it is excluse to the initialiser routine, {INIT_ROUTINE}.",
+                        curr_routine.ident,
                     ),
-                    idx,
+                    line_idx,
                 )));
                 continue;
             }
-
+            // TODO: check if the arg handler takes a list,
+            // then validate the args and format them into a vec.
             // find the handler function
             match handlers
                 .iter()
-                .find(|&(sig, _)| sig == &arg_signature)
+                .find(|&(sig, _)| {
+                    if sig.len() > 0
+                        && let TasmValueType::List(list_type) = &sig[0]
+                    // an argset with a list signature should NEVER have any other argument types.
+                    {
+                        args_signature.iter().all(|arg_type| arg_type == list_type)
+                    } else {
+                        // assume that the sig is made entirely of primitives
+                        sig.iter()
+                            .filter_map(|v| match v {
+                                TasmValueType::Primitive(p) => Some(p),
+                                _ => None,
+                            })
+                            .eq(&args_signature[..])
+                    }
+                })
                 .and_then(|v| Some(v.1))
             {
                 Some(handler) => {
-                    curr_routine.add_isntruction(Instruction {
+                    curr_routine.add_instruction(Instruction {
                         ident: instr.into(),
+                        _type: get_instr_type(instr).unwrap(),
+                        line_number: line_idx,
                         args,
                         handler_fn: handler,
                     });
@@ -215,7 +244,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 None => {
                     errors.push(TasmParseError::InvalidInstruction((
                         format!("Instruction {instr} has no argument handler."),
-                        idx,
+                        line_idx,
                     )));
                 }
             }
@@ -229,6 +258,6 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
     if errors.len() > 0 {
         Err(errors)
     } else {
-        Ok(Tasm { routines })
+        Ok(Tasm::from_routines(routines))
     }
 }

@@ -258,7 +258,6 @@ def parse_namespace(namespace, group_offset=0, coll_block_offset=0, counter_offs
         routine["group"]: len(routine["instructions"]) for routine in namespace.values()
     }
     
-    # used for that one time iw anted to see if groups > 10000 worked
     start_block = gdobj.ioblock(routines.index("_start") + group_offset, 0, "start", override=True) if "_start" in routines else ""
     
     gdobj.coll_block_offset = coll_block_offset

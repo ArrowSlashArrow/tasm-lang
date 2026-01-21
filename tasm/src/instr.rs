@@ -1,18 +1,18 @@
 use gdlib::gdobj::{GDObjConfig, GDObject, misc::default_block};
 
-use crate::core::{TasmValue, TasmValueType};
+use crate::core::{HandlerData, HandlerReturn, TasmPrimitive, TasmValue, TasmValueType};
 
 pub const INSTR_SPEC: &[(
-    &'static str,
-    &'static str,
-    &[(&[TasmValueType], fn(Vec<TasmValue>) -> GDObject)],
+    &'static str,                                               // ident
+    bool,                                                       // exclusive to _init
+    &[(&[TasmValueType], fn(Vec<TasmValue>) -> HandlerReturn)], // handlers
 )] = &[(
     "MALLOC",
-    "_init",
-    &[(&[TasmValueType::Int], malloc_handler)],
+    true,
+    &[(&[TasmValueType::List(TasmPrimitive::Int)], todo)],
 )];
 
-fn malloc_handler(args: Vec<TasmValue>) -> GDObject {
-    // todo
-    default_block(&GDObjConfig::default())
+fn todo(args: Vec<TasmValue>) -> HandlerReturn {
+    //
+    Ok(HandlerData::object(default_block(&GDObjConfig::default())))
 }
