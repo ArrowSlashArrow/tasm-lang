@@ -1,0 +1,38 @@
+_init:
+    MALLOC 10
+    DISPLAY T1  ; input value
+    DISPLAY T2  ; x squared
+    DISPLAY T3  ; x^3
+    DISPLAY T4  ; x^5
+    DISPLAY T5  ; x^7
+    DISPLAY T6  ; result
+    DISPLAY T7  ; result but amplified (to see dp)
+
+_start:
+    MOV T1, 0.43
+        
+    MOV T2, T1
+    MUL T2, T1
+    
+    MOV T3, T1
+    MUL T3, T2
+
+    MOV T4, T3
+    MUL T4, T2
+
+    MOV T5, T3
+    MUL T5, T2
+
+    MOV T6, T1
+
+    DIV T3, 6
+    DIV T4, 120
+    MUL T5, 0.0001984
+
+    SUB T6, T3
+    ADD T6, T4
+    SUB T6, T5
+
+    ; not necessary for computation, jsut to see accurarcy
+    MOV T7, T6
+    MUL T7, 1000000

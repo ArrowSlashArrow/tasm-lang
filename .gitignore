@@ -1,8 +1,7 @@
 # VSCode settings
 .vscode
 
-# my programs
-programs
+# temp file
 namespace.json
 
 # Byte-compiled / optimized / DLL files

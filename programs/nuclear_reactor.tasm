@@ -1,0 +1,510 @@
+; Logic of reactor in reactor minigame
+_init:
+    FMALLOC 185 ; 5 (heats) + 5 (heat capacity) + 5 floats * 35 cells (cell array)
+    INITMEM 0,0,6,8,0,0,20,10,8,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,2,10,6,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1
+    DISPLAY T2001  ; total heat
+    DISPLAY T2002  ; total nrg
+    DISPLAY C2001  ; array ptr (in terms of structs)
+    DISPLAY C2002  ; array size (const)
+    DISPLAY C2004  ; cell_idx
+    DISPLAY C2005  ; ticks
+    DISPLAY C2020 ; tick is stepping (0: not stepping, 1: stepping)
+    ; C6: cells_width
+    ; C7: cells_height
+
+    ; auxiliary
+    DISPLAY T2011 ; type
+    DISPLAY T2012 ; heat capacity
+    DISPLAY T2013 ; heat per second
+    DISPLAY T2014 ; heat
+    DISPLAY T2015 ; health
+    ; DISPLAY T16 ; delta heat of cell
+
+    ; default cell string: ,0,0,0,0,1
+
+    IOBLOCK move_forward, 2, move forward
+    IOBLOCK move_backward, 4, move backward
+    IOBLOCK move_reset, 6, reset ptr
+    IOBLOCK display_values, 8, update display
+    IOBLOCK tick, 10, ben
+
+_start:
+    MOV C2002, 35 ; CONST! UPDATE WHEN CHANGING MALLOC
+    MUL C2003, C2002, 5
+    ADD C2003, 5  ; ptr move limit
+    MOV C2006, 7  ; CONST! cell width
+    MOV C2007, 5  ; CONST! cell height
+    SPAWN move_reset
+    NOP
+    NOP
+    NOP
+    NOP
+    SPAWN tick
+
+move_forward:
+    SL _inner_move_fwd, PTRPOS, C2003
+
+move_backward:
+    SG _inner_move_back, PTRPOS, 10
+
+_inner_move_back:
+    MPTR -5
+    SUB C2001, 1
+
+_inner_move_fwd:
+    MPTR 5
+    ADD C2001, 1
+
+move_reset:
+    MRESET
+    MPTR 10
+    MOV C2001, 0
+
+display_values:
+    MREAD
+    MFUNC
+    MOV T2011, MEMREG
+    MPTR 1
+
+    MFUNC
+    MOV T2012, MEMREG
+    MPTR 1
+
+    MFUNC
+    MOV T2013, MEMREG
+    MPTR 1
+
+    MFUNC
+    MOV T2014, MEMREG
+    MPTR 1
+
+    MFUNC
+    MOV T2015, MEMREG
+    MPTR -4
+
+tick:
+    ; reset reactor heat
+    MOV T2001, 0
+    ; load vars for first loop
+    ; set counter idx to 0
+    MOV C2004, 0
+    SE cell_iter_delta_heat, C2020, 0
+    MOV C2020, 1  ; tick is stepping
+
+cell_iter_delta_heat:
+    ; Struct: [type, heat capacity, heat per tick, heat, health]
+    ; ptr is at type
+    ; auxiliary variables
+    ; T16: delta_heat
+    ; T17: coef counter for c.heat_per_tick
+    ; T18: previous heat value of this cell
+    MREAD
+    MPTR 4 ; goto health
+    MFUNC  ; read to reg
+    MOV T2017, MEMREG
+    DIV T2017, 2
+    ADD T2017, 0.5
+
+    MPTR -1 ; goto heat
+    MFUNC
+    MOV T2018, MEMREG
+
+    MPTR -1 ; goto heat per tick
+    MFUNC
+    MOV T2016, MEMREG
+    MUL T2016, T2017 ; delta_heat var is now in T16
+
+    ; move delta_heat into the cell
+    MWRITE
+    MPTR 1        ; goto heat
+    ADD T2016, T2018  ; add previous heat value
+    MUL T2016, 0.98 ; heat dissipation
+    MOV MEMREG, T2016 
+    MFUNC         ; heat is now saved
+    
+    MPTR -3 ; go back to beginning of struct
+    ; ptr can move forward if ptrpos + 1 < array len (C2)
+    ; C5 is auxiliary var for ptrpos + 1
+    MOV C2005, C2001
+    ADD C2005, 1
+
+    FL cell_iter_delta_heat_intermediate, tick_continue1, C2005, C2002
+
+cell_iter_delta_heat_intermediate:
+    ; move ptr forward
+    MPTR 5
+    ADD C2001, 1 
+    ADD C2004, 1
+    SPAWN cell_iter_delta_heat
+
+tick_continue1:
+    ; now load vars for second loop
+    ; set counter idx to 0, will be used like enumeration
+    MOV C2004, 0
+    ; clear auxiliary values
+    MOV T2016, 0
+    MOV T2017, 0
+    MOV T2018, 0
+    MOV C2005, 0
+    ; reset ptr
+    MRESET
+    MPTR 10
+    MOV C2001, 0
+    BREAKPOINT
+    SPAWN cell_iter_heat_propagate
+
+cell_iter_heat_propagate:
+    ; Struct: [type, heat capacity, heat per tick, heat, health]
+    ; ptr is at type
+    ; auxiliary variables
+    ; T16: cell heat
+    MREAD
+    MPTR 3
+    MFUNC
+    MOV T2016, MEMREG  ; memreg has cell.heat
+    ; get shared_heat_per_direction
+    ; stored in T17
+    DIV T2017, T2016, 5
+    MWRITE
+    MOV MEMREG, T2017
+    MFUNC  ; cell.heat is updated
+    
+    ; if idx (C4) >= cells_width (C6)
+
+    SGE cell_iter_heat_propagate_if1, C2004, C2006
+    ; no-ops to prevent multible active writer threads simultaneously
+    ; cell_iter_heat_propagate_if1 has 8 instructions, so 8 no-ops + 1 for safety
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    
+    ; compute cells_count (C2) - cells_width (C6)
+    MOV C2008, C2006
+    SUB C2008, C2002
+    ; if idx (C4) < cells_count - cells_width (C8)
+    SL cell_iter_heat_propagate_if2, C2004, C2008
+    ; no-ops to prevent multible active writer threads simultaneously
+    ; cell_iter_heat_propagate_if2 has 8 instructions, so 8 no-ops + 1 for safety
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+
+    ; compute idx (C4) % cells_width (C6)
+    MOV C2010, C2004
+    FLDIV C2009, C2010, C2006
+    MUL C2009, C2006
+    SUB C2010, C2009  ; modulo in here
+
+    ; compute cells_width (C6) - 1
+    MOV C2011, C2006
+    SUB C2011, 1
+    
+    ; if idx % cells_width (C10) < cells_width - 1 (C11)
+    SL cell_iter_heat_propagate_if3, C2010, C2011
+    ; no-ops to prevent multible active writer threads simultaneously
+    ; cell_iter_heat_propagate_if3 has 8 instructions, so 8 no-ops + 1 for safety
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    
+    ; if idx % cells_width (C10) > 0
+    SG cell_iter_heat_propagate_if4, C2010, 0
+    ; no-ops to prevent multible active writer threads simultaneously
+    ; cell_iter_heat_propagate_if4 has 8 instructions, so 8 no-ops + 1 for safety
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+
+    ; move ptr back
+    MPTR -3
+
+    MOV C2005, C2004
+    ADD C2005, 1
+
+    ; if iters + 1 < 
+    FL cell_iter_heat_propagate_intermediate, tick_continue2, C2005, C2002
+    
+
+cell_iter_heat_propagate_if1:
+    ; goto struct that is C6 * 5 away (35)
+    ; ptr is at heat
+    MREAD
+    MPTR -35
+    MFUNC
+    MOV T2018, MEMREG  ; get cell[idx - width].heat
+    ADD T2018, T2017     ; add shared heat to this cell's heat
+    MOV MEMREG, T2018
+    MWRITE
+    MFUNC            ; put it back
+    MPTR 35          ; move ptr back
+
+cell_iter_heat_propagate_if2:
+    ; goto struct that is C6 * 5 away (35)
+    ; ptr is at heat
+    MREAD
+    MPTR 35
+    MFUNC
+    MOV T2018, MEMREG  ; get cell[idx - width].heat
+    ADD T2018, T2017     ; add shared heat to this cell's heat
+    MOV MEMREG, T2018
+    MWRITE
+    MFUNC            ; put it back
+    MPTR -35         ; move ptr back
+
+cell_iter_heat_propagate_if3:
+    ; goto struct that is 5 away
+    ; ptr is at heat
+    MREAD
+    MPTR 5
+    MFUNC
+    MOV T2018, MEMREG  ; get cell[idx - width].heat
+    ADD T2018, T2017     ; add shared heat to this cell's heat
+    MOV MEMREG, T2018
+    MWRITE
+    MFUNC            ; put it back
+    MPTR -5         ; move ptr back
+
+cell_iter_heat_propagate_if4:
+    ; goto struct that is 5 away
+    ; ptr is at heat
+    MREAD
+    MPTR -5
+    MFUNC
+    MOV T2018, MEMREG  ; get cell[idx - width].heat
+    ADD T2018, T2017     ; add shared heat to this cell's heat
+    MOV MEMREG, T2018
+    MWRITE
+    MFUNC            ; put it back
+    MPTR 5           ; move ptr back
+
+cell_iter_heat_propagate_intermediate:
+    ; move ptr forward
+    MPTR 5
+    ADD C2001, 1 
+    ADD C2004, 1
+    SPAWN cell_iter_heat_propagate  
+
+tick_continue2:
+    ; now load vars for second loop
+    ; set counter idx to 0, will be used like enumeration
+    MOV C2004, 0
+    ; clear auxiliary values
+    MOV T2016, 0
+    MOV T2017, 0
+    MOV T2018, 0
+    MOV C2005, 0
+    MOV C2008, 0
+    MOV C2009, 0
+    MOV C2010, 0
+    MOV C2011, 0
+    ; reset ptr
+    MRESET
+    MPTR 10
+    MOV C2001, 0
+    BREAKPOINT
+    SPAWN cell_iter_attr_mgr
+
+cell_iter_attr_mgr:
+    ; Struct: [type, heat capacity, heat per tick, heat, health]
+    ; ptr is at type
+    MREAD
+    MFUNC
+    MOV C2008, MEMREG  ; C8: cell.type
+
+    ; if c.type == 1
+    SE cell_iter_attr_mgr_if1, C2008, 1
+    ; no-ops for thread safety (11 + 1 for safety)
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    
+    ; if c.type == 0 else
+    FE cell_iter_attr_mgr_if2, cell_iter_attr_mgr_else2, C2008, 0
+    ; 17 + 1 nops
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+
+    MREAD
+    ; ptr is at type
+    MPTR 4
+    MFUNC
+    MOV T2005, MEMREG
+    MPTR -4
+    ; if c.health (t5) <= 0
+    SLE cell_iter_attr_mgr_if3, T2005, 0
+    ; 6 + 1 nops
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+
+    MREAD
+    MPTR 3
+    MFUNC
+    MOV T2005, MEMREG
+    ADD T2001, T2005 ; add cell's heat to total heat
+    MPTR -3 
+
+    ; for loop continuation
+    MOV C2005, C2004
+    ADD C2005, 1
+
+    FL cell_iter_attr_mgr_intermediate, tick_continue3, C2005, C2002
+
+cell_iter_attr_mgr_intermediate:
+    ; move ptr forward
+    MPTR 5
+    ADD C2001, 1 
+    ADD C2004, 1
+    SPAWN cell_iter_attr_mgr  
+
+cell_iter_attr_mgr_if1:
+    ; ptr is at type
+    ; get heat
+    MPTR 3
+    MREAD
+    MFUNC
+    MOV T2003, MEMREG
+    MUL T2003, 0.6  ; absorbed heat
+    ADD T2002, T2003   ; add to total reactor nrg
+    SUB T2001, T2003   ; sub from total reactor heat
+    SUB MEMREG, T2003   ; sub from cell.nrg
+    MWRITE
+    MFUNC  ; put it back
+    MPTR -3
+
+cell_iter_attr_mgr_if2:
+    ; ptr is at type
+    MPTR 4
+    MWRITE
+    MOV MEMREG, 1.0
+    MFUNC
+    MPTR -4
+
+cell_iter_attr_mgr_else2:
+    ; ptr is at type
+    MREAD
+    MPTR 3
+    MFUNC
+    MOV T2005, MEMREG
+    MPTR -2  ; +1
+    MFUNC
+    MOV T2006, MEMREG
+    ; T5: heat
+    ; T6: heat capacity
+    ; if c.heat < c.capacity else
+    ; get amount of health to subtract
+    FL cell_iter_attr_mgr_else2_if, cell_iter_attr_mgr_else2_else, T2005, T2006
+    NOP
+    ; ptr is at heat capacity
+    MPTR 3
+    MFUNC
+    MOV T2005, MEMREG  ; health
+    SUB T2005, T2004
+    MWRITE
+    MOV MEMREG, T2005
+    MFUNC
+    MPTR -4
+
+
+cell_iter_attr_mgr_else2_if:
+    MOV T2004, 0.0001
+cell_iter_attr_mgr_else2_else:
+    MOV T2004, 0.0006
+
+cell_iter_attr_mgr_if3:
+    MPTR 4
+    ; ptr is at health (+4)
+    MWRITE
+    MOV MEMREG, 0
+    MFUNC ; health = 0
+
+    MPTR -4
+    MOV MEMREG, 4
+    MFUNC ; type = waste (4)
+
+tick_continue3:
+    MRESET
+    MPTR 10
+    MOV C2020, 0

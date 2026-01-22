@@ -1,0 +1,58 @@
+_init:
+    MALLOC 25
+    INITMEM 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
+    DISPLAY C1 ; auxiliary var
+    DISPLAY C2 ; amount to move
+    DISPLAY C3
+    DISPLAY C4
+
+reverse:
+    
+    MREAD
+    MFUNC
+    MOV C1, MEMREG
+    MOV C4, PTRPOS      ; swap position 2
+    ADD C3, PTRPOS, C2  ; swap position 1
+    MPTR 1
+    FL move, continue, PTRPOS, C3
+
+move:
+    MPTR 1
+    FL move, continue, PTRPOS, C3
+
+movebackwards:
+    MPTR -1
+    FG movebackwards, continue1, PTRPOS, C4
+
+moveagain:
+    MPTR 1
+    FL moveagain, continue2, PTRPOS, C3
+
+movebackwardsagain:
+    MPTR -1
+    FG movebackwardsagain, continue3, PTRPOS, C4
+
+continue:
+    MFUNC
+    MWRITE
+    FG movebackwards, continue1, PTRPOS, C4
+
+continue1:
+    MFUNC
+    MOV MEMREG, C1
+    FL moveagain, continue2, PTRPOS, C3
+
+continue2:
+    MFUNC
+    FG movebackwardsagain, continue3, PTRPOS, C4
+
+continue3:
+    MPTR 1
+    SUB C2, 2
+    SNE reverse, PTRPOS, 50
+
+_start:
+    MOV C2, 23
+    SPAWN reverse
+    
+

@@ -1,0 +1,83 @@
+_init:
+    DISPLAY C1
+    IOBLOCK sleep_2, 2, 2 nops
+    IOBLOCK sleep_10, 4, 10 nops
+    IOBLOCK sleep_50, 6, 50 nops
+
+_start:
+    NOP
+
+sleep_2:
+    MOV C1, 0
+    NOP
+    NOP
+    MOV C1, 1
+
+sleep_10:
+    MOV C1, 0
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    MOV C1, 1
+
+
+sleep_50:
+    MOV C1, 0
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    MOV C1, 1

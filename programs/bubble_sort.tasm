@@ -1,0 +1,44 @@
+; bubble sorter program (warning :slow)
+_init:
+    MALLOC 20
+    INITMEM 11,21111111,1111,2,2111,11111,1111111111,211,1111111,21,211111111,11111111,111,1,2111111,111111111,111111,211111,2111111111,21111
+; 23,35,67,46,69,54,83,86,79,22,85,36,80,27,59,84,75,34,94,24,5,93,57,39,21,51,53,0,66,96,43,32,9,88,15,2,37,7,71,70,17,50,44,16,72,3,91,63,64,89,55,40,61,45,28,11,92,4,73,62,90,31,77,8,99,19,74,26,6,81,29,87,42,58,60,82,52,56,12,20,18,78,65,98,10,33,38,68,48,25,13,49,47,1,95,97,30,14,41,76
+    DISPLAY C1
+    DISPLAY C2
+
+bubble:
+    MFUNC
+    MOV C1, MEMREG
+    MPTR 1
+    MFUNC
+    FG swap, continue, C1, MEMREG
+
+swap:
+    MWRITE
+    MPTR -1
+    MFUNC
+    MOV MEMREG, C1
+    MPTR 1
+    MFUNC
+    MREAD
+    SPAWN continue
+
+continue:   
+    FL bubble, nextiter, PTRPOS, C2
+
+nextiter:
+    MRESET
+    SUB C2, 1
+    FG bubble, end, C2, 0
+
+end:
+    SE test_routine, C5, C6
+
+test_routine:
+    MOV C5, 100000000
+
+_start:
+    MOV C2, MEMSIZE
+    SUB C2, 1
+    MREAD
+    SPAWN bubble

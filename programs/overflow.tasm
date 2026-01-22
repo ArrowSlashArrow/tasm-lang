@@ -1,0 +1,7 @@
+_init:
+    DISPLAY C1
+
+_start:
+    MOV C1, 2147483647
+    MOV C1, 2147483648
+    MOV C1, 2147483649
