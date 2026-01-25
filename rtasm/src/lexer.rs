@@ -91,68 +91,126 @@ pub const INSTRUCTIONS: &[&str] = &[
 
 pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> {
     let file = f_str.as_ref();
+    let lines = file
+        .lines()
+        .map(|l| l.split(';').next().unwrap().trim_end())
+        .collect::<Vec<&str>>();
 
-    let mut routines = vec![];
+    // [(line, ident, group, instruction_lines)]
+    let mut routine_data = vec![];
+    // [(group, ident)]: mapping between what routine has which group
+    let mut routine_group_map = vec![];
+
     let mut seen_entry_point = false;
 
-    let mut curr_routine = Routine::empty();
+    let mut curr_group = 0i16;
+    let mut curr_routine_data = (0usize, String::new(), 0i16, vec![]);
 
-    let mut errors = vec![];
-
-    let mut indent_size = 0;
-    for (line_idx, raw_line) in file.lines().into_iter().enumerate() {
-        let line = raw_line.split(";").next().unwrap();
-        if raw_line.trim().is_empty() {
+    // index all routines
+    let mut line_idx = 0usize;
+    let mut in_routine = false;
+    for line in lines.iter() {
+        if line.trim().is_empty() {
+            line_idx += 1;
             continue;
         }
 
         if !line.starts_with(' ') {
-            // no space, check for routine identifier.
+            // commit old data
+            let routine_ident = curr_routine_data.1.clone();
+            if routine_ident == INIT_ROUTINE {
+                curr_routine_data.2 = 0i16; // init has no group
+                curr_group -= 1;
+            } else {
+                routine_group_map.push((routine_ident, curr_group));
+            }
+            routine_data.push(curr_routine_data.clone());
+
+            // no indent, check for routine identifier.
             let mut strip = line.trim().to_string();
             if strip.ends_with(':') && !strip.contains(' ') {
+                curr_group += 1;
                 // now we are certain that this is a routine ident
                 strip.pop();
                 let routine_ident = strip;
                 if routine_ident == ENTRY_POINT {
                     seen_entry_point = true;
                 }
-
-                // save current routine and load this one + reset indent size
-                routines.push(curr_routine);
-                indent_size = 0;
-                curr_routine = Routine::empty();
+                // clear out bad data
+                curr_routine_data = (line_idx, routine_ident, curr_group, vec![]);
+                in_routine = true;
             }
-        } else {
-            let indentation = line.chars().take_while(|c| *c == ' ').count();
-            // check or set indent size
-            if indent_size == 0 {
-                // first line after routine ident
-                indent_size = indentation;
-            } else if indentation != indent_size {
-                errors.push(TasmParseError::InconsistentIndent((
-                    "Inconsistent indentation amount".into(),
-                    line_idx + 1,
-                    indentation,
-                    indent_size,
-                )));
+        } else if in_routine {
+            let trim = line.trim();
+            if !trim.is_empty() {
+                curr_routine_data.3.push(trim);
+            } else {
+                in_routine = false;
             }
+        }
+        line_idx += 1;
+    }
 
-            // 0 is the cmd (MUST be there), 1.. are args (optional)
+    // commit routine data
+    let routine_ident = curr_routine_data.1.clone();
+    if routine_ident == INIT_ROUTINE {
+        curr_routine_data.2 = 0i16; // init has no group
+        curr_group -= 1;
+    } else {
+        routine_group_map.push((routine_ident, curr_group));
+    }
+    routine_data.push(curr_routine_data.clone());
+
+    // first routine was garbage data, so remove it
+    routine_data.remove(0);
+
+    println!("{routine_data:#?}");
+
+    if !seen_entry_point {
+        return Err(vec![TasmParseError::NoEntryPoint]);
+    }
+
+    let mut routines = vec![];
+    let mut errors = vec![];
+
+    for (start_line, ident, rtn_group, rtn_lines) in routine_data {
+        let mut curr_routine = Routine::default().group(rtn_group).ident(&ident);
+
+        let mut curr_line = start_line + 1;
+        for line in rtn_lines {
+            curr_line += 1;
+
             let trimmed_line = line.trim();
             if trimmed_line == "" {
+                println!("hit blank");
+                // println!("skipping blank line: {curr_line}");
                 continue; // skip blank line
             }
-
+            // parse instruction and args
             let instr;
             let args: Vec<TasmValue>;
             if let Some(pos) = trimmed_line.trim().find(" ") {
                 instr = &trimmed_line[..pos];
 
+                // TODO: you cannot spawn _init.
+
                 let mut erroneous_instr = false;
                 args = trimmed_line[pos + 1..]
                     .split(',')
                     .filter_map(|v| match TasmValue::to_value(v.trim()) {
-                        Ok(t) => Some(t),
+                        Ok(t) => {
+                            // if this is a routine ident, add corresponding group
+                            if let TasmValue::String(s) = t.clone()
+                                && let Some(group) = routine_group_map
+                                    .iter()
+                                    .find(|(ident, _)| *ident == s)
+                                    .and_then(|data| Some(data.1))
+                            {
+                                Some(TasmValue::Group(group))
+                            } else {
+                                Some(t)
+                            }
+                        }
                         Err(e) => {
                             // error if unable to parse argument value
                             errors.push(e);
@@ -164,7 +222,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 if erroneous_instr {
                     errors.push(TasmParseError::InvalidInstruction((
                         "Failed to parse instruction: invalid argset".into(),
-                        line_idx + 1,
+                        curr_line,
                     )));
                 }
             } else {
@@ -175,7 +233,10 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
 
             if !INSTRUCTIONS.contains(&instr) {
                 // error due to unrecognized instruction
-                errors.push(TasmParseError::InvalidInstruction((instr.into(), line_idx)));
+                errors.push(TasmParseError::InvalidInstruction((
+                    instr.into(),
+                    curr_line,
+                )));
             }
 
             let args_signature = args
@@ -192,7 +253,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                     None => {
                         errors.push(TasmParseError::InvalidInstruction((
                             format!("Instruction {instr} has no argument handler."),
-                            line_idx,
+                            curr_line,
                         )));
                         continue;
                     }
@@ -205,12 +266,11 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                         "Instruction {instr} is not allowed in routine {} because it is excluse to the initialiser routine, {INIT_ROUTINE}.",
                         curr_routine.ident,
                     ),
-                    line_idx,
+                    curr_line,
                 )));
                 continue;
             }
-            // TODO: check if the arg handler takes a list,
-            // then validate the args and format them into a vec.
+
             // find the handler function
             match handlers
                 .iter()
@@ -230,29 +290,29 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                             .eq(&args_signature[..])
                     }
                 })
+                // return fn pointer
                 .and_then(|v| Some(v.1))
             {
                 Some(handler) => {
+                    // finally, add instruction to routine
                     curr_routine.add_instruction(Instruction {
                         ident: instr.into(),
                         _type: get_instr_type(instr).unwrap(),
-                        line_number: line_idx,
+                        line_number: curr_line,
                         args,
                         handler_fn: handler,
                     });
                 }
                 None => {
+                    // otherwise, error
                     errors.push(TasmParseError::InvalidInstruction((
                         format!("Instruction {instr} has no argument handler."),
-                        line_idx,
+                        curr_line,
                     )));
                 }
             }
         }
-    }
-
-    if !seen_entry_point {
-        errors.push(TasmParseError::NoEntryPoint);
+        routines.push(curr_routine);
     }
 
     if errors.len() > 0 {

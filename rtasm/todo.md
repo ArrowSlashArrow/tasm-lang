@@ -3,6 +3,7 @@
  - add spawn delay + remap support to asm
  - various other comp triggers 
  - replace NOP with WAIT \<x>
+ - do not skip unindented strings that are not routine identifiers
 
 ## commands
 ### SPAWN command and derivatives
@@ -44,3 +45,4 @@ return: stop trigger that stops all objects with that control id (all spawn trig
 Args: `WAIT <int>`
 **Set to deprecate `NOP`.**
 Waits for the given amount of ticks.
+

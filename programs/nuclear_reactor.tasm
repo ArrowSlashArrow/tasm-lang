@@ -65,7 +65,6 @@ display_values:
     MFUNC
     MOV T2011, MEMREG
     MPTR 1
-
     MFUNC
     MOV T2012, MEMREG
     MPTR 1

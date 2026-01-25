@@ -14,9 +14,15 @@ struct Args {
     infile: String,
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
-    /// which may make them an unreadable mess of triggers in the process.
+    /// which will reduce readability in the editor.
     #[arg(long)]
     release: bool,
+    /* args todo:
+     * group offset
+     * export as gmd
+     * export level name
+     *
+     */
 }
 
 fn main() -> Result<(), Error> {

@@ -1,6 +1,9 @@
 use std::{error::Error, fmt::Display};
 
-use gdlib::gdobj::{GDObjConfig, GDObject};
+use gdlib::{
+    gdlevel::Level,
+    gdobj::{GDObjConfig, GDObject},
+};
 
 pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
@@ -11,9 +14,10 @@ pub struct Tasm {
     pub routines: Vec<Routine>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Routine {
     pub ident: String,
+    pub group: i16,
     pub instructions: Vec<Instruction>,
 }
 
@@ -21,8 +25,19 @@ impl Routine {
     pub fn empty() -> Self {
         Routine {
             ident: String::new(),
+            group: 0,
             instructions: vec![],
         }
+    }
+
+    pub fn group(mut self, group: i16) -> Self {
+        self.group = group;
+        self
+    }
+
+    pub fn ident(mut self, ident: &String) -> Self {
+        self.ident = ident.into();
+        self
     }
 
     pub fn add_instruction(&mut self, instr: Instruction) {
@@ -31,17 +46,26 @@ impl Routine {
 }
 
 pub type HandlerReturn = Result<HandlerData, TasmParseError>;
+pub type HandlerFn = fn(Vec<TasmValue>, &GDObjConfig) -> HandlerReturn;
 
+#[derive(Default)]
 pub struct HandlerData {
-    object: GDObject,
+    objects: Vec<GDObject>,
+    // skip this amount of obj
     skip_spaces: i32,
-    used_extra_groups: i32,
+    // extra used groups
+    used_extra_groups: i16,
 }
 
 impl HandlerData {
-    pub fn object(object: GDObject) -> Self {
+    pub fn set_objects(mut self, objects: Vec<GDObject>) -> Self {
+        self.objects = objects;
+        self
+    }
+
+    pub fn from_objects(objects: Vec<GDObject>) -> Self {
         Self {
-            object,
+            objects: objects,
             skip_spaces: 0,
             used_extra_groups: 0,
         }
@@ -52,7 +76,7 @@ impl HandlerData {
         self
     }
 
-    pub fn extra_groups(mut self, groups: i32) -> Self {
+    pub fn extra_groups(mut self, groups: i16) -> Self {
         self.used_extra_groups = groups;
         self
     }
@@ -64,7 +88,7 @@ pub struct Instruction {
     pub _type: InstrType,
     pub line_number: usize,
     pub args: Vec<TasmValue>,
-    pub handler_fn: fn(Vec<TasmValue>) -> HandlerReturn,
+    pub handler_fn: HandlerFn,
 }
 
 #[derive(Debug)]
@@ -73,7 +97,6 @@ pub enum TasmParseError {
     InvalidArguments((String, usize)),
     NoEntryPoint,
     InvalidNumber(String),
-    InconsistentIndent((String, usize, usize, usize)),
     ExceedsGroupLimit,
 }
 
@@ -90,12 +113,6 @@ impl Display for TasmParseError {
                 write!(f, "Bad command: {cmd} at line {line}")
             }
             Self::NoEntryPoint => write!(f, "No entry point found. ({ENTRY_POINT} routine)"),
-            Self::InconsistentIndent((reason, line, expected, got)) => {
-                write!(
-                    f,
-                    "{reason} on line {line}. Expected {expected} spaces, got {got} spaces."
-                )
-            }
             Self::InvalidArguments((reason, line)) => {
                 write!(f, "Invalid arguments on line {line}: {reason}")
             }
@@ -109,11 +126,12 @@ impl Display for TasmParseError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TasmValue {
     Counter(i16),
     Timer(i16),
     Number(f64),
+    Group(i16),
     /// Default
     String(String),
 }
@@ -129,6 +147,7 @@ pub enum TasmPrimitive {
     Counter,
     Timer,
     Int,
+    Group,
     Float,
     String,
 }
@@ -171,6 +190,7 @@ impl TasmValue {
                     TasmPrimitive::Float
                 }
             }
+            Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
         }
     }
@@ -181,10 +201,14 @@ impl Tasm {
         Self { routines }
     }
 
-    pub fn handle_routines(&mut self) -> Result<(), Vec<TasmParseError>> {
+    pub fn handle_routines(&mut self) -> Result<Level, Vec<TasmParseError>> {
         let mut errors: Vec<TasmParseError> = vec![];
 
+        let mut level = Level::new("tasm level", "tasm", None, None);
         let mut curr_group = 0i16;
+
+        let mut obj_pos = 0.0;
+
         for routine in self.routines.iter() {
             curr_group += 1;
             if curr_group > GROUP_LIMIT {
@@ -193,17 +217,42 @@ impl Tasm {
             }
 
             // starting position of objects: (15, 75 + curr_group * 15)
-            let mut obj_config = GDObjConfig::default()
-                .pos(15.0, 75.0 + (curr_group as f64) * 15.0)
-                .groups([curr_group]);
+            for instr in routine.instructions.iter() {
+                let cfg = if routine.ident == INIT_ROUTINE {
+                    if let InstrType::Init = instr._type {
+                        GDObjConfig::default()
+                    } else {
+                        curr_group -= 1;
+                        GDObjConfig::default()
+                            .pos(-15.0 - obj_pos, 75.0 + (curr_group as f64) * 15.0)
+                    }
+                } else {
+                    GDObjConfig::default()
+                        .pos(15.0 + obj_pos, 75.0 + (curr_group as f64) * 15.0)
+                        .groups([curr_group])
+                };
 
-            for instr in routine.instructions.iter() {}
+                let handler = instr.handler_fn;
+                let data = match handler(instr.args.clone(), &cfg) {
+                    Ok(data) => data,
+                    Err(e) => {
+                        errors.push(e);
+                        continue;
+                    }
+                };
+                for obj in data.objects.into_iter() {
+                    level.add_object(obj);
+                }
+                let skip_spaces = data.skip_spaces;
+                curr_group += data.used_extra_groups;
+                obj_pos += skip_spaces as f64;
+            }
         }
 
         if errors.len() > 0 {
             Err(errors)
         } else {
-            Ok(())
+            Ok(level)
         }
     }
 }
@@ -220,8 +269,8 @@ pub enum InstrType {
     Debug, // any instruction that is only used by the emulator, and ignored when parsing to GD objects.
 }
 
-pub fn get_instr_type(instr: &str) -> Option<InstrType> {
-    match instr {
+pub fn get_instr_type(ident: &str) -> Option<InstrType> {
+    match ident {
         "SPAWN" | "SRAND" | "FRAND" | "SE" | "SNE" | "SL" | "SLE" | "SG" | "SGE" | "FE" | "FNE"
         | "FL" | "FLE" | "FG" | "FGE" => Some(InstrType::Spawner),
         "ADD" | "SUB" | "MUL" | "DIV" | "FLDIV" | "MOV" => Some(InstrType::Arithmetic),

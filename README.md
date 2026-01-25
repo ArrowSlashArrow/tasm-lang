@@ -1,17 +1,20 @@
 # .tasm Documentation
 Here lies the documentation for all of the tasm instructions.
 
-# Rewrite notice
-I am working on a rust rewrite and polish of this program. For now, the python verion is still available, however it will soon be deprecated.
+# Important information
+**By default, the compiler OVERWRITES the first level in your savefile.** I have not implemented the patch for this yet, however PLEASE either make a temporary level when compiling or back up your savefile. 
+Note that I am working on a rust rewrite and polish of this program. For now, the python verion is still available, however it will soon be deprecated. Expect the rewrite to be complete by Feb 15th, 2026.
+
   
 # Guide
 TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in 2.2. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  
   
 Features:
-* Asynchronous execution
 * Turing-complete instruction set
 * Optimised trigger placement and group usage
 * Built-in memory system
+* Compiles directly to build triggers
+* Versatile compiler, lots of options.
   
 To create a program, first make a `.tasm` file.
 In the new file, create two subroutines:
@@ -23,7 +26,7 @@ _start:
     ; code goes here
 ```
   
-The `_init` subroutine will run before you play the GD level.
+The `_init` subroutine will run before you play the GD level. This routine contains instructions such as `MALLOC` to allocate memory, or `DISPLAY` to display a counter.
 The `_start` subroutine is the start point, similar to a main function.
 Any additional subroutines may be defined as such:
 ```
