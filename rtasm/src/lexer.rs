@@ -91,6 +91,7 @@ pub const INSTRUCTIONS: &[&str] = &[
 
 pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> {
     let file = f_str.as_ref();
+    let mut errors = vec![];
     let lines = file
         .lines()
         .map(|l| l.split(';').next().unwrap().trim_end())
@@ -139,6 +140,9 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 // clear out bad data
                 curr_routine_data = (line_idx, routine_ident, curr_group, vec![]);
                 in_routine = true;
+            } else {
+                // this is not a routine identifier, so it is a bad token
+                errors.push(TasmParseError::BadToken((line.to_string(), line_idx)));
             }
         } else if in_routine {
             let trim = line.trim();
@@ -155,7 +159,6 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
     let routine_ident = curr_routine_data.1.clone();
     if routine_ident == INIT_ROUTINE {
         curr_routine_data.2 = 0i16; // init has no group
-        curr_group -= 1;
     } else {
         routine_group_map.push((routine_ident, curr_group));
     }
@@ -167,11 +170,10 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
     println!("{routine_data:#?}");
 
     if !seen_entry_point {
-        return Err(vec![TasmParseError::NoEntryPoint]);
+        errors.push(TasmParseError::NoEntryPoint);
     }
 
     let mut routines = vec![];
-    let mut errors = vec![];
 
     for (start_line, ident, rtn_group, rtn_lines) in routine_data {
         let mut curr_routine = Routine::default().group(rtn_group).ident(&ident);
@@ -182,17 +184,14 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
 
             let trimmed_line = line.trim();
             if trimmed_line == "" {
-                println!("hit blank");
-                // println!("skipping blank line: {curr_line}");
                 continue; // skip blank line
             }
+
             // parse instruction and args
             let instr;
             let args: Vec<TasmValue>;
             if let Some(pos) = trimmed_line.trim().find(" ") {
                 instr = &trimmed_line[..pos];
-
-                // TODO: you cannot spawn _init.
 
                 let mut erroneous_instr = false;
                 args = trimmed_line[pos + 1..]
@@ -200,13 +199,17 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                     .filter_map(|v| match TasmValue::to_value(v.trim()) {
                         Ok(t) => {
                             // if this is a routine ident, add corresponding group
-                            if let TasmValue::String(s) = t.clone()
-                                && let Some(group) = routine_group_map
+                            if let TasmValue::String(s) = t.clone() {
+                                if let Some(group) = routine_group_map
                                     .iter()
                                     .find(|(ident, _)| *ident == s)
                                     .and_then(|data| Some(data.1))
-                            {
-                                Some(TasmValue::Group(group))
+                                {
+                                    Some(TasmValue::Group(group))
+                                } else {
+                                    errors.push(TasmParseError::InitRoutineSpawnError(curr_line));
+                                    None
+                                }
                             } else {
                                 Some(t)
                             }

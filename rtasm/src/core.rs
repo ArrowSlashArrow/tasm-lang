@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
@@ -95,9 +95,12 @@ pub struct Instruction {
 pub enum TasmParseError {
     InvalidInstruction((String, usize)),
     InvalidArguments((String, usize)),
+    BadToken((String, usize)),
     NoEntryPoint,
     InvalidNumber(String),
+    InvalidGroup(ParseIntError),
     ExceedsGroupLimit,
+    InitRoutineSpawnError(usize),
 }
 
 impl Error for TasmParseError {
@@ -116,7 +119,22 @@ impl Display for TasmParseError {
             Self::InvalidArguments((reason, line)) => {
                 write!(f, "Invalid arguments on line {line}: {reason}")
             }
+            Self::BadToken((tok, line)) => {
+                write!(
+                    f,
+                    "Bad token on line {line}: {tok}. If this is an instruction, it must be indented."
+                )
+            }
+            Self::InitRoutineSpawnError(line) => {
+                write!(
+                    f,
+                    "Spawning the initialiser routine is not allowed (line {line})."
+                )
+            }
             Self::InvalidNumber(why) => {
+                write!(f, "Invalid number. {why}")
+            }
+            Self::InvalidGroup(why) => {
                 write!(f, "Invalid number. {why}")
             }
             Self::ExceedsGroupLimit => {
@@ -144,8 +162,7 @@ pub enum TasmValueType {
 
 #[derive(PartialEq)]
 pub enum TasmPrimitive {
-    Counter,
-    Timer,
+    Item,
     Int,
     Group,
     Float,
@@ -156,6 +173,7 @@ impl TasmValue {
     pub fn to_value(s: &str) -> Result<Self, TasmParseError> {
         let mut iter = s.chars();
         let pref = iter.next().unwrap();
+        let postf = s.chars().last().unwrap();
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
         if pref == 'T'
             && let Ok(n) = remaining_i16
@@ -166,6 +184,7 @@ impl TasmValue {
         {
             return Ok(Self::Counter(n));
         } else if let Ok(n) = s.parse::<f64>() {
+            // sanity checks
             if !n.is_finite() {
                 return Err(TasmParseError::InvalidNumber(
                     "Infinity not allowed.".into(),
@@ -173,7 +192,19 @@ impl TasmValue {
             } else if n.is_nan() {
                 return Err(TasmParseError::InvalidNumber("NaN not allowed.".into()));
             }
-            return Ok(Self::Number(n));
+
+            // if this is an int and postfixed by 'g', consider it a group literal
+            if postf == 'g' {
+                // chop off one char
+                let mut chopped = s.to_string();
+                chopped.pop();
+                match chopped.parse::<i16>() {
+                    Ok(n) => Ok(Self::Group(n)),
+                    Err(e) => Err(TasmParseError::InvalidGroup(e)),
+                }
+            } else {
+                Ok(Self::Number(n))
+            }
         } else {
             Ok(Self::String(s.into()))
         }
@@ -181,8 +212,8 @@ impl TasmValue {
 
     pub fn get_type(&self) -> TasmPrimitive {
         match self {
-            Self::Counter(_) => TasmPrimitive::Counter,
-            Self::Timer(_) => TasmPrimitive::Timer,
+            Self::Counter(_) => TasmPrimitive::Item,
+            Self::Timer(_) => TasmPrimitive::Item,
             Self::Number(f) => {
                 if f.fract() == 0.0 {
                     TasmPrimitive::Int
@@ -192,6 +223,48 @@ impl TasmValue {
             }
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
+        }
+    }
+
+    pub fn to_int(&self) -> Option<i32> {
+        match self {
+            Self::Number(n) => Some(*n as i32),
+            _ => None,
+        }
+    }
+
+    pub fn to_float(&self) -> Option<f64> {
+        match self {
+            Self::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn to_counter_id(&self) -> Option<i16> {
+        match self {
+            Self::Counter(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn to_timer_id(&self) -> Option<i16> {
+        match self {
+            Self::Timer(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn to_group_id(&self) -> Option<i16> {
+        match self {
+            Self::Group(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn to_string(&self) -> Option<String> {
+        match self {
+            Self::String(s) => Some(s.to_owned()),
+            _ => None,
         }
     }
 }
