@@ -97,7 +97,9 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
         .map(|l| l.split(';').next().unwrap().trim_end())
         .collect::<Vec<&str>>();
 
-    // [(line, ident, group, instruction_lines)]
+    println!("{lines:#?}");
+
+    // [(line, ident, group, instruction_lines: (idx, line))]
     let mut routine_data = vec![];
     // [(group, ident)]: mapping between what routine has which group
     let mut routine_group_map = vec![];
@@ -108,11 +110,9 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
     let mut curr_routine_data = (0usize, String::new(), 0i16, vec![]);
 
     // index all routines
-    let mut line_idx = 0usize;
     let mut in_routine = false;
-    for line in lines.iter() {
+    for (line_idx, line) in lines.iter().enumerate() {
         if line.trim().is_empty() {
-            line_idx += 1;
             continue;
         }
 
@@ -146,13 +146,11 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
             }
         } else if in_routine {
             let trim = line.trim();
-            if !trim.is_empty() {
-                curr_routine_data.3.push(trim);
-            } else {
+            curr_routine_data.3.push((line_idx, trim));
+            if trim.is_empty() {
                 in_routine = false;
             }
         }
-        line_idx += 1;
     }
 
     // commit routine data
@@ -175,13 +173,10 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
 
     let mut routines = vec![];
 
-    for (start_line, ident, rtn_group, rtn_lines) in routine_data {
+    for (_, ident, rtn_group, rtn_lines) in routine_data {
         let mut curr_routine = Routine::default().group(rtn_group).ident(&ident);
 
-        let mut curr_line = start_line + 1;
-        for line in rtn_lines {
-            curr_line += 1;
-
+        for (curr_line, line) in rtn_lines {
             let trimmed_line = line.trim();
             if trimmed_line == "" {
                 continue; // skip blank line
@@ -210,6 +205,8 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                                     errors.push(TasmParseError::InitRoutineSpawnError(curr_line));
                                     None
                                 }
+                            // todo: if this is a number, but the signature specifies that it be an int,
+                            // check that it is a valid int. throw err if not
                             } else {
                                 Some(t)
                             }

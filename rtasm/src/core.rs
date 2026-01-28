@@ -113,22 +113,24 @@ impl Display for TasmParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidInstruction((cmd, line)) => {
-                write!(f, "Bad command: {cmd} at line {line}")
+                write!(f, "Bad command: {cmd} on line {}", line + 1)
             }
             Self::NoEntryPoint => write!(f, "No entry point found. ({ENTRY_POINT} routine)"),
             Self::InvalidArguments((reason, line)) => {
-                write!(f, "Invalid arguments on line {line}: {reason}")
+                write!(f, "Invalid arguments on line {}: {reason}", line + 1)
             }
             Self::BadToken((tok, line)) => {
                 write!(
                     f,
-                    "Bad token on line {line}: {tok}. If this is an instruction, it must be indented."
+                    "Bad token on line {}: {tok}. If this is an instruction, it must be indented.",
+                    line + 1
                 )
             }
             Self::InitRoutineSpawnError(line) => {
                 write!(
                     f,
-                    "Spawning the initialiser routine is not allowed (line {line})."
+                    "Spawning the initialiser routine is not allowed (line {}).",
+                    line + 1
                 )
             }
             Self::InvalidNumber(why) => {
@@ -163,9 +165,10 @@ pub enum TasmValueType {
 #[derive(PartialEq)]
 pub enum TasmPrimitive {
     Item,
+    Number,
     Int,
-    Group,
     Float,
+    Group,
     String,
 }
 
@@ -214,13 +217,7 @@ impl TasmValue {
         match self {
             Self::Counter(_) => TasmPrimitive::Item,
             Self::Timer(_) => TasmPrimitive::Item,
-            Self::Number(f) => {
-                if f.fract() == 0.0 {
-                    TasmPrimitive::Int
-                } else {
-                    TasmPrimitive::Float
-                }
-            }
+            Self::Number(f) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
         }

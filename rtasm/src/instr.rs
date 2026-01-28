@@ -6,6 +6,8 @@ use gdlib::gdobj::{
 
 use crate::core::{HandlerData, HandlerFn, HandlerReturn, TasmPrimitive, TasmValue, TasmValueType};
 
+// pub type ArithmeticInstrHandler = fn(Vec<TasmValue>, &GDObjConfig, Op) -> GDObject;
+
 pub const INSTR_SPEC: &[(
     &'static str,                     // ident
     bool,                             // exclusive to _init
@@ -25,46 +27,82 @@ pub const INSTR_SPEC: &[(
     (
         "ADD",
         false,
-        &[(
-            &[
-                TasmValueType::Primitive(TasmPrimitive::Item),
-                TasmValueType::Primitive(TasmPrimitive::Item),
-            ],
-            add,
-        )],
+        &[
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                ],
+                add_2items,
+            ),
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Number),
+                ],
+                add_item_num,
+            ),
+        ],
     ),
     (
         "SUB",
         false,
-        &[(
-            &[
-                TasmValueType::Primitive(TasmPrimitive::Item),
-                TasmValueType::Primitive(TasmPrimitive::Item),
-            ],
-            sub,
-        )],
+        &[
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                ],
+                sub_2items,
+            ),
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Number),
+                ],
+                sub_item_num,
+            ),
+        ],
     ),
     (
         "MUL",
         false,
-        &[(
-            &[
-                TasmValueType::Primitive(TasmPrimitive::Item),
-                TasmValueType::Primitive(TasmPrimitive::Item),
-            ],
-            mul,
-        )],
+        &[
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                ],
+                mul_2items,
+            ),
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Number),
+                ],
+                mul_item_num,
+            ),
+        ],
     ),
     (
         "DIV",
         false,
-        &[(
-            &[
-                TasmValueType::Primitive(TasmPrimitive::Item),
-                TasmValueType::Primitive(TasmPrimitive::Item),
-            ],
-            div,
-        )],
+        &[
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                ],
+                div_2items,
+            ),
+            (
+                &[
+                    TasmValueType::Primitive(TasmPrimitive::Item),
+                    TasmValueType::Primitive(TasmPrimitive::Number),
+                ],
+                div_item_num,
+            ),
+        ],
     ),
 ];
 
@@ -111,7 +149,28 @@ fn _arithmetic_2items(args: Vec<TasmValue>, cfg: &GDObjConfig, op: Op) -> GDObje
     )
 }
 
-fn add(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+fn _arithmetic_item_num(args: Vec<TasmValue>, cfg: &GDObjConfig, op: Op) -> GDObject {
+    let (res_id, res_t) = get_item_spec(&args[0]).unwrap();
+    // second arg should always be a number
+    let modifier = args[1].to_float().unwrap();
+    item_edit(
+        &cfg,
+        None,
+        None,
+        res_id,
+        res_t,
+        modifier,
+        op,
+        None,
+        None,
+        RoundMode::None,
+        RoundMode::None,
+        SignMode::None,
+        SignMode::None,
+    )
+}
+
+fn add_2items(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![_arithmetic_2items(
         args,
         cfg,
@@ -119,24 +178,63 @@ fn add(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
     )]))
 }
 
-fn sub(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+fn sub_2items(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![_arithmetic_2items(
         args,
         cfg,
         Op::Sub,
     )]))
 }
-fn mul(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+fn mul_2items(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![_arithmetic_2items(
         args,
         cfg,
         Op::Mul,
     )]))
 }
-fn div(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+fn div_2items(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![_arithmetic_2items(
         args,
         cfg,
         Op::Div,
     )]))
 }
+
+fn add_item_num(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![_arithmetic_item_num(
+        args,
+        cfg,
+        Op::Add,
+    )]))
+}
+
+fn sub_item_num(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![_arithmetic_item_num(
+        args,
+        cfg,
+        Op::Sub,
+    )]))
+}
+fn mul_item_num(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![_arithmetic_item_num(
+        args,
+        cfg,
+        Op::Mul,
+    )]))
+}
+fn div_item_num(args: Vec<TasmValue>, cfg: &GDObjConfig) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![_arithmetic_item_num(
+        args,
+        cfg,
+        Op::Div,
+    )]))
+}
+
+// fn arithmetic(
+//     args: Vec<TasmValue>,
+//     cfg: &GDObjConfig,
+//     inner: ArithmeticInstrHandler,
+//     op: Op,
+// ) -> GDObject {
+//     inner(args, cfg, op)
+// }
