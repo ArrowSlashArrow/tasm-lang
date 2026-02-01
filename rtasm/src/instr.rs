@@ -6,19 +6,31 @@ use gdlib::gdobj::{
 
 use crate::core::{HandlerData, HandlerFn, HandlerReturn, TasmPrimitive, TasmValue, TasmValueType};
 
-// pub type ArithmeticInstrHandler = fn(Vec<TasmValue>, &GDObjConfig, Op) -> GDObject;
+macro_rules! primitive {
+    ($var:ident) => {
+        TasmValueType::Primitive(TasmPrimitive::$var)
+    };
+}
+
+macro_rules! list {
+    ($var:ident) => {
+        &[TasmValueType::List(TasmPrimitive::$var)]
+    };
+}
+
+macro_rules! empty {
+    () => {
+        &[]
+    };
+}
 
 pub const INSTR_SPEC: &[(
     &'static str,                     // ident
     bool,                             // exclusive to _init
     &[(&[TasmValueType], HandlerFn)], // handlers
 )] = &[
-    (
-        "MALLOC",
-        true,
-        &[(&[TasmValueType::List(TasmPrimitive::Int)], todo)],
-    ),
-    ("NOP", false, &[(&[], nop)]),
+    ("MALLOC", true, &[(list!(Int), todo)]),
+    ("NOP", false, &[(empty!(), nop)]),
     (
         "WAIT",
         false,
@@ -28,80 +40,32 @@ pub const INSTR_SPEC: &[(
         "ADD",
         false,
         &[
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                ],
-                add_2items,
-            ),
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Number),
-                ],
-                add_item_num,
-            ),
+            (&[primitive!(Item), primitive!(Item)], add_2items),
+            (&[primitive!(Item), primitive!(Number)], add_item_num),
         ],
     ),
     (
         "SUB",
         false,
         &[
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                ],
-                sub_2items,
-            ),
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Number),
-                ],
-                sub_item_num,
-            ),
+            (&[primitive!(Item), primitive!(Item)], sub_2items),
+            (&[primitive!(Item), primitive!(Number)], sub_item_num),
         ],
     ),
     (
         "MUL",
         false,
         &[
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                ],
-                mul_2items,
-            ),
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Number),
-                ],
-                mul_item_num,
-            ),
+            (&[primitive!(Item), primitive!(Item)], mul_2items),
+            (&[primitive!(Item), primitive!(Number)], mul_item_num),
         ],
     ),
     (
         "DIV",
         false,
         &[
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                ],
-                div_2items,
-            ),
-            (
-                &[
-                    TasmValueType::Primitive(TasmPrimitive::Item),
-                    TasmValueType::Primitive(TasmPrimitive::Number),
-                ],
-                div_item_num,
-            ),
+            (&[primitive!(Item), primitive!(Item)], div_2items),
+            (&[primitive!(Item), primitive!(Number)], div_item_num),
         ],
     ),
 ];

@@ -1,20 +1,24 @@
-# .tasm Documentation
-Here lies the documentation for all of the tasm instructions.
+# .tasm
+A computational language that compiles to Geometry Dash trigger objects.  
+Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/wiki/Turbo_Assembler).  
+  
+tasm is currently in **version v0.1.0**.  
+The basic instruction set is defined [here](docs.md), and the working compiler is in the root directory of the repo. Note that the compiler is not a standalone executable, and must be executed from source.
 
 # Important information
 **By default, the compiler OVERWRITES the first level in your savefile.** I have not implemented the patch for this yet, however PLEASE either make a temporary level when compiling or back up your savefile. 
-Note that I am working on a rust rewrite and polish of this program. For now, the python verion is still available, however it will soon be deprecated. Expect the rewrite to be complete by Feb 15th, 2026.
 
+I am currently working on a rust rewrite and polish of this program. For now, the python verion is still available, however it will soon be deprecated. Expect the rewrite to be complete and usable by Feb 15th, 2026.
   
 # Guide
-TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in 2.2. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  
+TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in version 2.2 of Geometry Dash. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  
   
 Features:
 * Turing-complete instruction set
 * Optimised trigger placement and group usage
 * Built-in memory system
-* Compiles directly to build triggers
-* Versatile compiler, lots of options.
+* Compiles directly to trigger objects
+<!-- * Versatile compiler, lots of options. -->
   
 To create a program, first make a `.tasm` file.
 In the new file, create two subroutines:
@@ -61,6 +65,8 @@ The resulting level should have the name of the program file, and is by default 
 * Counters are 32-bit signed ints. You can assign them to any number with item edit triggers, however the input values in those are stored as 32-bit floats, so larger numbers (specifically above 2^24) are incorrectly rounded due to floating point imprecision. Counters store values higher than 999,999,999 even if they display 999,999,999.
 * To assign counters to really high numbers, use bit packing: Assign it the greater 16 bits, multiply by 65536, assign it the lesser 16 bits. Example 1000 \* 65536 + 1 yields 65536001 every time with no mistakes. This takes 3 instructions instead of 1. **THE `MOV` COMMAND ALREADY DOES THIS IF YOU ARE MOVING A NUMBER GREATER THAN 1,048,576. you can disable this with the flag `--no-bit-packing`.**
 * Timers are useful to store floats, however their maximum value is 9,999,999.0
+* Each instruction has a time to execute, which is denoted by `n-tick`, where `n` is the amount of ticks the instruction takes. Note that not all instructions are 1-tick, which can create race conditions if not accounted for when running multiple groups in parallel.
+* Instructions that are `_init` routine-exclusive do not have a execution time, 
 * Aliases exist for special counters: MEMREG (memory register value) for c9998, PTRPOS (address of pointer) for c9999.
 * The geometry dash "CPU" is very different to a normal one: it only processes a maximum of 120 instructions per second per group (active routine), however it can run as many groups in parallel as necessary.
 * The limit for block IDs, counter IDs, and groups is 9999, and any objects with corresponding values higher than that of the limit are not functional.
@@ -69,114 +75,4 @@ The resulting level should have the name of the program file, and is by default 
 * Feel free to reach out to me on discord: @arrowslasharrow to ask me any questions!
 
 # Instructions
-
-## Arithmetic
-### ADD
-Arguments: `ADD <item> <number>`, `ADD <item> <item>`, `ADD <item> <item> <item>`
-Adds the second argument to the first argument.
-If there are three arguments, the second and third are added instead.
-The result is stored in the first argument.
-  
-### SUB
-Arguments: `SUB <item> <number>`, `SUB <item> <item>`, `SUB <item> <item> <item>`
-Subtracts the second argument from the first argument.
-If there are three arguments, the third is subtracted from the second instead.
-The result is stored in the first argument.
-  
-### MUL
-Arguments: `MUL <item> <number>`, `MUL <item> <item>`, `MUL <item> <item> <item>`, `MUL <item> <item> <number>`  
-Multiplies the second argument by the first argument.  
-If there are three arguments, the second and third are multiplied instead.  
-The result is stored in the first argument.  
-  
-### DIV
-Arguments: `DIV <item> <number>`, `DIV <item> <item>`, `DIV <item> <item> <item>`, `DIV <item> <item> <number>`  
-Divides the second argument by the first argument.  
-If there are three arguments, the second is divided by the third instead.  
-The result is stored in the first argument.  
-
-### FLDIV
-Same as `DIV`, except the result is rounded down.
-  
-## Compares
-`SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`
-* SE: Spawns routine if a == b
-* SNE: Spawns routine if a != b
-* SL: Spawns routine if a < b
-* SLE: Spawns routine if a <= b
-* SG: Spawns routine if a > b
-* SGE: Spawns routine if a >= b
-* Does not pause the current group.
-  
-`FE`, `FNE`, `FL`, `FLE`, `FG`, `FE` all accept: `<routine> <routine> <item> <number>`, `<routine> <routine> <item> <item>`
-* FE: Spawns first routine if a == b otherwise spawns the second routine.
-* FNE: Spawns first routine if a != b otherwise spawns the second routine.
-* FL: Spawns first routine if a < b otherwise spawns the second routine.
-* FLE: Spawns first routine if a <= b otherwise spawns the second routine.
-* FG: Spawns first routine if a > b otherwise spawns the second routine.
-* FGE: Spawns first routine if a >= b otherwise spawns the second routine.
-* Does not pause the current group.
-  
-## Memory
-### INITMEM
-Arguments: `MALLOC <numbers>`
-Assigns the numbers to memory in order, starting at address 0. Must be done after MALLOC. Numbers must for separated by commas, with no spacing.
-Only allowed `_init` routine.
-  
-### MALLOC
-Arguments: `MALLOC <number>`
-Allocates a specified amount of counters to memory. Uses 1 group per counter + 4 groups.
-Only allowed `_init` routine.
-  
-### MFUNC
-Arguments: `MFUNC`
-If the current memory mode is set to READ, then the value of the current memory location will be read to c9999.
-If the current memory mode is set to WRITE, then the value of c9999 will be written to the current memory location.
-  
-### MREAD
-Arguments: `MREAD`
-Sets the memory mode to READ
-  
-### MWRITE
-Arguments: `MWRITE`
-Sets the memory mode to WRITE
-  
-### MPTR
-Arguments: `MPTR <int>`
-Moves the poiner by a specified amount.
-Note: there is padding to prevent overflow/underflow, however if you move the pointer by a ridiculous amount, you will just not be able to read/write.
-  
-### MRESET
-Arguments: `MRESET`
-Resets the pointer position to 0
-  
-### MOV
-Arguments: `MOV <item> <number>`, `MOV <item> <item>`
-Copies the value of the second argument to the first argument.
-  
-## I/O
-### IOBLOCK
-Arguments: `IOBLOCK <group>`,
-Places a block with a touchable spawn trigger to the specified group at the bottom.
-Only allowed in the `_init` routine.
-  
-## Miscellaneous
-### NOP
-Arguments: `NOP`
-Does nothing.
-  
-### SPAWN
-Arguments: `SPAWN <routine>`
-Spawns the corresponding routine.
-Does not pause the current group.
-  
-### PERS
-Arguments: `PERS <item>`
-Makes the corresponding item persistent.
-Only allowed in the `_init` routine.
-  
-### DISPLAY
-Arguments: `DISPLAY <item>`
-Adds a counter object for the corresponding item.
-Only allowed in the `_init` routine.
-  
+Documentation for all instructions can be found [here](docs.md)

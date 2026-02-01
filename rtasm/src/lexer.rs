@@ -89,6 +89,72 @@ pub const INSTRUCTIONS: &[&str] = &[
     "FGE",
 ];
 
+pub fn fits_arg_sig(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
+    match args.len() {
+        0 => sig.len() == 0,
+        1 => {
+            if let TasmValueType::List(l_type) = &sig[0] {
+                // check that all arguments are of the type in the list
+                args.iter().all(|arg_type| arg_type.get_type() == *l_type)
+            } else {
+                // check that the argument matches the specified type
+                TasmValueType::Primitive(args[0].get_type()) == sig[0]
+            }
+        }
+        n => {
+            if sig.len() != n {
+                return false;
+            }
+
+            for (arg, t) in args.iter().zip(sig) {
+                // skip list args, because we don't allow hybrid argsets
+                // should never happen
+                if let TasmValueType::List(_) = t {
+                    continue;
+                } else if let TasmValueType::Primitive(p) = t {
+                    match p {
+                        TasmPrimitive::Int => {
+                            if !arg.is_int() {
+                                return false;
+                            }
+                        }
+                        p => {
+                            if &arg.get_type() != p {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+    }
+}
+
+pub fn parse_tasm_value(
+    t: TasmValue,
+    routine_group_map: &Vec<(String, i16)>,
+    errors: &mut Vec<TasmParseError>,
+    curr_line: usize,
+) -> Option<TasmValue> {
+    // if this is a routine ident, add corresponding group
+    if let TasmValue::String(s) = t.clone() {
+        if let Some(group) = routine_group_map
+            .iter()
+            .find(|(ident, _)| *ident == s)
+            .and_then(|data| Some(data.1))
+        {
+            Some(TasmValue::Group(group))
+        } else {
+            errors.push(TasmParseError::InitRoutineSpawnError(curr_line));
+            None
+        }
+    } else {
+        Some(t)
+    }
+}
+
 pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> {
     let file = f_str.as_ref();
     let mut errors = vec![];
@@ -192,25 +258,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 args = trimmed_line[pos + 1..]
                     .split(',')
                     .filter_map(|v| match TasmValue::to_value(v.trim()) {
-                        Ok(t) => {
-                            // if this is a routine ident, add corresponding group
-                            if let TasmValue::String(s) = t.clone() {
-                                if let Some(group) = routine_group_map
-                                    .iter()
-                                    .find(|(ident, _)| *ident == s)
-                                    .and_then(|data| Some(data.1))
-                                {
-                                    Some(TasmValue::Group(group))
-                                } else {
-                                    errors.push(TasmParseError::InitRoutineSpawnError(curr_line));
-                                    None
-                                }
-                            // todo: if this is a number, but the signature specifies that it be an int,
-                            // check that it is a valid int. throw err if not
-                            } else {
-                                Some(t)
-                            }
-                        }
+                        Ok(t) => parse_tasm_value(t, &routine_group_map, &mut errors, curr_line),
                         Err(e) => {
                             // error if unable to parse argument value
                             errors.push(e);
@@ -239,14 +287,12 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 )));
             }
 
-            let args_signature = args
-                .iter()
-                .map(|a| a.get_type())
-                .collect::<Vec<TasmPrimitive>>();
+            // let args_signature = args
+            //     .iter()
+            //     .map(|a| a.get_type())
+            //     .collect::<Vec<TasmPrimitive>>();
 
-            // the args are now valid tasm values,
-            // so we can find the matching argset in instr.rs to get handler
-
+            // find the instruction spec which contains arg handlers
             let (_, init_exclusive, handlers) =
                 match INSTR_SPEC.iter().find(|(ident, _, _)| ident == &instr) {
                     Some(spec) => spec,
@@ -274,23 +320,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
             // find the handler function
             match handlers
                 .iter()
-                .find(|&(sig, _)| {
-                    if sig.len() > 0
-                        && let TasmValueType::List(list_type) = &sig[0]
-                    // an argset with a list signature should NEVER have any other argument types.
-                    {
-                        args_signature.iter().all(|arg_type| arg_type == list_type)
-                    } else {
-                        // assume that the sig is made entirely of primitives
-                        sig.iter()
-                            .filter_map(|v| match v {
-                                TasmValueType::Primitive(p) => Some(p),
-                                _ => None,
-                            })
-                            .eq(&args_signature[..])
-                    }
-                })
-                // return fn pointer
+                .find(|&(sig, _)| fits_arg_sig(&args, sig))
                 .and_then(|v| Some(v.1))
             {
                 Some(handler) => {

@@ -43,6 +43,10 @@ return: stop trigger that stops all objects with that control id (all spawn trig
 
 ### `WAIT`
 Args: `WAIT <int>`
-**Set to deprecate `NOP`.**
+
 Waits for the given amount of ticks.
 
+### `ADDM` / `SUBM`
+1-tick Addition/subtraction command with a multiplier.
+The sum is computed, and then multiplied by the multiplier.
+Arguments: `ADDM <item>, <number>, <number>`, `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`

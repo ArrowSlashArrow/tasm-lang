@@ -7,6 +7,9 @@ pub mod core;
 pub mod instr;
 pub mod lexer;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Parser)]
 #[command(about, version, author)]
 struct Args {

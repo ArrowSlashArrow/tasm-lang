@@ -217,9 +217,19 @@ impl TasmValue {
         match self {
             Self::Counter(_) => TasmPrimitive::Item,
             Self::Timer(_) => TasmPrimitive::Item,
-            Self::Number(f) => TasmPrimitive::Number,
+            Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
+        }
+    }
+
+    pub fn is_int(&self) -> bool {
+        if let Self::Number(n) = self
+            && n.fract() == 0.0
+        {
+            true
+        } else {
+            false
         }
     }
 
