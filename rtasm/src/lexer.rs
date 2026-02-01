@@ -59,14 +59,14 @@ pub const INSTRUCTIONS: &[&str] = &[
     "IOBLOCK",
     "BREAKPOINT", // debug
     "NOP",        // wait
-    "WAIT",
-    "TSPAWN", // timer
-    "TSTART",
-    "TSTOP",
-    "SRAND", // process
-    "FRAND",
-    "RET",
-    "STOP",
+    // "WAIT",
+    // "TSPAWN", // timer
+    // "TSTART",
+    // "TSTOP",
+    // "SRAND", // process
+    // "FRAND",
+    // "RET",
+    // "STOP",
     "SPAWN",
     "PERS", // init
     "ADD",  // arithmetic
@@ -112,17 +112,14 @@ pub fn fits_arg_sig(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
                 if let TasmValueType::List(_) = t {
                     continue;
                 } else if let TasmValueType::Primitive(p) = t {
-                    match p {
-                        TasmPrimitive::Int => {
-                            if !arg.is_int() {
-                                return false;
-                            }
-                        }
-                        p => {
-                            if &arg.get_type() != p {
-                                return false;
-                            }
-                        }
+                    // check if an int is required here
+                    // get_type returns `Number` for a `Number` even if it is an `Int`
+                    if let TasmPrimitive::Int = p
+                        && !arg.is_int()
+                    {
+                        return false;
+                    } else if &arg.get_type() != p {
+                        return false;
                     }
                 }
             }
@@ -252,7 +249,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
             let instr;
             let args: Vec<TasmValue>;
             if let Some(pos) = trimmed_line.trim().find(" ") {
-                instr = &trimmed_line[..pos];
+                instr = trimmed_line[..pos].to_uppercase();
 
                 let mut erroneous_instr = false;
                 args = trimmed_line[pos + 1..]
@@ -275,22 +272,18 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 }
             } else {
                 // no args or extras (everything after | )
-                instr = trimmed_line;
+                instr = trimmed_line.to_uppercase();
                 args = vec![];
             }
 
-            if !INSTRUCTIONS.contains(&instr) {
+            if !INSTRUCTIONS.contains(&instr.as_str()) {
                 // error due to unrecognized instruction
                 errors.push(TasmParseError::InvalidInstruction((
                     instr.into(),
                     curr_line,
                 )));
+                continue;
             }
-
-            // let args_signature = args
-            //     .iter()
-            //     .map(|a| a.get_type())
-            //     .collect::<Vec<TasmPrimitive>>();
 
             // find the instruction spec which contains arg handlers
             let (_, init_exclusive, handlers) =
@@ -326,8 +319,8 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 Some(handler) => {
                     // finally, add instruction to routine
                     curr_routine.add_instruction(Instruction {
-                        ident: instr.into(),
-                        _type: get_instr_type(instr).unwrap(),
+                        ident: instr.clone(),
+                        _type: get_instr_type(&instr).unwrap(),
                         line_number: curr_line,
                         args,
                         handler_fn: handler,

@@ -2,8 +2,8 @@
  - serialise instructions
  - add spawn delay + remap support to asm
  - various other comp triggers 
- - replace NOP with WAIT \<x>
  - do not skip unindented strings that are not routine identifiers
+ - add flag args: `INSTR <args> | <flags>`
 
 ## commands
 ### SPAWN command and derivatives
@@ -46,7 +46,15 @@ Args: `WAIT <int>`
 
 Waits for the given amount of ticks.
 
-### `ADDM` / `SUBM`
-1-tick Addition/subtraction command with a multiplier.
+### `INSTRM` / `INSTRD`
+Arithmetic instruction, except the result is multiplied/divided by the last argument.
+This instruction is 1-tick.
 The sum is computed, and then multiplied by the multiplier.
 Arguments: `ADDM <item>, <number>, <number>`, `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
+
+this could potentially be in stored as a flag
+
+### arithmetic
+support some way to assign with an operator to items: `+=`, `/=`, etc.
+
+this could potentially be in stored as a flag

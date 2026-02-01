@@ -28,6 +28,9 @@ The result is stored in the first argument.
 Same as `DIV`, except the result is rounded down to the nearest integer.
   
 # Compares
+Spawning a group does not automatically pause the parent group.  
+The spawned group will start execution 2 ticks after the compare instruction
+is executed.  
 All compare instructions are 2-tick.
 
 `SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`
@@ -37,7 +40,6 @@ All compare instructions are 2-tick.
 * SLE: Spawns routine if a <= b
 * SG: Spawns routine if a > b
 * SGE: Spawns routine if a >= b
-* Does not pause the current group.
   
 `FE`, `FNE`, `FL`, `FLE`, `FG`, `FE` all accept: `<routine> <routine> <item> <number>`, `<routine> <routine> <item> <item>`
 * FE: Spawns first routine if a == b otherwise spawns the second routine.
@@ -46,7 +48,6 @@ All compare instructions are 2-tick.
 * FLE: Spawns first routine if a <= b otherwise spawns the second routine.
 * FG: Spawns first routine if a > b otherwise spawns the second routine.
 * FGE: Spawns first routine if a >= b otherwise spawns the second routine.
-* Does not pause the current group.
   
 # Memory
 ### INITMEM
@@ -117,3 +118,6 @@ Only allowed in the `_init` routine.
 Arguments: `IOBLOCK <group>`,
 Places a block with a touchable spawn trigger to the specified group at the bottom.
 Only allowed in the `_init` routine.
+
+# Version
+TASM instruction set version: **v0.1.0**

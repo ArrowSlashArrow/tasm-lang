@@ -48,7 +48,6 @@ impl Routine {
 pub type HandlerReturn = Result<HandlerData, TasmParseError>;
 pub type HandlerFn = fn(Vec<TasmValue>, &GDObjConfig) -> HandlerReturn;
 
-#[derive(Default)]
 pub struct HandlerData {
     objects: Vec<GDObject>,
     // skip this amount of obj
@@ -58,24 +57,34 @@ pub struct HandlerData {
 }
 
 impl HandlerData {
+    #[inline(always)]
+    pub fn default() -> Self {
+        Self {
+            objects: vec![],
+            skip_spaces: 1, // always advance one space
+            used_extra_groups: 0,
+        }
+    }
+
+    #[inline(always)]
     pub fn set_objects(mut self, objects: Vec<GDObject>) -> Self {
         self.objects = objects;
         self
     }
 
     pub fn from_objects(objects: Vec<GDObject>) -> Self {
-        Self {
-            objects: objects,
-            skip_spaces: 0,
-            used_extra_groups: 0,
-        }
+        let mut new = Self::default();
+        new.objects = objects;
+        new
     }
 
+    #[inline(always)]
     pub fn skip_spaces(mut self, spaces: i32) -> Self {
         self.skip_spaces = spaces;
         self
     }
 
+    #[inline(always)]
     pub fn extra_groups(mut self, groups: i16) -> Self {
         self.used_extra_groups = groups;
         self
@@ -165,9 +174,8 @@ pub enum TasmValueType {
 #[derive(PartialEq)]
 pub enum TasmPrimitive {
     Item,
-    Number,
+    Number, // also a float.
     Int,
-    Float,
     Group,
     String,
 }
