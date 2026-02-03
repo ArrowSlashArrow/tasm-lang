@@ -76,6 +76,14 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => fldiv_2items_num),
         ],
     ),
+    (
+        "SE",
+        false,
+        &[
+            argset!((Group, Item, Item) => todo),
+            argset!((Group, Item, Number) => todo),
+        ],
+    ),
 ];
 
 // utils

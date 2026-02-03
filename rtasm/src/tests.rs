@@ -26,3 +26,27 @@ fn no_int_detection() {
         ],
     ))
 }
+
+#[test]
+fn parse_tasm() {
+    let file = fs::read_to_string("../programs/nuclear_reactor.tasm").unwrap();
+    let parse_start = Instant::now();
+    let _tasm = match lexer::parse_file(file) {
+        Ok(t) => {
+            println!("Parsed file with 0 errors.");
+            t
+        }
+        Err(e) => {
+            for err in e.iter() {
+                println!("{err}");
+            }
+            println!("Parsed file with {} errors.", e.len());
+            panic!("bad tasm")
+        }
+    };
+
+    println!(
+        "Parse time: {:.3}ms",
+        parse_start.elapsed().as_micros() as f64 / 1000.0
+    );
+}

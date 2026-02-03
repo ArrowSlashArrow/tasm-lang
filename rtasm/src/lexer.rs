@@ -89,6 +89,11 @@ pub const INSTRUCTIONS: &[&str] = &[
     "FGE",
 ];
 
+pub const ALIASES: &[(&'static str, TasmValue)] = &[
+    ("MEMREG", TasmValue::Counter(9998)), // Counter or timer (depends on memory type) at the end of malloc'ed counters + 1
+    ("PTRPOS", TasmValue::Counter(9999)), // Always a counter at the end of the malloc'ed counters + 2
+];
+
 pub fn fits_arg_sig(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
     match args.len() {
         0 => sig.len() == 0,
