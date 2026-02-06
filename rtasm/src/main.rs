@@ -1,4 +1,4 @@
-use std::{fs, time::Instant};
+use std::fs;
 
 use anyhow::{Error, anyhow};
 use clap::Parser;
@@ -32,7 +32,7 @@ fn main() -> Result<(), Error> {
     let args = Args::parse();
     let file = fs::read_to_string(args.infile).unwrap();
 
-    let tasm = match lexer::parse_file(file) {
+    let _tasm = match lexer::parse_file(file) {
         Ok(t) => {
             println!("Parsed file with 0 errors.");
             t

@@ -50,7 +50,7 @@ Waits for the given amount of ticks.
 Arithmetic instruction, except the result is multiplied/divided by the last argument.
 This instruction is 1-tick.
 The sum is computed, and then multiplied by the multiplier.
-Arguments: `ADDM <item>, <number>, <number>`, `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
+Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
 
 this could potentially be in stored as a flag
 
@@ -58,3 +58,54 @@ this could potentially be in stored as a flag
 support some way to assign with an operator to items: `+=`, `/=`, etc.
 
 this could potentially be in stored as a flag
+
+### flags
+a.k.a. "extra args"/ "extras"  
+Very rough concept for passing extra arguments to instructions expandably, specifically to avoid many similar instructions.  
+Consider the tasm where each variant has its own spearate instruction:
+```
+; base add
+; C1 += C2
+ADD     C1, C2
+; add with multiplier
+; C1 += C2 * 0.5
+ADDM    C1, C2, 0.5
+; add with divider
+; C1 += C2 / 2
+ADDD    C1, C2, 2
+; add with multiplier, adding result to result item
+; C3 += (C1 + C2) * 0.5
+ADDMA   C3, C1, C2, 0.5
+; add with divider, subtracting rounded result from result item 
+; C3 -= round( (C1 + C2) / 2 )
+RADDDS  C3, C1, C2, 2
+; add with multiplier, dividing negated rounded result by result item, which is finally floored and made absolute
+; C3 = | floor( C3 / -round( (C1 + C2) * 0.5 ) ) |
+RNADDMSAF   C3, C1, C2, 0.5  ; preposterous!
+...
+```
+vs. a tasm with flags to specify all possible configurations:
+```
+; base add
+; C1 += C2
+ADD     C1, C2
+; add with multiplier
+; C1 += C2 * 0.5
+ADDM    C1, C2, 0.5
+; add with divider
+; C1 += C2 / 2
+ADDD    C1, C2, 2
+; add with multiplier, adding result to result item
+; C3 += (C1 + C2) * 0.5
+ADDM    C3, C1, C2, 0.5 | +=
+; add with divider, subtracting rounded result from result item 
+; C3 -= round( (C1 + C2) / 2 )
+ADDD    C3, C1, C2, 2   | -= res:r
+; add with multiplier, dividing negated rounded result by result item, which is finally floored and made absolute
+; C3 = | floor( C3 / -round( (C1 + C2) * 0.5 ) ) |
+ADDM    C3, C1, C2, 0.5 | /= res:r- fin:f+  ; a bit cleaner
+...
+```
+
+Creating an instruction for each possible combinations would result in 5760 instructions total, which is simply unsistainable.  
+While the flag system is arguably better for this situation, it still needs some work. For example, `res:r-` could be optionally written as `result:round-` or `res:-round` for disambiguation purposes. 

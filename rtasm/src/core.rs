@@ -46,7 +46,16 @@ impl Routine {
 }
 
 pub type HandlerReturn = Result<HandlerData, TasmParseError>;
-pub type HandlerFn = fn(Vec<TasmValue>, &GDObjConfig) -> HandlerReturn;
+pub type HandlerFn = fn(HandlerArgs) -> HandlerReturn;
+
+pub struct HandlerArgs {
+    /// Arguments to this function. e.g. Counter(C1), Number(2.5)
+    pub args: Vec<TasmValue>,
+    /// Config (specifically position and group) of the resulting object(s)
+    pub cfg: GDObjConfig,
+    /// Next available group to use for the objects
+    pub curr_group: i16,
+}
 
 pub struct HandlerData {
     objects: Vec<GDObject>,
@@ -321,7 +330,13 @@ impl Tasm {
                 };
 
                 let handler = instr.handler_fn;
-                let data = match handler(instr.args.clone(), &cfg) {
+                let args = HandlerArgs {
+                    args: instr.args.clone(),
+                    cfg: cfg.spawnable(true).multitrigger(true),
+                    curr_group,
+                };
+
+                let data = match handler(args) {
                     Ok(data) => data,
                     Err(e) => {
                         errors.push(e);

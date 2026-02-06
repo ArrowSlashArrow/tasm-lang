@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     core::{TasmValue, TasmValueType},
     lexer::fits_arg_sig,
