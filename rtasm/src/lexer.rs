@@ -106,20 +106,23 @@ pub fn fits_arg_sig(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
             _ => &arg.get_type() == p,
         }
     }
-    match args.len() {
-        0 => sig.len() == 0,
+    match sig.len() {
+        0 => args.len() == 0,
         1 => match &sig[0] {
             TasmValueType::List(l_type) => {
                 // check that all arguments are of the type in the list
                 args.iter().all(|arg| check_primitive(&l_type, arg))
             }
             TasmValueType::Primitive(p) => {
+                if args.len() != 1 {
+                    return false;
+                }
                 // check that the argument matches the specified type
                 check_primitive(p, &args[0])
             }
         },
         n => {
-            if sig.len() != n {
+            if args.len() != n {
                 return false;
             }
             for (arg, t) in args.iter().zip(sig) {

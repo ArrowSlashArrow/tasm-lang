@@ -174,7 +174,7 @@ pub enum TasmValue {
     String(String),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum TasmValueType {
     Primitive(TasmPrimitive),
     List(TasmPrimitive),
