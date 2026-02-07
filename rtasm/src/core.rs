@@ -180,7 +180,7 @@ pub enum TasmValueType {
     List(TasmPrimitive),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum TasmPrimitive {
     Item,
     Number, // also a float.
@@ -241,12 +241,9 @@ impl TasmValue {
     }
 
     pub fn is_int(&self) -> bool {
-        if let Self::Number(n) = self
-            && n.fract() == 0.0
-        {
-            true
-        } else {
-            false
+        match self {
+            Self::Number(n) => n.fract() == 0.0,
+            _ => false,
         }
     }
 

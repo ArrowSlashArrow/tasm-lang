@@ -31,11 +31,37 @@ pub const INSTR_SPEC: &[(
     bool,                             // exclusive to _init
     &[(&[TasmValueType], HandlerFn)], // handlers
 )] = &[
+    // inits
     ("MALLOC", true, &[argset!((Int) => todo)]),
     ("FMALLOC", true, &[argset!((Int) => todo)]),
     ("INITMEM", true, &[argset!([Number] => todo)]),
+    ("PERS", true, &[argset!((Item) => todo)]),
+    ("DISPLAY", true, &[argset!((Item) => todo)]),
+    ("IOBLOCK", true, &[argset!((Group, Int, String) => todo)]),
+    // memory
+    ("MFUNC", false, &[argset!(() => todo)]),
+    ("MREAD", false, &[argset!(() => todo)]),
+    ("MWRITE", false, &[argset!(() => todo)]),
+    ("MPTR", false, &[argset!((Int) => todo)]),
+    ("MRESET", false, &[argset!(() => todo)]),
+    (
+        "MOV",
+        false,
+        &[
+            argset!((Item, Number) => todo),
+            argset!((Item, Item) => todo),
+        ],
+    ),
+    // debug
+    ("BREAKPOINT", false, &[argset!(() => todo)]),
+    // Process
+    ("SPAWN", false, &[argset!((Group) => todo)]),
+    // Waits
     ("NOP", false, &[argset!(() => nop)]),
-    ("WAIT", false, &[argset!((Int) => wait)]),
+    // Commented out due to being
+    // ("WAIT", false, &[argset!((Int) => wait)]),
+
+    // Arithmetic
     (
         "ADD",
         false,
@@ -132,6 +158,54 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Number) => spawn_item_num_geq),
         ],
     ),
+    (
+        "FE",
+        false,
+        &[
+            argset!((Group, Item, Item) => fork_item_item_eq),
+            argset!((Group, Item, Number) => fork_item_num_eq),
+        ],
+    ),
+    (
+        "FNE",
+        false,
+        &[
+            argset!((Group, Item, Item) => fork_item_item_ne),
+            argset!((Group, Item, Number) => fork_item_num_ne),
+        ],
+    ),
+    (
+        "FL",
+        false,
+        &[
+            argset!((Group, Item, Item) => fork_item_item_le),
+            argset!((Group, Item, Number) => fork_item_num_le),
+        ],
+    ),
+    (
+        "FLE",
+        false,
+        &[
+            argset!((Group, Item, Item) => fork_item_item_leq),
+            argset!((Group, Item, Number) => fork_item_num_leq),
+        ],
+    ),
+    (
+        "FG",
+        false,
+        &[
+            argset!((Group, Item, Item) => fork_item_item_ge),
+            argset!((Group, Item, Number) => fork_item_num_ge),
+        ],
+    ),
+    (
+        "FGE",
+        false,
+        &[
+            argset!((Group, Item, Item) => fork_item_item_geq),
+            argset!((Group, Item, Number) => fork_item_num_geq),
+        ],
+    ),
 ];
 
 // utils
@@ -200,13 +274,13 @@ macro_rules! handlers {
         )*
     };
 
-    ( [$($var:ident),* $(,)?] => $inner_fn:ident) => {
+    ( [$($var:ident),* $(,)?] + $extra_groups:literal => $inner_fn:ident) => {
         $(
             paste! {
                 fn [<$inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
                     Ok(
                         HandlerData::from_objects($inner_fn(args, (LowerCompOp::$var).to_op()))
-                            .extra_groups(1),
+                            .extra_groups($extra_groups),
                     )
                 }
             }
@@ -215,7 +289,7 @@ macro_rules! handlers {
 }
 
 fn todo(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![default_block(&args.cfg)]))
+    unimplemented!()
 }
 
 /* WAIT */
@@ -466,12 +540,148 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
     ]
 }
+fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+    // below
+    let cfg = args.cfg;
+    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
+    let spawn_true_cfg = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 + 10.0)
+        .scale(0.33, 0.33)
+        .groups([args.curr_group]); // use auxiliary group for spawn trigger
 
-handlers!([eq, ne, le, leq, ge, geq] => spawn_item_num);
-handlers!([eq, ne, le, leq, ge, geq] => spawn_item_item);
+    let spawn_false_cfg = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 - 10.0)
+        .scale(0.33, 0.33)
+        .groups([args.curr_group + 1]); // use auxiliary group for spawn trigger
+
+    let iargs = args.args;
+    let (lhs_id, lhs_t) = get_item_spec(&iargs[2]).unwrap();
+    let num = iargs[3].to_float().unwrap();
+    // FX rtn, rtn2, I1, 42
+    // args: [Group(n), Group(n), Item, Number]
+
+    vec![
+        item_compare(
+            &compare_cfg,
+            args.curr_group,     // spawn auxiliary group (true trigger)
+            args.curr_group + 1, // spawn 2nd aux group (false trigger)
+            (
+                lhs_id as i32,
+                lhs_t,
+                1.0,
+                Op::Mul,
+                RoundMode::None,
+                SignMode::None,
+            ),
+            (
+                0,
+                ItemType::Counter,
+                num,
+                Op::Mul,
+                RoundMode::None,
+                SignMode::None,
+            ),
+            op,
+            0.0,
+        ),
+        spawn_trigger(
+            &spawn_true_cfg,
+            // spawn true group
+            iargs[0].to_group_id().unwrap() as i32,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+        ),
+        spawn_trigger(
+            &spawn_false_cfg,
+            // spawn false group
+            iargs[1].to_group_id().unwrap() as i32,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+        ),
+    ]
+}
+fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+    // below
+    let cfg = args.cfg;
+    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
+    let spawn_true_cfg = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 + 10.0)
+        .scale(0.33, 0.33)
+        .groups([args.curr_group]); // use auxiliary group for spawn trigger
+
+    let spawn_false_cfg = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 - 10.0)
+        .scale(0.33, 0.33)
+        .groups([args.curr_group + 1]); // use auxiliary group for spawn trigger
+
+    let iargs = args.args;
+    let (lhs_id, lhs_t) = get_item_spec(&iargs[2]).unwrap();
+    let (rhs_id, rhs_t) = get_item_spec(&iargs[3]).unwrap();
+    // FX rtn, rtn2, I1, 42
+    // args: [Group(n), Group(n), Item, Item]
+
+    vec![
+        item_compare(
+            &compare_cfg,
+            args.curr_group,     // spawn auxiliary group (true trigger)
+            args.curr_group + 1, // spawn 2nd aux group (false trigger)
+            (
+                lhs_id as i32,
+                lhs_t,
+                1.0,
+                Op::Mul,
+                RoundMode::None,
+                SignMode::None,
+            ),
+            (
+                rhs_id as i32,
+                rhs_t,
+                1.0,
+                Op::Mul,
+                RoundMode::None,
+                SignMode::None,
+            ),
+            op,
+            0.0,
+        ),
+        spawn_trigger(
+            &spawn_true_cfg,
+            // spawn true group
+            iargs[0].to_group_id().unwrap() as i32,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+        ),
+        spawn_trigger(
+            &spawn_false_cfg,
+            // spawn false group
+            iargs[1].to_group_id().unwrap() as i32,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+        ),
+    ]
+}
+
+handlers!([eq, ne, le, leq, ge, geq] + 1 => spawn_item_num);
+handlers!([eq, ne, le, leq, ge, geq] + 1 => spawn_item_item);
+handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_num);
+handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
 // TODO: spawn item, item fns
 // TODO: form item, item + item, num
 // TODO: more unit test and lints
-
-// possibly TODO: macros for function codegen

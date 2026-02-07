@@ -89,42 +89,48 @@ pub const INSTRUCTIONS: &[&str] = &[
     "FGE",
 ];
 
-pub const ALIASES: &[(&'static str, TasmValue)] = &[
-    ("MEMREG", TasmValue::Counter(9998)), // Counter or timer (depends on memory type) at the end of malloc'ed counters + 1
-    ("PTRPOS", TasmValue::Counter(9999)), // Always a counter at the end of the malloc'ed counters + 2
+pub const ALIASES: &[(&'static str, i16)] = &[
+    ("MEMREG", -2), // Counter or timer (depends on memory type) at the end of malloc'ed counters + 1
+    ("PTRPOS", -1), // Always a counter at the end of the malloc'ed counters + 2
 ];
 
+const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
+
 pub fn fits_arg_sig(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
+    // helper fn
+    fn check_primitive(p: &TasmPrimitive, arg: &TasmValue) -> bool {
+        // check if an int is required here
+        // get_type returns `Number` for a `Number` even if it is an `Int`
+        match p {
+            TasmPrimitive::Int => arg.is_int(),
+            _ => &arg.get_type() == p,
+        }
+    }
     match args.len() {
         0 => sig.len() == 0,
-        1 => {
-            if let TasmValueType::List(l_type) = &sig[0] {
+        1 => match &sig[0] {
+            TasmValueType::List(l_type) => {
                 // check that all arguments are of the type in the list
-                args.iter().all(|arg_type| arg_type.get_type() == *l_type)
-            } else {
-                // check that the argument matches the specified type
-                TasmValueType::Primitive(args[0].get_type()) == sig[0]
+                args.iter().all(|arg| check_primitive(&l_type, arg))
             }
-        }
+            TasmValueType::Primitive(p) => {
+                // check that the argument matches the specified type
+                check_primitive(p, &args[0])
+            }
+        },
         n => {
             if sig.len() != n {
                 return false;
             }
-
             for (arg, t) in args.iter().zip(sig) {
                 // skip list args, because we don't allow hybrid argsets
-                // should never happen
-                if let TasmValueType::List(_) = t {
-                    continue;
-                } else if let TasmValueType::Primitive(p) = t {
-                    // check if an int is required here
-                    // get_type returns `Number` for a `Number` even if it is an `Int`
-                    if let TasmPrimitive::Int = p
-                        && !arg.is_int()
-                    {
-                        return false;
-                    } else if &arg.get_type() != p {
-                        return false;
+                match t {
+                    TasmValueType::List(_) => continue,
+                    TasmValueType::Primitive(p) => {
+                        if !check_primitive(p, arg) {
+                            println!("{arg:?} is not {p:?}");
+                            return false;
+                        }
                     }
                 }
             }
@@ -142,15 +148,22 @@ pub fn parse_tasm_value(
 ) -> Option<TasmValue> {
     // if this is a routine ident, add corresponding group
     if let TasmValue::String(s) = t.clone() {
-        if let Some(group) = routine_group_map
+        if s == INIT_ROUTINE {}
+        match routine_group_map
             .iter()
             .find(|(ident, _)| *ident == s)
             .and_then(|data| Some(data.1))
         {
-            Some(TasmValue::Group(group))
-        } else {
-            errors.push(TasmParseError::InitRoutineSpawnError(curr_line));
-            None
+            Some(group) => {
+                if group != INIT_PLACEHOLDER_GROUP {
+                    Some(TasmValue::Group(group))
+                } else {
+                    // only throw err if the group is the _init group
+                    errors.push(TasmParseError::InitRoutineSpawnError(curr_line + 1));
+                    None
+                }
+            }
+            None => Some(TasmValue::String(s)),
         }
     } else {
         Some(t)
@@ -164,8 +177,6 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
         .lines()
         .map(|l| l.split(';').next().unwrap().trim_end())
         .collect::<Vec<&str>>();
-
-    println!("{lines:#?}");
 
     // [(line, ident, group, instruction_lines: (idx, line))]
     let mut routine_data = vec![];
@@ -188,7 +199,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
             // commit old data
             let routine_ident = curr_routine_data.1.clone();
             if routine_ident == INIT_ROUTINE {
-                curr_routine_data.2 = 0i16; // init has no group
+                curr_routine_data.2 = INIT_PLACEHOLDER_GROUP; // init has no group, -1 serves as a unique _init marker
                 curr_group -= 1;
             } else {
                 routine_group_map.push((routine_ident, curr_group));
@@ -233,16 +244,20 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
     // first routine was garbage data, so remove it
     routine_data.remove(0);
 
-    println!("{routine_data:#?}");
-
     if !seen_entry_point {
         errors.push(TasmParseError::NoEntryPoint);
     }
 
     let mut routines = vec![];
 
-    for (_, ident, rtn_group, rtn_lines) in routine_data {
-        let mut curr_routine = Routine::default().group(rtn_group).ident(&ident);
+    for (_, rtn_ident, rtn_group, rtn_lines) in routine_data {
+        let mut curr_routine = Routine::default()
+            .group(match rtn_group {
+                // if this routine is the init routine, don't give it a group
+                INIT_PLACEHOLDER_GROUP => 0,
+                g => g,
+            })
+            .ident(&rtn_ident);
 
         for (curr_line, line) in rtn_lines {
             let trimmed_line = line.trim();
@@ -296,7 +311,7 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                     Some(spec) => spec,
                     None => {
                         errors.push(TasmParseError::InvalidInstruction((
-                            format!("Instruction {instr} has no argument handler."),
+                            format!("Unrecognized instruction {instr}: "),
                             curr_line,
                         )));
                         continue;
@@ -304,10 +319,10 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 };
 
             // check if this isntruction is allowed in the routine
-            if *init_exclusive && instr != INIT_ROUTINE {
+            if *init_exclusive && rtn_ident != INIT_ROUTINE {
                 errors.push(TasmParseError::InvalidInstruction((
                     format!(
-                        "Instruction {instr} is not allowed in routine {} because it is excluse to the initialiser routine, {INIT_ROUTINE}.",
+                        "Instruction {instr} is not allowed in routine {} because it is exclusive to the initialiser routine, {INIT_ROUTINE}.",
                         curr_routine.ident,
                     ),
                     curr_line,
@@ -334,7 +349,9 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 None => {
                     // otherwise, error
                     errors.push(TasmParseError::InvalidInstruction((
-                        format!("Instruction {instr} has no argument handler."),
+                        format!(
+                            "Instruction {instr} has no argument handler for the given arguments."
+                        ),
                         curr_line,
                     )));
                 }

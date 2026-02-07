@@ -56,8 +56,12 @@ Assigns the numbers to memory in order, starting at address 0. Must be done afte
 Only allowed `_init` routine.
   
 ### MALLOC
-Arguments: `MALLOC <number>`
+Arguments: `MALLOC <positive int>`
 Allocates a specified amount of counters to memory. Uses 1 group per counter + 4 groups.
+Only allowed `_init` routine.
+### FMALLOC
+Arguments: `FMALLOC <positive int>`
+Allocates a specified amount of timers (floats) to memory. Uses 1 group per timer + 4 groups.
 Only allowed `_init` routine.
   
 ### MFUNC
@@ -115,8 +119,10 @@ Adds a counter object for the corresponding item.
 Only allowed in the `_init` routine.
 
 ### IOBLOCK
-Arguments: `IOBLOCK <group>`,
-Places a block with a touchable spawn trigger to the specified group at the bottom.
+Arguments: `IOBLOCK <group>, <int>, <string>`,
+Places a block at the bottom of the level, at the specified x-position (2nd argument) with an annotation (3rd argument).
+Also places a touchable spawn trigger that spawns the specified group. 
+Intended as a debug feature and/or substitute for user input.
 Only allowed in the `_init` routine.
 
 # Version

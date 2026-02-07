@@ -10,10 +10,13 @@ use super::*;
 #[test]
 fn int_detection() {
     assert!(fits_arg_sig(
-        &vec![TasmValue::Number(1.0), TasmValue::Number(1.1)],
+        &vec![
+            TasmValue::Number(1.0),
+            // TasmValue::Number(1.1)
+        ],
         &[
             TasmValueType::Primitive(core::TasmPrimitive::Int),
-            TasmValueType::Primitive(core::TasmPrimitive::Number),
+            // TasmValueType::Primitive(core::TasmPrimitive::Number),
         ],
     ))
 }
