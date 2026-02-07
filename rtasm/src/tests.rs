@@ -36,7 +36,7 @@ fn no_int_detection() {
 fn parse_tasm() {
     let file = fs::read_to_string("../programs/nuclear_reactor.tasm").unwrap();
     let parse_start = Instant::now();
-    let _tasm = match lexer::parse_file(file) {
+    let _tasm = match lexer::parse_file(file, 9999) {
         Ok(t) => {
             println!("Parsed file with 0 errors.");
             t

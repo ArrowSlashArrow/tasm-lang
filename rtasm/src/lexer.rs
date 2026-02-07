@@ -90,8 +90,8 @@ pub const INSTRUCTIONS: &[&str] = &[
 ];
 
 pub const ALIASES: &[(&'static str, i16)] = &[
-    ("MEMREG", -2), // Counter or timer (depends on memory type) at the end of malloc'ed counters + 1
-    ("PTRPOS", -1), // Always a counter at the end of the malloc'ed counters + 2
+    ("MEMREG", -1), // Counter or timer (depends on memory type) at the end of malloc'ed counters + 1
+    ("PTRPOS", 0),  // Always a counter at the end of the malloc'ed counters + 2
 ];
 
 const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
@@ -128,7 +128,7 @@ pub fn fits_arg_sig(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
                     TasmValueType::List(_) => continue,
                     TasmValueType::Primitive(p) => {
                         if !check_primitive(p, arg) {
-                            println!("{arg:?} is not {p:?}");
+                            // println!("{arg:?} is not {p:?}");
                             return false;
                         }
                     }
@@ -144,11 +144,20 @@ pub fn parse_tasm_value(
     t: TasmValue,
     routine_group_map: &Vec<(String, i16)>,
     errors: &mut Vec<TasmParseError>,
+    mem_end_counter: i16,
     curr_line: usize,
 ) -> Option<TasmValue> {
+    let alias_lookup = |s: &str| -> Option<TasmValue> {
+        match s {
+            // TODO: make MEMREG a timer if the memory is a timer
+            "MEMREG" => Some(TasmValue::Counter(mem_end_counter - 1)),
+            "PTRPOS" => Some(TasmValue::Counter(mem_end_counter)),
+            _ => None,
+        }
+    };
+
     // if this is a routine ident, add corresponding group
     if let TasmValue::String(s) = t.clone() {
-        if s == INIT_ROUTINE {}
         match routine_group_map
             .iter()
             .find(|(ident, _)| *ident == s)
@@ -163,14 +172,20 @@ pub fn parse_tasm_value(
                     None
                 }
             }
-            None => Some(TasmValue::String(s)),
+            None => match alias_lookup(&s) {
+                Some(v) => Some(v),
+                None => Some(TasmValue::String(s)),
+            },
         }
     } else {
         Some(t)
     }
 }
 
-pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> {
+pub fn parse_file<T: AsRef<str>>(
+    f_str: T,
+    mem_end_counter: i16,
+) -> Result<Tasm, Vec<TasmParseError>> {
     let file = f_str.as_ref();
     let mut errors = vec![];
     let lines = file
@@ -275,7 +290,13 @@ pub fn parse_file<T: AsRef<str>>(f_str: T) -> Result<Tasm, Vec<TasmParseError>> 
                 args = trimmed_line[pos + 1..]
                     .split(',')
                     .filter_map(|v| match TasmValue::to_value(v.trim()) {
-                        Ok(t) => parse_tasm_value(t, &routine_group_map, &mut errors, curr_line),
+                        Ok(t) => parse_tasm_value(
+                            t,
+                            &routine_group_map,
+                            &mut errors,
+                            mem_end_counter,
+                            curr_line,
+                        ),
                         Err(e) => {
                             // error if unable to parse argument value
                             errors.push(e);

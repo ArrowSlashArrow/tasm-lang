@@ -162,48 +162,48 @@ pub const INSTR_SPEC: &[(
         "FE",
         false,
         &[
-            argset!((Group, Item, Item) => fork_item_item_eq),
-            argset!((Group, Item, Number) => fork_item_num_eq),
+            argset!((Group, Group, Item, Item) => fork_item_item_eq),
+            argset!((Group, Group, Item, Number) => fork_item_num_eq),
         ],
     ),
     (
         "FNE",
         false,
         &[
-            argset!((Group, Item, Item) => fork_item_item_ne),
-            argset!((Group, Item, Number) => fork_item_num_ne),
+            argset!((Group, Group, Item, Item) => fork_item_item_ne),
+            argset!((Group, Group, Item, Number) => fork_item_num_ne),
         ],
     ),
     (
         "FL",
         false,
         &[
-            argset!((Group, Item, Item) => fork_item_item_le),
-            argset!((Group, Item, Number) => fork_item_num_le),
+            argset!((Group, Group, Item, Item) => fork_item_item_le),
+            argset!((Group, Group, Item, Number) => fork_item_num_le),
         ],
     ),
     (
         "FLE",
         false,
         &[
-            argset!((Group, Item, Item) => fork_item_item_leq),
-            argset!((Group, Item, Number) => fork_item_num_leq),
+            argset!((Group, Group, Item, Item) => fork_item_item_leq),
+            argset!((Group, Group, Item, Number) => fork_item_num_leq),
         ],
     ),
     (
         "FG",
         false,
         &[
-            argset!((Group, Item, Item) => fork_item_item_ge),
-            argset!((Group, Item, Number) => fork_item_num_ge),
+            argset!((Group, Group, Item, Item) => fork_item_item_ge),
+            argset!((Group, Group, Item, Number) => fork_item_num_ge),
         ],
     ),
     (
         "FGE",
         false,
         &[
-            argset!((Group, Item, Item) => fork_item_item_geq),
-            argset!((Group, Item, Number) => fork_item_num_geq),
+            argset!((Group, Group, Item, Item) => fork_item_item_geq),
+            argset!((Group, Group, Item, Number) => fork_item_num_geq),
         ],
     ),
 ];
@@ -682,6 +682,4 @@ handlers!([eq, ne, le, leq, ge, geq] + 1 => spawn_item_item);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_num);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
-// TODO: spawn item, item fns
-// TODO: form item, item + item, num
 // TODO: more unit test and lints

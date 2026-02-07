@@ -20,6 +20,13 @@ struct Args {
     /// which will reduce readability in the editor.
     #[arg(long)]
     release: bool,
+
+    #[arg(
+        value_parser = clap::value_parser!(i16),
+        default_value_t = 9999i16,
+        long
+    )]
+    mem_end_counter: i16,
     /* args todo:
      * group offset
      * export as gmd
@@ -30,9 +37,10 @@ struct Args {
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
+    println!("{}", args.mem_end_counter);
     let file = fs::read_to_string(args.infile).unwrap();
 
-    let _tasm = match lexer::parse_file(file) {
+    let _tasm = match lexer::parse_file(file, args.mem_end_counter) {
         Ok(t) => {
             println!("Parsed file with 0 errors.");
             t
