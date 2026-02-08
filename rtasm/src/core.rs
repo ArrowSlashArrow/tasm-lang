@@ -1,20 +1,23 @@
 use std::{error::Error, fmt::Display, num::ParseIntError};
 
-use gdlib::{
-    gdlevel::Level,
-    gdobj::{GDObjConfig, GDObject},
-};
+use gdlib::gdobj::{GDObjConfig, GDObject};
 
 pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
 pub const GROUP_LIMIT: i16 = 9_999;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Tasm {
     pub routines: Vec<Routine>,
+    pub errors: Vec<TasmParseError>,
+    pub routine_data: Vec<(usize, String, i16, Vec<(usize, String)>)>,
+    pub routine_group_map: Vec<(String, i16)>,
+    pub has_entry_point: bool,
+    pub lines: Vec<String>,
+    pub mem_end_counter: i16,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Routine {
     pub ident: String,
     pub group: i16,
@@ -58,11 +61,11 @@ pub struct HandlerArgs {
 }
 
 pub struct HandlerData {
-    objects: Vec<GDObject>,
+    pub objects: Vec<GDObject>,
     // skip this amount of obj
-    skip_spaces: i32,
+    pub skip_spaces: i32,
     // extra used groups
-    used_extra_groups: i16,
+    pub used_extra_groups: i16,
 }
 
 impl HandlerData {
@@ -100,7 +103,7 @@ impl HandlerData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instruction {
     pub ident: String,
     pub _type: InstrType,
@@ -290,74 +293,54 @@ impl TasmValue {
     }
 }
 
-impl Tasm {
-    pub fn from_routines(routines: Vec<Routine>) -> Self {
-        Self { routines }
-    }
-
-    pub fn handle_routines(&mut self) -> Result<Level, Vec<TasmParseError>> {
-        let mut errors: Vec<TasmParseError> = vec![];
-
-        let mut level = Level::new("tasm level", "tasm", None, None);
-        let mut curr_group = 0i16;
-
-        let mut obj_pos = 0.0;
-
-        for routine in self.routines.iter() {
-            curr_group += 1;
-            if curr_group > GROUP_LIMIT {
-                errors.push(TasmParseError::ExceedsGroupLimit);
-                break;
-            }
-
-            // starting position of objects: (15, 75 + curr_group * 15)
-            for instr in routine.instructions.iter() {
-                let cfg = if routine.ident == INIT_ROUTINE {
-                    if let InstrType::Init = instr._type {
-                        GDObjConfig::default()
-                    } else {
-                        curr_group -= 1;
-                        GDObjConfig::default()
-                            .pos(-15.0 - obj_pos, 75.0 + (curr_group as f64) * 15.0)
-                    }
-                } else {
-                    GDObjConfig::default()
-                        .pos(15.0 + obj_pos, 75.0 + (curr_group as f64) * 15.0)
-                        .groups([curr_group])
-                };
-
-                let handler = instr.handler_fn;
-                let args = HandlerArgs {
-                    args: instr.args.clone(),
-                    cfg: cfg.spawnable(true).multitrigger(true),
-                    curr_group,
-                };
-
-                let data = match handler(args) {
-                    Ok(data) => data,
-                    Err(e) => {
-                        errors.push(e);
-                        continue;
-                    }
-                };
-                for obj in data.objects.into_iter() {
-                    level.add_object(obj);
-                }
-                let skip_spaces = data.skip_spaces;
-                curr_group += data.used_extra_groups;
-                obj_pos += skip_spaces as f64;
-            }
+pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
+    // helper fn
+    fn check_primitive(p: &TasmPrimitive, arg: &TasmValue) -> bool {
+        // check if an int is required here
+        // get_type returns `Number` for a `Number` even if it is an `Int`
+        match p {
+            TasmPrimitive::Int => arg.is_int(),
+            _ => &arg.get_type() == p,
         }
+    }
+    match sig.len() {
+        0 => args.len() == 0,
+        1 => match &sig[0] {
+            TasmValueType::List(l_type) => {
+                // check that all arguments are of the type in the list
+                args.iter().all(|arg| check_primitive(&l_type, arg))
+            }
+            TasmValueType::Primitive(p) => {
+                if args.len() != 1 {
+                    return false;
+                }
+                // check that the argument matches the specified type
+                check_primitive(p, &args[0])
+            }
+        },
+        n => {
+            if args.len() != n {
+                return false;
+            }
+            for (arg, t) in args.iter().zip(sig) {
+                // skip list args, because we don't allow hybrid argsets
+                match t {
+                    TasmValueType::List(_) => continue,
+                    TasmValueType::Primitive(p) => {
+                        if !check_primitive(p, arg) {
+                            // println!("{arg:?} is not {p:?}");
+                            return false;
+                        }
+                    }
+                }
+            }
 
-        if errors.len() > 0 {
-            Err(errors)
-        } else {
-            Ok(level)
+            return true;
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InstrType {
     Arithmetic, // any instruction that deals specifically with operations between counters
     Init,       // any instruction that can only go into the _init routine.

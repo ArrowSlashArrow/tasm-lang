@@ -1,6 +1,5 @@
 use gdlib::gdobj::{
     GDObject,
-    misc::default_block,
     triggers::{
         CompareOp, ItemType, Op, RoundMode, SignMode, item_compare, item_edit, spawn_trigger,
     },
@@ -48,8 +47,8 @@ pub const INSTR_SPEC: &[(
         "MOV",
         false,
         &[
-            argset!((Item, Number) => todo),
-            argset!((Item, Item) => todo),
+            argset!((Item, Number) => arithmetic_item_num_mov),
+            argset!((Item, Item) => arithmetic_2items_mov),
         ],
     ),
     // debug
@@ -225,6 +224,7 @@ enum LowerOp {
     sub,
     mul,
     div,
+    mov,
 }
 impl LowerOp {
     pub fn to_op(&self) -> Op {
@@ -233,6 +233,7 @@ impl LowerOp {
             Self::sub => Op::Sub,
             Self::mul => Op::Mul,
             Self::div => Op::Div,
+            Self::mov => Op::Set,
         }
     }
 }
@@ -402,9 +403,9 @@ fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
     )]
 }
 
-handlers!((add, sub, mul, div) => arithmetic_2items);
+handlers!((add, sub, mul, div, mov) => arithmetic_2items);
 handlers!((add, sub, mul, div) => arithmetic_3items);
-handlers!((add, sub, mul, div) => arithmetic_item_num);
+handlers!((add, sub, mul, div, mov) => arithmetic_item_num);
 handlers!((mul, div) => arithmetic_2items_num);
 
 // fldiv instructions are not supported in the macro, so they are defined here.

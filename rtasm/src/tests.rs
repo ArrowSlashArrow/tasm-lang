@@ -1,15 +1,12 @@
 use std::time::Instant;
 
-use crate::{
-    core::{TasmValue, TasmValueType},
-    lexer::fits_arg_sig,
-};
+use crate::core::{TasmValue, TasmValueType, fits_arg_signature};
 
 use super::*;
 
 #[test]
 fn int_detection() {
-    assert!(fits_arg_sig(
+    assert!(fits_arg_signature(
         &vec![
             TasmValue::Number(1.0),
             // TasmValue::Number(1.1)
@@ -23,7 +20,7 @@ fn int_detection() {
 
 #[test]
 fn no_int_detection() {
-    assert!(!fits_arg_sig(
+    assert!(!fits_arg_signature(
         &vec![TasmValue::Number(1.1), TasmValue::Number(1.1)],
         &[
             TasmValueType::Primitive(core::TasmPrimitive::Int),
