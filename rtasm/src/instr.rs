@@ -58,7 +58,7 @@ pub const INSTR_SPEC: &[(
     ("SPAWN", false, &[argset!((Group) => todo)]),
     // Waits
     ("NOP", false, &[argset!(() => nop)]),
-    // Commented out due to being
+    // Commented out due to being non-v0.1.0
     // ("WAIT", false, &[argset!((Int) => wait)]),
 
     // Arithmetic

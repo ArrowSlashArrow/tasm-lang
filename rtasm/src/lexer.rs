@@ -44,51 +44,6 @@ use crate::{
     },
     instr::INSTR_SPEC,
 };
-
-// todo: dynamic load from commands file
-pub const INSTRUCTIONS: &[&str] = &[
-    "INITMEM", // init
-    "MALLOC",
-    "FMALLOC",
-    "MFUNC", // memory
-    "MREAD",
-    "MWRITE",
-    "MPTR",
-    "MRESET",
-    "DISPLAY", // init
-    "IOBLOCK",
-    "BREAKPOINT", // debug
-    "NOP",        // wait
-    // "WAIT",
-    // "TSPAWN", // timer
-    // "TSTART",
-    // "TSTOP",
-    // "SRAND", // process
-    // "FRAND",
-    // "RET",
-    // "STOP",
-    "SPAWN",
-    "PERS", // init
-    "ADD",  // arithmetic
-    "SUB",
-    "MUL",
-    "DIV",
-    "FLDIV",
-    "MOV",
-    "SE", // comparison
-    "SNE",
-    "SL",
-    "SLE",
-    "SG",
-    "SGE",
-    "FE",
-    "FNE",
-    "FL",
-    "FLE",
-    "FG",
-    "FGE",
-];
-
 pub const ALIASES: &[(&'static str, i16)] = &[
     ("MEMREG", -1), // Counter or timer (depends on memory type) at the end of malloc'ed counters + 1
     ("PTRPOS", 0),  // Always a counter at the end of the malloc'ed counters + 2
@@ -320,15 +275,6 @@ pub fn parse_file<T: AsRef<str>>(
                 args = vec![];
             }
 
-            if !INSTRUCTIONS.contains(&instr.as_str()) {
-                // error due to unrecognized instruction
-                errors.push(TasmParseError::InvalidInstruction((
-                    instr.into(),
-                    curr_line,
-                )));
-                continue;
-            }
-
             // find the instruction spec which contains arg handlers
             let (_, init_exclusive, handlers) =
                 match INSTR_SPEC.iter().find(|(ident, _, _)| ident == &instr) {
@@ -390,3 +336,5 @@ pub fn parse_file<T: AsRef<str>>(
         Ok(Tasm::from_routines(routines))
     }
 }
+
+// TODO: move this into a parser object for easier handling of state variables
