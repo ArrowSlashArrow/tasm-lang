@@ -90,6 +90,15 @@ impl Tasm {
                     args: instr.args.clone(),
                     cfg: cfg.spawnable(true).multitrigger(true),
                     curr_group,
+                    ptr_group: self.ptr_group,
+                    ptr_reset_group: self.ptr_reset_group,
+                    // these two are set only once a MALLOC instruction is processed
+                    // if there is no malloc, there is no memory access allowed
+                    // and therefore these fields are never read
+                    // therefore it does not matter if there is junk data in there
+                    // since it will either be overwritten or never read
+                    memreg: self.memreg.clone(),
+                    ptrpos_id: self.ptrpos_id,
                 };
 
                 let data = match handler(args) {
@@ -105,6 +114,18 @@ impl Tasm {
                 let skip_spaces = data.skip_spaces;
                 curr_group += data.used_extra_groups;
                 obj_pos += skip_spaces as f64;
+
+                // these two if statements handle the logic of keeping track of the ptr group
+                // it is necessary for instructions such as MRESET and MPTR which move the pointer
+                // this information is only updated if it is set. this information is set
+                // only in the malloc methods, which would usually be parsed first.
+                if data.ptr_group != 0 {
+                    self.ptr_group = data.ptr_group
+                }
+
+                if data.ptr_reset_group != 0 {
+                    self.ptr_reset_group = data.ptr_reset_group
+                }
             }
         }
 
@@ -118,6 +139,13 @@ impl Tasm {
     pub fn parse(&mut self) {
         // index routines before anything else
         self.index_routines();
+
+        // push _init routine to the start to process it before anyting else
+        if let Some(init_pos) = self.routine_data.iter().position(|r| r.1 == INIT_ROUTINE) {
+            let rtn = self.routine_data[init_pos].clone();
+            self.routine_data.remove(init_pos);
+            self.routine_data.insert(0, rtn);
+        }
 
         // error if no entry point
         if !self.has_entry_point {

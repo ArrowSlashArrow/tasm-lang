@@ -4,6 +4,8 @@
  - various other comp triggers 
  - do not skip unindented strings that are not routine identifiers
  - add flag args: `INSTR <args> | <flags>`
+ - InitRoutineMemoryAccess error
+    - not allowed to run memory instructions in _init routine
 
 ## commands
 ### SPAWN command and derivatives

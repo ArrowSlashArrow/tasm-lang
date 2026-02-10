@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, num::ParseIntError};
+use std::{default, error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::gdobj::{GDObjConfig, GDObject};
 
@@ -15,6 +15,10 @@ pub struct Tasm {
     pub has_entry_point: bool,
     pub lines: Vec<String>,
     pub mem_end_counter: i16,
+    pub ptr_group: i16,
+    pub ptr_reset_group: i16,
+    pub memreg: TasmValue,
+    pub ptrpos_id: i16,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -58,6 +62,11 @@ pub struct HandlerArgs {
     pub cfg: GDObjConfig,
     /// Next available group to use for the objects
     pub curr_group: i16,
+    /// Group of the pointer collision block
+    pub ptr_group: i16,
+    pub ptr_reset_group: i16,
+    pub memreg: TasmValue,
+    pub ptrpos_id: i16,
 }
 
 pub struct HandlerData {
@@ -66,6 +75,8 @@ pub struct HandlerData {
     pub skip_spaces: i32,
     // extra used groups
     pub used_extra_groups: i16,
+    pub ptr_group: i16,
+    pub ptr_reset_group: i16,
 }
 
 impl HandlerData {
@@ -75,6 +86,8 @@ impl HandlerData {
             objects: vec![],
             skip_spaces: 1, // always advance one space
             used_extra_groups: 0,
+            ptr_reset_group: 0,
+            ptr_group: 0,
         }
     }
 
@@ -175,6 +188,12 @@ pub enum TasmValue {
     Group(i16),
     /// Default
     String(String),
+}
+
+impl Default for TasmValue {
+    fn default() -> Self {
+        Self::Number(0.0)
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -364,5 +383,12 @@ pub fn get_instr_type(ident: &str) -> Option<InstrType> {
         "RET" | "STOP" => Some(InstrType::Stopper),
         "BREAKPOINT" => Some(InstrType::Debug),
         _ => None,
+    }
+}
+
+pub fn show_errors(es: Vec<TasmParseError>, err_msg: &str) {
+    println!("{err_msg} with {} errors:", es.len());
+    for e in es {
+        println!("{e}");
     }
 }

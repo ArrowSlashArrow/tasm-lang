@@ -2,6 +2,9 @@ use std::fs;
 
 use anyhow::{Error, anyhow};
 use clap::Parser;
+use gdlib::gdlevel::Levels;
+
+use crate::core::show_errors;
 
 pub mod core;
 pub mod instr;
@@ -33,26 +36,40 @@ struct Args {
      * export level name
      *
      */
+    /// Whether to export the copmiled level as a .gmd
+    #[arg(long)]
+    gmd: bool,
 }
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
     println!("{}", args.mem_end_counter);
-    let file = fs::read_to_string(args.infile).unwrap();
+    let file = fs::read_to_string(&args.infile).unwrap();
 
-    let _tasm = match lexer::parse_file(file, args.mem_end_counter) {
+    let mut tasm = match lexer::parse_file(file, args.mem_end_counter) {
         Ok(t) => {
             println!("Parsed file with 0 errors.");
             t
         }
         Err(e) => {
-            for err in e.iter() {
-                println!("{err}");
-            }
-            println!("Parsed file with {} errors.", e.len());
+            show_errors(e, "Unable to parse file");
             return Err(anyhow!("bad tasm"));
         }
     };
+
+    match tasm.handle_routines() {
+        Ok(level) => match args.gmd {
+            true => level.export_to_gmd(&format!("{}.gmd", args.infile))?,
+            false => {
+                let mut savefile = Levels::from_local()?;
+                savefile.add_level(level);
+                savefile.export_to_savefile()?
+            }
+        },
+        Err(e) => {
+            show_errors(e, "Unable to compile to level");
+        }
+    }
 
     Ok(())
 }

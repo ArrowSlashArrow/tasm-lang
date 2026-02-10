@@ -30,8 +30,8 @@ fn no_int_detection() {
 }
 
 #[test]
-fn parse_tasm() {
-    let file = fs::read_to_string("../programs/nuclear_reactor.tasm").unwrap();
+fn parse_tasm() -> anyhow::Result<()> {
+    let file = fs::read_to_string("../programs/nuclear_reactor.tasm")?;
     let mut parse_start = Instant::now();
     let mut tasm = match lexer::parse_file(file, 9999) {
         Ok(t) => {
@@ -53,9 +53,12 @@ fn parse_tasm() {
     );
 
     parse_start = Instant::now();
-    tasm.handle_routines().unwrap();
+    let level = tasm.handle_routines().unwrap();
     println!(
         "Serialise time: {:.3}ms",
         parse_start.elapsed().as_micros() as f64 / 1000.0
     );
+
+    level.export_to_gmd("test.gmd")?;
+    Ok(())
 }
