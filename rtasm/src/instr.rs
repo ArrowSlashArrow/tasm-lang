@@ -3,8 +3,8 @@ use std::ops::Add;
 use gdlib::gdobj::{
     GDObject,
     triggers::{
-        CompareOp, DefaultMove, ItemType, MoveMode, Op, RoundMode, SignMode, item_compare,
-        item_edit, move_trigger, spawn_trigger,
+        CompareOp, DefaultMove, ItemType, MoveMode, Op, RoundMode, SignMode, TargetMove,
+        item_compare, item_edit, move_trigger, spawn_trigger,
     },
 };
 use paste::paste;
@@ -45,7 +45,7 @@ pub const INSTR_SPEC: &[(
     ("MREAD", false, &[argset!(() => todo)]),
     ("MWRITE", false, &[argset!(() => todo)]),
     ("MPTR", false, &[argset!((Int) => mptr)]),
-    ("MRESET", false, &[argset!(() => todo)]),
+    ("MRESET", false, &[argset!(() => mreset)]),
     (
         "MOV",
         false,
@@ -733,6 +733,42 @@ fn mptr(args: HandlerArgs) -> HandlerReturn {
             ItemType::Counter,
             move_amount,
             Op::Add,
+            None,
+            None,
+            RoundMode::None,
+            RoundMode::None,
+            SignMode::None,
+            SignMode::None,
+        ),
+    ]))
+}
+
+fn mreset(args: HandlerArgs) -> HandlerReturn {
+    let cfg = args.cfg;
+    let move_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 + 7.5);
+    let add_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 - 7.5);
+    Ok(HandlerData::from_objects(vec![
+        move_trigger(
+            &move_cfg,
+            MoveMode::Targeting(TargetMove {
+                target_group_id: args.ptr_reset_group as i32,
+                center_group_id: None,
+                axis_only: None,
+            }),
+            0.0,
+            args.ptr_group,
+            false,
+            false,
+            None,
+        ),
+        item_edit(
+            &add_cfg,
+            None,
+            None,
+            args.ptrpos_id,
+            ItemType::Counter,
+            0.0,
+            Op::Set,
             None,
             None,
             RoundMode::None,
