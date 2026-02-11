@@ -35,24 +35,23 @@ impl Tasm {
         let mut errors: Vec<TasmParseError> = vec![];
 
         let mut level = Level::new("tasm level", "tasm", None, None);
-        let mut curr_group = 0i16;
+        let mut curr_group = self.routines.len() as i16;
 
         for routine in self.routines.iter() {
             let mut obj_pos = 0.0;
-            let rtn_ypos = 75.0 + (curr_group as f64) * 30.0;
-            curr_group += 1;
+            let rtn_ypos = 75.0 + (routine.group as f64) * 30.0;
             if curr_group > GROUP_LIMIT {
                 errors.push(TasmParseError::ExceedsGroupLimit);
                 break;
             }
 
             if routine.ident == ENTRY_POINT {
-                self.start_rtn_group = curr_group;
+                self.start_rtn_group = routine.group;
             }
 
             level.add_object(text(
                 &GDObjConfig::new().pos(0.0, rtn_ypos).scale(0.6, 0.6),
-                format!("{curr_group}: {}", routine.ident),
+                format!("{}: {}", routine.group, routine.ident),
                 0,
             ));
 
@@ -62,20 +61,19 @@ impl Tasm {
                     if let InstrType::Init = instr._type {
                         GDObjConfig::default()
                     } else {
-                        curr_group -= 1;
                         GDObjConfig::default().pos(-15.0 - obj_pos, rtn_ypos)
                     }
                 } else {
                     GDObjConfig::default()
                         .pos(105.0 + obj_pos, rtn_ypos)
-                        .groups([curr_group])
+                        .groups([routine.group])
                 };
 
                 let handler = instr.handler_fn;
                 let args = HandlerArgs {
                     args: instr.args.clone(),
                     cfg: cfg.spawnable(true).multitrigger(true),
-                    curr_group,
+                    curr_group, // used as auxiliary group
                     ptr_group: self.ptr_group,
                     ptr_reset_group: self.ptr_reset_group,
                     // these two are set only once a MALLOC instruction is processed

@@ -851,7 +851,6 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
 
     Ok(HandlerData::from_objects(vec![
         default_block(&cfg),
-        text(&text_cfg, msg, 0),
         spawn_trigger(
             &spawn_cfg,
             spawn_group as i32,
@@ -861,6 +860,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
             true,
             false,
         ),
+        text(&text_cfg, msg, 0),
     ])
     .skip_spaces(0))
 }
