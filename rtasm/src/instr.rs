@@ -1,8 +1,10 @@
 use gdlib::gdobj::{
-    GDObject,
+    GDObjConfig, GDObject,
+    misc::{default_block, text},
     triggers::{
-        CompareOp, DefaultMove, ItemType, MoveMode, Op, RoundMode, SignMode, TargetMove,
-        item_compare, item_edit, move_trigger, spawn_trigger, toggle_trigger,
+        CompareOp, CounterMode, DefaultMove, ItemAlign, ItemType, MoveMode, Op, RoundMode,
+        SignMode, TargetMove, counter_object, item_compare, item_edit, move_trigger, spawn_trigger,
+        toggle_trigger,
     },
 };
 use paste::paste;
@@ -36,8 +38,8 @@ pub const INSTR_SPEC: &[(
     ("FMALLOC", true, &[argset!((Int) => todo)]),
     ("INITMEM", true, &[argset!([Number] => todo)]),
     ("PERS", true, &[argset!((Item) => todo)]),
-    ("DISPLAY", true, &[argset!((Item) => todo)]),
-    ("IOBLOCK", true, &[argset!((Group, Int, String) => todo)]),
+    ("DISPLAY", true, &[argset!((Item) => display)]),
+    ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
     // memory
     ("MFUNC", false, &[argset!(() => mfunc)]),
     ("MREAD", false, &[argset!(() => mread)]),
@@ -809,6 +811,53 @@ fn mwrite(args: HandlerArgs) -> HandlerReturn {
 }
 fn mread(args: HandlerArgs) -> HandlerReturn {
     mem_mode(args, true)
+}
+
+fn display(args: HandlerArgs) -> HandlerReturn {
+    let (id, t) = get_item_spec(&args.args[0]).unwrap();
+    let cfg = GDObjConfig::new().pos(15.0, 75.0 + 15.0 * args.displayed_items as f64);
+
+    let obj = counter_object(
+        &cfg,
+        id,
+        match t {
+            ItemType::Timer => true,
+            _ => false,
+        },
+        ItemAlign::Center,
+        false,
+        match t {
+            ItemType::Attempts => Some(CounterMode::Attempts),
+            ItemType::MainTime => Some(CounterMode::MainTime),
+            ItemType::Points => Some(CounterMode::Points),
+            _ => None,
+        },
+    );
+
+    Ok(HandlerData::from_objects(vec![obj]).skip_spaces(0))
+}
+
+pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
+    let spawn_group = args.args[0].to_group_id().unwrap();
+    let position = args.args[1].to_int().unwrap();
+    let msg = args.args[2].to_string().unwrap();
+    let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 15.0, 75.0);
+    let spawn_cfg = cfg.clone().touchable(true);
+
+    Ok(HandlerData::from_objects(vec![
+        default_block(&cfg),
+        text(&cfg, msg, 0),
+        spawn_trigger(
+            &spawn_cfg,
+            spawn_group as i32,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+        ),
+    ])
+    .skip_spaces(0))
 }
 
 // fn malloc(args: HandlerArgs) -> HandlerReturn {

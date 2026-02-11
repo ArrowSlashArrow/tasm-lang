@@ -5,6 +5,8 @@ use gdlib::{
     gdobj::{GDObjConfig, GDObject},
 };
 
+use crate::instr::ioblock;
+
 pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
 pub const GROUP_LIMIT: i16 = 9_999;
@@ -24,6 +26,8 @@ pub struct Tasm {
     pub ptrpos_id: i16,
     pub read_group: i16,
     pub write_group: i16,
+    pub displayed_items: usize,
+    pub start_rtn_group: i16,
 }
 
 impl Tasm {
@@ -40,6 +44,10 @@ impl Tasm {
             if curr_group > GROUP_LIMIT {
                 errors.push(TasmParseError::ExceedsGroupLimit);
                 break;
+            }
+
+            if routine.ident == ENTRY_POINT {
+                self.start_rtn_group = curr_group;
             }
 
             // starting position of objects: (15, 75 + curr_group * 15)
@@ -74,6 +82,7 @@ impl Tasm {
                     ptrpos_id: self.ptrpos_id,
                     read_group: self.read_group,
                     write_group: self.write_group,
+                    displayed_items: self.displayed_items,
                 };
 
                 let data = match handler(args) {
@@ -86,6 +95,7 @@ impl Tasm {
                 for obj in data.objects.into_iter() {
                     level.add_object(obj);
                 }
+
                 let skip_spaces = data.skip_spaces;
                 curr_group += data.used_extra_groups;
                 obj_pos += skip_spaces as f64;
@@ -101,6 +111,27 @@ impl Tasm {
                 if data.ptr_reset_group != 0 {
                     self.ptr_reset_group = data.ptr_reset_group
                 }
+            }
+        }
+
+        if self.start_rtn_group != 0 {
+            let ioblock_result = ioblock(HandlerArgs {
+                args: vec![],
+                cfg: GDObjConfig::new(),
+                curr_group,
+                ptr_group: 0,
+                ptr_reset_group: 0,
+                memreg: TasmValue::default(),
+                ptrpos_id: 0,
+                read_group: 0,
+                write_group: 0,
+                displayed_items: self.displayed_items,
+            })
+            .unwrap();
+
+            // add starting block
+            for obj in ioblock_result.objects.into_iter() {
+                level.add_object(obj);
             }
         }
 
@@ -160,6 +191,7 @@ pub struct HandlerArgs {
     pub ptrpos_id: i16,
     pub read_group: i16,
     pub write_group: i16,
+    pub displayed_items: usize,
 }
 
 pub struct HandlerData {
@@ -170,6 +202,7 @@ pub struct HandlerData {
     pub used_extra_groups: i16,
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
+    pub added_ioblock: bool,
 }
 
 impl HandlerData {
@@ -181,6 +214,7 @@ impl HandlerData {
             used_extra_groups: 0,
             ptr_reset_group: 0,
             ptr_group: 0,
+            added_ioblock: false,
         }
     }
 
