@@ -1,10 +1,8 @@
-use std::ops::Add;
-
 use gdlib::gdobj::{
     GDObject,
     triggers::{
         CompareOp, DefaultMove, ItemType, MoveMode, Op, RoundMode, SignMode, TargetMove,
-        item_compare, item_edit, move_trigger, spawn_trigger,
+        item_compare, item_edit, move_trigger, spawn_trigger, toggle_trigger,
     },
 };
 use paste::paste;
@@ -41,9 +39,9 @@ pub const INSTR_SPEC: &[(
     ("DISPLAY", true, &[argset!((Item) => todo)]),
     ("IOBLOCK", true, &[argset!((Group, Int, String) => todo)]),
     // memory
-    ("MFUNC", false, &[argset!(() => todo)]),
-    ("MREAD", false, &[argset!(() => todo)]),
-    ("MWRITE", false, &[argset!(() => todo)]),
+    ("MFUNC", false, &[argset!(() => mfunc)]),
+    ("MREAD", false, &[argset!(() => mread)]),
+    ("MWRITE", false, &[argset!(() => mwrite)]),
     ("MPTR", false, &[argset!((Int) => mptr)]),
     ("MRESET", false, &[argset!(() => mreset)]),
     (
@@ -292,7 +290,7 @@ macro_rules! handlers {
     };
 }
 
-fn todo(args: HandlerArgs) -> HandlerReturn {
+fn todo(_args: HandlerArgs) -> HandlerReturn {
     unimplemented!()
 }
 
@@ -310,10 +308,10 @@ fn nop(_args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::default().skip_spaces(1))
 }
 
-fn wait(args: HandlerArgs) -> HandlerReturn {
-    // skip specified amount of spaces
-    Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
-}
+// fn wait(args: HandlerArgs) -> HandlerReturn {
+//     // skip specified amount of spaces
+//     Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
+// }
 
 /* ARITHMETIC */
 
@@ -777,6 +775,40 @@ fn mreset(args: HandlerArgs) -> HandlerReturn {
             SignMode::None,
         ),
     ]))
+}
+
+fn mfunc(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![move_trigger(
+        &args.cfg,
+        MoveMode::Default(DefaultMove {
+            dx: 0.0,
+            dy: 30.0,
+            x_lock: None,
+            y_lock: None,
+        }),
+        0.0,
+        args.ptr_group,
+        false,
+        false,
+        None,
+    )])
+    .skip_spaces(2))
+}
+
+fn mem_mode(args: HandlerArgs, toggle_read: bool) -> HandlerReturn {
+    let top_cfg = args.cfg.clone().scale(0.5, 0.5).y(args.cfg.pos.1 + 7.5);
+    let bottom_cfg = args.cfg.clone().scale(0.5, 0.5).y(args.cfg.pos.1 - 7.5);
+    Ok(HandlerData::from_objects(vec![
+        toggle_trigger(&top_cfg, args.write_group, !toggle_read),
+        toggle_trigger(&bottom_cfg, args.read_group, toggle_read),
+    ]))
+}
+
+fn mwrite(args: HandlerArgs) -> HandlerReturn {
+    mem_mode(args, false)
+}
+fn mread(args: HandlerArgs) -> HandlerReturn {
+    mem_mode(args, true)
 }
 
 // fn malloc(args: HandlerArgs) -> HandlerReturn {

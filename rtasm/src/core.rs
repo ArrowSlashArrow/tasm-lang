@@ -1,6 +1,9 @@
-use std::{default, error::Error, fmt::Display, num::ParseIntError};
+use std::{error::Error, fmt::Display, num::ParseIntError};
 
-use gdlib::gdobj::{GDObjConfig, GDObject};
+use gdlib::{
+    gdlevel::Level,
+    gdobj::{GDObjConfig, GDObject},
+};
 
 pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
@@ -19,6 +22,94 @@ pub struct Tasm {
     pub ptr_reset_group: i16,
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
+    pub read_group: i16,
+    pub write_group: i16,
+}
+
+impl Tasm {
+    pub fn handle_routines(&mut self) -> Result<Level, Vec<TasmParseError>> {
+        let mut errors: Vec<TasmParseError> = vec![];
+
+        let mut level = Level::new("tasm level", "tasm", None, None);
+        let mut curr_group = 0i16;
+
+        let mut obj_pos = 0.0;
+
+        for routine in self.routines.iter() {
+            curr_group += 1;
+            if curr_group > GROUP_LIMIT {
+                errors.push(TasmParseError::ExceedsGroupLimit);
+                break;
+            }
+
+            // starting position of objects: (15, 75 + curr_group * 15)
+            for instr in routine.instructions.iter() {
+                let cfg = if routine.ident == INIT_ROUTINE {
+                    if let InstrType::Init = instr._type {
+                        GDObjConfig::default()
+                    } else {
+                        curr_group -= 1;
+                        GDObjConfig::default()
+                            .pos(-15.0 - obj_pos, 75.0 + (curr_group as f64) * 15.0)
+                    }
+                } else {
+                    GDObjConfig::default()
+                        .pos(15.0 + obj_pos, 75.0 + (curr_group as f64) * 15.0)
+                        .groups([curr_group])
+                };
+
+                let handler = instr.handler_fn;
+                let args = HandlerArgs {
+                    args: instr.args.clone(),
+                    cfg: cfg.spawnable(true).multitrigger(true),
+                    curr_group,
+                    ptr_group: self.ptr_group,
+                    ptr_reset_group: self.ptr_reset_group,
+                    // these two are set only once a MALLOC instruction is processed
+                    // if there is no malloc, there is no memory access allowed
+                    // and therefore these fields are never read
+                    // therefore it does not matter if there is junk data in there
+                    // since it will either be overwritten or never read
+                    memreg: self.memreg.clone(),
+                    ptrpos_id: self.ptrpos_id,
+                    read_group: self.read_group,
+                    write_group: self.write_group,
+                };
+
+                let data = match handler(args) {
+                    Ok(data) => data,
+                    Err(e) => {
+                        errors.push(e);
+                        continue;
+                    }
+                };
+                for obj in data.objects.into_iter() {
+                    level.add_object(obj);
+                }
+                let skip_spaces = data.skip_spaces;
+                curr_group += data.used_extra_groups;
+                obj_pos += skip_spaces as f64;
+
+                // these two if statements handle the logic of keeping track of the ptr group
+                // it is necessary for instructions such as MRESET and MPTR which move the pointer
+                // this information is only updated if it is set. this information is set
+                // only in the malloc methods, which would usually be parsed first.
+                if data.ptr_group != 0 {
+                    self.ptr_group = data.ptr_group
+                }
+
+                if data.ptr_reset_group != 0 {
+                    self.ptr_reset_group = data.ptr_reset_group
+                }
+            }
+        }
+
+        if errors.len() > 0 {
+            Err(errors)
+        } else {
+            Ok(level)
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -67,6 +158,8 @@ pub struct HandlerArgs {
     pub ptr_reset_group: i16,
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
+    pub read_group: i16,
+    pub write_group: i16,
 }
 
 pub struct HandlerData {

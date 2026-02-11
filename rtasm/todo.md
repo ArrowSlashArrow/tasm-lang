@@ -6,6 +6,9 @@
  - add flag args: `INSTR <args> | <flags>`
  - InitRoutineMemoryAccess error
     - not allowed to run memory instructions in _init routine
+ - alias resolution should be done after lexing stage, aliases should be stored as TasmValue::Alias(...). alias type is different by alias
+ - malloc/fmalloc handlers must update Tasm.memreg/ptrpos_id
+
 
 ## commands
 ### SPAWN command and derivatives
