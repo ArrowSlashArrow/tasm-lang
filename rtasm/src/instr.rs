@@ -815,7 +815,9 @@ fn mread(args: HandlerArgs) -> HandlerReturn {
 
 fn display(args: HandlerArgs) -> HandlerReturn {
     let (id, t) = get_item_spec(&args.args[0]).unwrap();
-    let cfg = GDObjConfig::new().pos(15.0, 75.0 + 15.0 * args.displayed_items as f64);
+    let cfg = GDObjConfig::new()
+        .pos(-75.0, 75.0 + 30.0 * args.displayed_items as f64)
+        .scale(0.5, 0.5);
 
     let obj = counter_object(
         &cfg,
@@ -834,19 +836,22 @@ fn display(args: HandlerArgs) -> HandlerReturn {
         },
     );
 
-    Ok(HandlerData::from_objects(vec![obj]).skip_spaces(0))
+    Ok(HandlerData::from_objects(vec![obj])
+        .skip_spaces(0)
+        .added_item_display())
 }
 
 pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let spawn_group = args.args[0].to_group_id().unwrap();
     let position = args.args[1].to_int().unwrap();
     let msg = args.args[2].to_string().unwrap();
-    let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 15.0, 75.0);
+    let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
+    let text_cfg = cfg.clone().scale(0.25, 0.25);
     let spawn_cfg = cfg.clone().touchable(true);
 
     Ok(HandlerData::from_objects(vec![
         default_block(&cfg),
-        text(&cfg, msg, 0),
+        text(&text_cfg, msg, 0),
         spawn_trigger(
             &spawn_cfg,
             spawn_group as i32,

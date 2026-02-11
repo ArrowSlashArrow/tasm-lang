@@ -1,9 +1,9 @@
 _init: 
-    DISPLAY C1, 0 
-    DISPLAY C2, 1
-    DISPLAY C3, 2
-    DISPLAY C4, 3
-    DISPLAY C5, 4
+    DISPLAY C1
+    DISPLAY C2
+    DISPLAY C3
+    DISPLAY C4
+    DISPLAY C5
 
 add_marker:  ; move the value to be added in here
     MOV C5, C1

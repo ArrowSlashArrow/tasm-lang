@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
-    gdobj::{GDObjConfig, GDObject},
+    gdobj::{GDObjConfig, GDObject, misc::text},
 };
 
 use crate::instr::ioblock;
@@ -37,9 +37,9 @@ impl Tasm {
         let mut level = Level::new("tasm level", "tasm", None, None);
         let mut curr_group = 0i16;
 
-        let mut obj_pos = 0.0;
-
         for routine in self.routines.iter() {
+            let mut obj_pos = 0.0;
+            let rtn_ypos = 75.0 + (curr_group as f64) * 30.0;
             curr_group += 1;
             if curr_group > GROUP_LIMIT {
                 errors.push(TasmParseError::ExceedsGroupLimit);
@@ -50,6 +50,12 @@ impl Tasm {
                 self.start_rtn_group = curr_group;
             }
 
+            level.add_object(text(
+                &GDObjConfig::new().pos(0.0, rtn_ypos).scale(0.6, 0.6),
+                format!("{curr_group}: {}", routine.ident),
+                0,
+            ));
+
             // starting position of objects: (15, 75 + curr_group * 15)
             for instr in routine.instructions.iter() {
                 let cfg = if routine.ident == INIT_ROUTINE {
@@ -57,12 +63,11 @@ impl Tasm {
                         GDObjConfig::default()
                     } else {
                         curr_group -= 1;
-                        GDObjConfig::default()
-                            .pos(-15.0 - obj_pos, 75.0 + (curr_group as f64) * 15.0)
+                        GDObjConfig::default().pos(-15.0 - obj_pos, rtn_ypos)
                     }
                 } else {
                     GDObjConfig::default()
-                        .pos(15.0 + obj_pos, 75.0 + (curr_group as f64) * 15.0)
+                        .pos(105.0 + obj_pos, rtn_ypos)
                         .groups([curr_group])
                 };
 
@@ -100,6 +105,10 @@ impl Tasm {
                 curr_group += data.used_extra_groups;
                 obj_pos += skip_spaces as f64;
 
+                if data.added_item_display {
+                    self.displayed_items += 1;
+                }
+
                 // these two if statements handle the logic of keeping track of the ptr group
                 // it is necessary for instructions such as MRESET and MPTR which move the pointer
                 // this information is only updated if it is set. this information is set
@@ -116,7 +125,11 @@ impl Tasm {
 
         if self.start_rtn_group != 0 {
             let ioblock_result = ioblock(HandlerArgs {
-                args: vec![],
+                args: vec![
+                    TasmValue::Group(self.start_rtn_group),
+                    TasmValue::Number(0.0),
+                    TasmValue::String("start".into()),
+                ],
                 cfg: GDObjConfig::new(),
                 curr_group,
                 ptr_group: 0,
@@ -202,7 +215,7 @@ pub struct HandlerData {
     pub used_extra_groups: i16,
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
-    pub added_ioblock: bool,
+    pub added_item_display: bool,
 }
 
 impl HandlerData {
@@ -214,7 +227,7 @@ impl HandlerData {
             used_extra_groups: 0,
             ptr_reset_group: 0,
             ptr_group: 0,
-            added_ioblock: false,
+            added_item_display: false,
         }
     }
 
@@ -239,6 +252,12 @@ impl HandlerData {
     #[inline(always)]
     pub fn extra_groups(mut self, groups: i16) -> Self {
         self.used_extra_groups = groups;
+        self
+    }
+
+    #[inline(always)]
+    pub fn added_item_display(mut self) -> Self {
+        self.added_item_display = true;
         self
     }
 }

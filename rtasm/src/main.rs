@@ -43,7 +43,7 @@ struct Args {
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
-    println!("{}", args.mem_end_counter);
+    println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
     let mut tasm = match lexer::parse_file(file, args.mem_end_counter) {
@@ -57,13 +57,15 @@ fn main() -> Result<(), Error> {
         }
     };
 
+    println!("Encoding level...");
     match tasm.handle_routines() {
         Ok(level) => match args.gmd {
             true => level.export_to_gmd(&format!("{}.gmd", args.infile))?,
             false => {
                 let mut savefile = Levels::from_local()?;
                 savefile.add_level(level);
-                savefile.export_to_savefile()?
+                savefile.export_to_savefile()?;
+                println!("exported to savefile.")
             }
         },
         Err(e) => {

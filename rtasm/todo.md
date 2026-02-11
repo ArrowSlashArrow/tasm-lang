@@ -10,6 +10,7 @@
     - not allowed to define different routines with the same names
  - alias resolution should be done after lexing stage, aliases should be stored as TasmValue::Alias(...). alias type is different by alias
  - malloc/fmalloc handlers must update Tasm.memreg/ptrpos_id
+ - fix disagreement between lexer-assigned group map and Tasm-assigned groups
 
 
 ## commands
