@@ -52,6 +52,7 @@ impl Tasm {
         self.index_routines();
 
         // push _init routine to the start to process it before anyting else
+        // important to do for alias resolution, since memtype is determined in init.
         if let Some(init_pos) = self.routine_data.iter().position(|r| r.1 == INIT_ROUTINE) {
             let rtn = self.routine_data[init_pos].clone();
             self.routine_data.remove(init_pos);
@@ -269,18 +270,9 @@ pub fn parse_tasm_value(
     t: TasmValue,
     routine_group_map: &Vec<(String, i16)>,
     errors: &mut Vec<TasmParseError>,
-    mem_end_counter: i16,
+    _mem_end_counter: i16,
     curr_line: usize,
 ) -> Option<TasmValue> {
-    let alias_lookup = |s: &str| -> Option<TasmValue> {
-        match s {
-            // TODO: make MEMREG a timer if the memory is a timer
-            "MEMREG" => Some(TasmValue::Counter(mem_end_counter - 1)),
-            "PTRPOS" => Some(TasmValue::Counter(mem_end_counter)),
-            _ => None,
-        }
-    };
-
     // if this is a routine ident, add corresponding group
     if let TasmValue::String(s) = t.clone() {
         match routine_group_map
@@ -297,10 +289,7 @@ pub fn parse_tasm_value(
                     None
                 }
             }
-            None => match alias_lookup(&s) {
-                Some(v) => Some(v),
-                None => Some(TasmValue::String(s)),
-            },
+            None => Some(TasmValue::String(s)),
         }
     } else {
         Some(t)

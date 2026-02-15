@@ -1,17 +1,20 @@
 ## general
- - serialise instructions
- - add spawn delay + remap support to asm
- - various other comp triggers 
- - do not skip unindented strings that are not routine identifiers
- - add flag args: `INSTR <args> | <flags>`
- - InitRoutineMemoryAccess error
-    - not allowed to run memory instructions in _init routine
- - MultipleRoutineDefinitions error
-    - not allowed to define different routines with the same names
- - alias resolution should be done after lexing stage, aliases should be stored as TasmValue::Alias(...). alias type is different by alias
- - malloc/fmalloc handlers must update Tasm.memreg/ptrpos_id
- - fix disagreement between lexer-assigned group map and Tasm-assigned groups
-
+- serialise instructions
+- add spawn delay + remap support to asm
+- various other comp triggers 
+- do not skip unindented strings that are not routine identifiers
+- add flag args: `INSTR <args> | <flags>`
+- InitRoutineMemoryAccess error
+   - not allowed to run memory instructions in _init routine
+- MultipleRoutineDefinitions error
+   - not allowed to define different routines with the same names
+- alias resolution should be done after lexing stage, aliases should be stored as TasmValue::Alias(...). alias type is different by alias
+- malloc/fmalloc handlers must update Tasm.memreg/ptrpos_id
+- fix disagreement between lexer-assigned group map and Tasm-assigned groups
+- add ability to move pointer a dynamic amount with binary splitting
+- add concurrent instruction prefix (`~`)
+- stop using spawn ordered
+   - use busy wait for sleep
 
 ## commands
 ### SPAWN command and derivatives
@@ -117,3 +120,27 @@ ADDM    C3, C1, C2, 0.5 | /= res:r- fin:f+  ; a bit cleaner
 
 Creating an instruction for each possible combinations would result in 5760 instructions total, which is simply unsistainable.  
 While the flag system is arguably better for this situation, it still needs some work. For example, `res:r-` could be optionally written as `result:round-` or `res:-round` for disambiguation purposes. 
+
+### Concurrent instructions
+Concurrent instructions are isntructions that will be placed on the same x-position,
+so that they will be executed on the same tick with spawn ordered.
+Concurrent instructions should be denoted with `~`:
+
+```
+sequential:
+    MOV C1, 1
+    MOV C2, 2
+    MOV C3, 3
+    MOV C4, 4
+    MOV C5, 5
+    MOV C6, 6
+
+concurrent:
+    MOV C1, 1
+    ~MOV C2, 2  ; will happen on the same tick as instruction above
+    ~MOV C3, 3
+    ~MOV C4, 4
+    ~MOV C5, 5
+    ~MOV C6, 6
+
+```

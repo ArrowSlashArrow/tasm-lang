@@ -3,8 +3,8 @@ use gdlib::gdobj::{
     misc::{default_block, text},
     triggers::{
         CompareOp, CounterMode, DefaultMove, ItemAlign, ItemType, MoveMode, Op, RoundMode,
-        SignMode, TargetMove, counter_object, item_compare, item_edit, move_trigger, spawn_trigger,
-        toggle_trigger,
+        SignMode, TargetMove, counter_object, item_compare, item_edit, move_trigger,
+        persistent_item, spawn_trigger, toggle_trigger,
     },
 };
 use paste::paste;
@@ -34,10 +34,10 @@ pub const INSTR_SPEC: &[(
     &[(&[TasmValueType], HandlerFn)], // handlers
 )] = &[
     // inits
-    ("MALLOC", true, &[argset!((Int) => todo)]),
-    ("FMALLOC", true, &[argset!((Int) => todo)]),
+    ("MALLOC", true, &[argset!((Int) => malloc)]),
+    ("FMALLOC", true, &[argset!((Int) => fmalloc)]),
     ("INITMEM", true, &[argset!([Number] => todo)]),
-    ("PERS", true, &[argset!((Item) => todo)]),
+    ("PERS", true, &[argset!((Item) => pers)]),
     ("DISPLAY", true, &[argset!((Item) => display)]),
     ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
     // memory
@@ -865,7 +865,32 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     .skip_spaces(0))
 }
 
-// fn malloc(args: HandlerArgs) -> HandlerReturn {
-//     // TODO: do stuff
-//     // TODO 2: return the groups of: ptr collblock, reset block
-// }
+fn pers(args: HandlerArgs) -> HandlerReturn {
+    let (id, t) = get_item_spec(&args.args[0]).unwrap();
+    Ok(HandlerData::from_objects(vec![persistent_item(
+        &args.cfg,
+        id,
+        t as i32 == ItemType::Timer as i32,
+        true,
+        false,
+        false,
+    )]))
+}
+
+fn malloc_inner(args: HandlerArgs, float_mem: bool) -> Vec<GDObject> {
+    // 1. each memory cell gets a column
+    // 2. mem ptr and mem ptr reset <- dont forget to include these in return
+    // 3. memory text
+    // 4. memreg and ptrpos counters
+    // 5. return memtype
+
+    vec![] // todo
+}
+
+fn malloc(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(malloc_inner(args, false)))
+}
+
+fn fmalloc(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(malloc_inner(args, true)))
+}

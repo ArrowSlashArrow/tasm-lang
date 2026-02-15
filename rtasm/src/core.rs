@@ -11,6 +11,19 @@ pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
 pub const GROUP_LIMIT: i16 = 9_999;
 
+#[derive(Debug, Clone)]
+pub enum MemType {
+    Float,
+    Int,
+}
+
+#[derive(Debug, Clone)]
+pub struct MemInfo {
+    _type: MemType,
+    memreg: TasmValue,
+    ptrpos: TasmValue,
+}
+
 #[derive(Debug, Default)]
 pub struct Tasm {
     pub routines: Vec<Routine>,
@@ -22,33 +35,55 @@ pub struct Tasm {
     pub mem_end_counter: i16,
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
-    pub memreg: TasmValue,
-    pub ptrpos_id: i16,
     pub read_group: i16,
     pub write_group: i16,
     pub displayed_items: usize,
     pub start_rtn_group: i16,
+    pub mem_info: Option<MemInfo>,
+    // aliases get resolved through the map:
+    pub aliases: Aliases,
+}
+
+/// Aliases lookup container
+#[derive(Debug, Default)]
+pub struct Aliases {
+    pub memreg: TasmValue,
+    pub ptrpos_id: i16,
+}
+
+impl Aliases {
+    pub fn get_value(&self, v: AliasType) -> TasmValue {
+        match v {
+            AliasType::MEMREG => self.memreg.clone(),
+            AliasType::PTRPOS => TasmValue::Counter(self.ptrpos_id),
+        }
+    }
 }
 
 impl Tasm {
-    pub fn handle_routines(&mut self) -> Result<Level, Vec<TasmParseError>> {
-        let mut errors: Vec<TasmParseError> = vec![];
+    pub fn handle_routines(&mut self, level_name: &String) -> Result<Level, Vec<TasmParseError>> {
+        // clear errors
+        self.errors = vec![];
 
-        let mut level = Level::new("tasm level", "tasm", None, None);
+        // setup state
+        let mut level = Level::new(level_name, &"tasm".to_owned(), None, None);
         let mut curr_group = self.routines.len() as i16;
 
         for routine in self.routines.iter() {
+            // setup position variables
             let mut obj_pos = 0.0;
             let rtn_ypos = 75.0 + (routine.group as f64) * 30.0;
             if curr_group > GROUP_LIMIT {
-                errors.push(TasmParseError::ExceedsGroupLimit);
+                self.errors.push(TasmParseError::ExceedsGroupLimit);
                 break;
             }
 
+            // keep track of entry group
             if routine.ident == ENTRY_POINT {
                 self.start_rtn_group = routine.group;
             }
 
+            // routine marker
             level.add_object(text(
                 &GDObjConfig::new().pos(0.0, rtn_ypos).scale(0.6, 0.6),
                 format!("{}: {}", routine.group, routine.ident),
@@ -57,6 +92,13 @@ impl Tasm {
 
             // starting position of objects: (15, 75 + curr_group * 15)
             for instr in routine.instructions.iter() {
+                let mut instr_args = instr.args.clone();
+                instr_args.iter_mut().for_each(|v| {
+                    if let TasmValue::Alias(alias) = v {
+                        *v = self.aliases.get_value(alias.clone())
+                    }
+                });
+
                 let cfg = if routine.ident == INIT_ROUTINE {
                     if let InstrType::Init = instr._type {
                         GDObjConfig::default()
@@ -71,7 +113,7 @@ impl Tasm {
 
                 let handler = instr.handler_fn;
                 let args = HandlerArgs {
-                    args: instr.args.clone(),
+                    args: instr_args,
                     cfg: cfg.spawnable(true).multitrigger(true),
                     curr_group, // used as auxiliary group
                     ptr_group: self.ptr_group,
@@ -79,10 +121,12 @@ impl Tasm {
                     // these two are set only once a MALLOC instruction is processed
                     // if there is no malloc, there is no memory access allowed
                     // and therefore these fields are never read
+                    // TODO: throw err if any memory ops are used but no memory exists\
+                    // TODO: throw err if memory is created more than once (>1 malloc call)
                     // therefore it does not matter if there is junk data in there
                     // since it will either be overwritten or never read
-                    memreg: self.memreg.clone(),
-                    ptrpos_id: self.ptrpos_id,
+                    memreg: self.aliases.memreg.clone(),
+                    ptrpos_id: self.aliases.ptrpos_id,
                     read_group: self.read_group,
                     write_group: self.write_group,
                     displayed_items: self.displayed_items,
@@ -91,7 +135,7 @@ impl Tasm {
                 let data = match handler(args) {
                     Ok(data) => data,
                     Err(e) => {
-                        errors.push(e);
+                        self.errors.push(e);
                         continue;
                     }
                 };
@@ -111,6 +155,25 @@ impl Tasm {
                 // it is necessary for instructions such as MRESET and MPTR which move the pointer
                 // this information is only updated if it is set. this information is set
                 // only in the malloc methods, which would usually be parsed first.
+                // TODO: handle alias changing in malloc, where the memreg and ptrpos ids are set
+
+                if let Some(m) = data.new_mem {
+                    // check that memory does not already exist
+                    if let Some(_) = self.mem_info {
+                        self.errors
+                            .push(TasmParseError::MultipleMemoryInstances(instr.line_number));
+                        continue;
+                    }
+
+                    // assigning new mem info, also assign the aliases
+
+                    self.mem_info = Some(m.clone());
+                    // assign to alias map
+                    self.aliases.memreg = m.memreg;
+                    self.aliases.ptrpos_id = m.ptrpos.to_counter_id().unwrap();
+                    // assign aliases themselves
+                }
+
                 if data.ptr_group != 0 {
                     self.ptr_group = data.ptr_group
                 }
@@ -146,8 +209,8 @@ impl Tasm {
             }
         }
 
-        if errors.len() > 0 {
-            Err(errors)
+        if self.errors.len() > 0 {
+            Err(self.errors.clone())
         } else {
             Ok(level)
         }
@@ -205,27 +268,27 @@ pub struct HandlerArgs {
     pub displayed_items: usize,
 }
 
+#[derive(Default)]
 pub struct HandlerData {
     pub objects: Vec<GDObject>,
-    // skip this amount of obj
+    // skip this amount of obj (default: 1)
     pub skip_spaces: i32,
     // extra used groups
     pub used_extra_groups: i16,
+    // both set in malloc, keeps track of the groups of the respective objects
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
+    // set in display instr handler to tell the tasm object to bump displays counter
     pub added_item_display: bool,
+    pub new_mem: Option<MemInfo>,
 }
 
 impl HandlerData {
     #[inline(always)]
     pub fn default() -> Self {
         Self {
-            objects: vec![],
             skip_spaces: 1, // always advance one space
-            used_extra_groups: 0,
-            ptr_reset_group: 0,
-            ptr_group: 0,
-            added_item_display: false,
+            ..Default::default()
         }
     }
 
@@ -269,7 +332,7 @@ pub struct Instruction {
     pub handler_fn: HandlerFn,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TasmParseError {
     InvalidInstruction((String, usize)),
     InvalidArguments((String, usize)),
@@ -279,6 +342,7 @@ pub enum TasmParseError {
     InvalidGroup(ParseIntError),
     ExceedsGroupLimit,
     InitRoutineSpawnError(usize),
+    MultipleMemoryInstances(usize),
 }
 
 impl Error for TasmParseError {
@@ -320,6 +384,9 @@ impl Display for TasmParseError {
             Self::ExceedsGroupLimit => {
                 write!(f, "Input file exceeds group limit of {GROUP_LIMIT} groups.")
             }
+            Self::MultipleMemoryInstances(line) => {
+                write!(f, "Multiple memory instances are not allowed: line {line}")
+            }
         }
     }
 }
@@ -330,8 +397,38 @@ pub enum TasmValue {
     Timer(i16),
     Number(f64),
     Group(i16),
+    Alias(AliasType),
     /// Default
     String(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AliasType {
+    MEMREG,
+    PTRPOS,
+}
+
+#[derive(Debug)]
+pub struct Alias {
+    pub _type: AliasType,
+    pub value: TasmValue,
+}
+
+impl AliasType {
+    pub fn to_alias(s: &str) -> Option<Self> {
+        match s {
+            "MEMREG" => Some(Self::MEMREG),
+            "PTRPOS" => Some(Self::PTRPOS),
+            _ => None,
+        }
+    }
+
+    pub fn get_type(&self) -> TasmPrimitive {
+        match self {
+            Self::MEMREG => TasmPrimitive::Item,
+            Self::PTRPOS => TasmPrimitive::Item,
+        }
+    }
 }
 
 impl Default for TasmValue {
@@ -361,7 +458,11 @@ impl TasmValue {
         let pref = iter.next().unwrap();
         let postf = s.chars().last().unwrap();
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
-        if pref == 'T'
+
+        // aliases are parsed before anything
+        if let Some(a) = AliasType::to_alias(s) {
+            Ok(Self::Alias(a))
+        } else if pref == 'T'
             && let Ok(n) = remaining_i16
         {
             return Ok(Self::Timer(n));
@@ -403,12 +504,14 @@ impl TasmValue {
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
+            Self::Alias(a) => a.get_type(),
         }
     }
 
     pub fn is_int(&self) -> bool {
         match self {
             Self::Number(n) => n.fract() == 0.0,
+            Self::Alias(a) => a.get_type() == TasmPrimitive::Int,
             _ => false,
         }
     }

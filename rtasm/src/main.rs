@@ -32,13 +32,13 @@ struct Args {
     mem_end_counter: i16,
     /* args todo:
      * group offset
-     * export as gmd
-     * export level name
-     *
      */
     /// Whether to export the copmiled level as a .gmd
     #[arg(long)]
     gmd: bool,
+
+    #[arg(long, value_name = "STRING")]
+    level_name: Option<String>,
 }
 
 fn main() -> Result<(), Error> {
@@ -57,10 +57,15 @@ fn main() -> Result<(), Error> {
         }
     };
 
+    let level_name = match args.level_name {
+        Some(l) => l,
+        None => args.infile,
+    };
+
     println!("Encoding level...");
-    match tasm.handle_routines() {
+    match tasm.handle_routines(&level_name) {
         Ok(level) => match args.gmd {
-            true => level.export_to_gmd(&format!("{}.gmd", args.infile))?,
+            true => level.export_to_gmd(&format!("{}.gmd", level_name))?,
             false => {
                 let mut savefile = Levels::from_local()?;
                 savefile.add_level(level);
