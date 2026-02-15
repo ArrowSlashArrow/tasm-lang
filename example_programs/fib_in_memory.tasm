@@ -3,8 +3,6 @@
 
 _init:
     DISPLAY C1
-    DISPLAY MEMREG
-    DISPLAY PTRPOS
     MALLOC 50
     INITMEM 0,1
 

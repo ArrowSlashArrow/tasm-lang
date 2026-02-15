@@ -3,8 +3,8 @@ use gdlib::gdobj::{
     misc::{default_block, text},
     triggers::{
         CompareOp, CounterMode, DefaultMove, ItemAlign, ItemType, MoveMode, Op, RoundMode,
-        SignMode, TargetMove, counter_object, item_compare, item_edit, move_trigger,
-        persistent_item, spawn_trigger, toggle_trigger,
+        SignMode, TargetMove, collision_block, collision_trigger, counter_object, item_compare,
+        item_edit, move_trigger, persistent_item, spawn_trigger, toggle_trigger,
     },
 };
 use paste::paste;
@@ -13,7 +13,8 @@ use paste::paste;
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 use crate::core::{
-    HandlerArgs, HandlerData, HandlerFn, HandlerReturn, TasmPrimitive, TasmValue, TasmValueType,
+    HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmPrimitive, TasmValue,
+    TasmValueType,
 };
 
 // convert a list of type identifiers into a slice
@@ -36,7 +37,7 @@ pub const INSTR_SPEC: &[(
     // inits
     ("MALLOC", true, &[argset!((Int) => malloc)]),
     ("FMALLOC", true, &[argset!((Int) => fmalloc)]),
-    ("INITMEM", true, &[argset!([Number] => todo)]),
+    ("INITMEM", true, &[argset!([Number] => init_mem)]),
     ("PERS", true, &[argset!((Item) => pers)]),
     ("DISPLAY", true, &[argset!((Item) => display)]),
     ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
@@ -800,9 +801,11 @@ fn mfunc(args: HandlerArgs) -> HandlerReturn {
 fn mem_mode(args: HandlerArgs, toggle_read: bool) -> HandlerReturn {
     let top_cfg = args.cfg.clone().scale(0.5, 0.5).y(args.cfg.pos.1 + 7.5);
     let bottom_cfg = args.cfg.clone().scale(0.5, 0.5).y(args.cfg.pos.1 - 7.5);
+    let mem_info = args.mem_info.unwrap();
+
     Ok(HandlerData::from_objects(vec![
-        toggle_trigger(&top_cfg, args.write_group, !toggle_read),
-        toggle_trigger(&bottom_cfg, args.read_group, toggle_read),
+        toggle_trigger(&top_cfg, mem_info.write_group, !toggle_read),
+        toggle_trigger(&bottom_cfg, mem_info.read_group, toggle_read),
     ]))
 }
 
@@ -877,20 +880,247 @@ fn pers(args: HandlerArgs) -> HandlerReturn {
     )]))
 }
 
-fn malloc_inner(args: HandlerArgs, float_mem: bool) -> Vec<GDObject> {
+fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
+    // this function exists because itemtype doesn't implement copy or clone
+    // so we can't copy or clone the thing
+    fn itemtype(float_mem: bool) -> ItemType {
+        match float_mem {
+            true => ItemType::Timer,
+            false => ItemType::Counter,
+        }
+    }
+
+    let (mem_x, mem_y) = (45.0, 165.0 + args.routine_count as f64 * 30.0);
+    let mem_size = args.args[0].to_int().unwrap() as i16;
+
+    let start_counter_id = args.ptrpos_id - mem_size - 1;
+    let ptr_collblock_id = mem_size + 1;
+    let memreg_id = args.ptrpos_id - 1;
+
+    let mut next_free_group = args.curr_group;
+
+    let ptr_reset_group = next_free_group;
+    let ptr_group = next_free_group + 1;
+    next_free_group += 2;
+
+    let read_group = next_free_group;
+    let write_group = next_free_group + 1;
+    next_free_group += 2;
+
+    let block_cfg = &GDObjConfig::new()
+        .pos(mem_x, mem_y - 30.0)
+        .scale(0.5, 0.5)
+        .groups([ptr_reset_group]);
+
+    let mut objs = vec![
+        // reset block
+        default_block(&block_cfg),
+        // pointer block
+        collision_block(
+            &block_cfg.clone().groups([ptr_group]).scale(0.8, 0.8),
+            ptr_collblock_id as i32,
+            true,
+        ),
+    ];
+
+    let mut idx = 0i16;
+    let mut counter_id = start_counter_id;
+
+    while counter_id < memreg_id {
+        let item_group = next_free_group;
+        let collblock_id = idx + 1;
+        let xpos = idx as f64 * 30.0 + mem_x;
+
+        let mut cfg = GDObjConfig::new().pos(xpos, mem_y);
+
+        objs.push(collision_block(&cfg, collblock_id as i32, false));
+        cfg = cfg
+            .pos(mem_x - 71.25, mem_y + (idx + 1) as f64 * 7.5 - 18.75)
+            .groups([item_group])
+            .scale(0.25, 0.25);
+        objs.push(collision_trigger(
+            &cfg,
+            collblock_id,
+            ptr_collblock_id,
+            item_group,
+            false,
+            false,
+            false,
+            true,
+            false,
+        ));
+        cfg = cfg
+            .pos(xpos, mem_y + 30.0)
+            .groups([item_group, write_group])
+            .spawnable(true)
+            .multitrigger(true)
+            .scale(1.0, 1.0);
+        // write memreg to item
+        objs.push(item_edit(
+            &cfg,
+            Some((memreg_id as i32, itemtype(float_mem))),
+            None,
+            counter_id,
+            itemtype(float_mem),
+            1.0,
+            Op::Set,
+            None,
+            None,
+            RoundMode::None,
+            RoundMode::None,
+            SignMode::None,
+            SignMode::None,
+        ));
+        // read item to memreg
+        cfg = cfg.y(mem_y + 60.0).groups([item_group, read_group]);
+        // write memreg to item
+        objs.push(item_edit(
+            &cfg,
+            Some((counter_id as i32, itemtype(float_mem))),
+            None,
+            memreg_id,
+            itemtype(float_mem),
+            1.0,
+            Op::Set,
+            None,
+            None,
+            RoundMode::None,
+            RoundMode::None,
+            SignMode::None,
+            SignMode::None,
+        ));
+        // moves ptr back after is moves up
+        cfg = cfg.y(mem_y + 90.0).groups([item_group]);
+        objs.push(move_trigger(
+            &cfg,
+            MoveMode::Default(DefaultMove {
+                dx: 0.0,
+                dy: -30.0,
+                x_lock: None,
+                y_lock: None,
+            }),
+            0.0,
+            ptr_group,
+            false,
+            false,
+            None,
+        ));
+
+        // counter obj
+        cfg = cfg.y(mem_y - 60.0).groups([]).scale(0.4, 0.4).angle(-30.0);
+        objs.push(counter_object(
+            &cfg,
+            counter_id,
+            float_mem,
+            ItemAlign::Center,
+            false,
+            None,
+        ));
+
+        next_free_group += 1;
+        counter_id += 1;
+        idx += 1;
+    }
+
+    objs.extend_from_slice(&[
+        // memreg and ptrpos counters
+        counter_object(
+            &GDObjConfig::new()
+                .pos(mem_x + mem_size as f64 * 30.0, mem_y - 60.0)
+                .scale(0.4, 0.4)
+                .angle(-30.0),
+            memreg_id,
+            float_mem,
+            ItemAlign::Center,
+            false,
+            None,
+        ),
+        counter_object(
+            &GDObjConfig::new()
+                .pos(mem_x + (mem_size + 1) as f64 * 30.0, mem_y - 60.0)
+                .scale(0.4, 0.4)
+                .angle(-30.0),
+            args.ptrpos_id,
+            false,
+            ItemAlign::Center,
+            false,
+            None,
+        ),
+        // memory text
+        text(
+            &GDObjConfig::new().pos(mem_x, mem_y + 150.0).scale(0.5, 0.5),
+            "memory",
+            0,
+        ),
+    ]);
+
     // 1. each memory cell gets a column
     // 2. mem ptr and mem ptr reset <- dont forget to include these in return
     // 3. memory text
     // 4. memreg and ptrpos counters
-    // 5. return memtype
+    // 5. return memtype, used groups (next free - args.current), ptr reset group, meminfo
 
-    vec![] // todo
+    let mut data = HandlerData::from_objects(objs);
+    data.used_extra_groups = next_free_group - args.curr_group;
+    data.ptr_reset_group = ptr_reset_group;
+    data.ptr_group = ptr_group;
+    data.new_mem = Some(MemInfo {
+        _type: match float_mem {
+            true => crate::core::MemType::Float,
+            false => crate::core::MemType::Int,
+        },
+        memreg: match float_mem {
+            true => TasmValue::Timer(memreg_id),
+            false => TasmValue::Counter(memreg_id),
+        },
+        ptrpos: TasmValue::Counter(args.ptrpos_id),
+        read_group,
+        write_group,
+        start_counter_id,
+    });
+
+    data
 }
 
 fn malloc(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(malloc_inner(args, false)))
+    Ok(malloc_inner(args, false))
 }
 
 fn fmalloc(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(malloc_inner(args, true)))
+    Ok(malloc_inner(args, true))
+}
+
+fn init_mem(args: HandlerArgs) -> HandlerReturn {
+    let y_offset = args.routine_count as f64 * 30.0 + 150.0;
+    let mut cfg = GDObjConfig::new().pos(-15.0, 0.0).scale(0.25, 0.25);
+
+    let mem_info = args.mem_info.unwrap();
+    let start_counter = mem_info.start_counter_id;
+
+    let mut objs = vec![];
+
+    for (idx, v) in args.args.iter().enumerate() {
+        cfg = cfg.y(y_offset + 7.5 * (idx + 1) as f64 - 18.75);
+
+        objs.push(item_edit(
+            &cfg,
+            None,
+            None,
+            start_counter + idx as i16,
+            match mem_info._type {
+                crate::core::MemType::Float => ItemType::Timer,
+                crate::core::MemType::Int => ItemType::Counter,
+            },
+            v.to_float().unwrap(),
+            Op::Set,
+            None,
+            None,
+            RoundMode::None,
+            RoundMode::None,
+            SignMode::None,
+            SignMode::None,
+        ));
+    }
+
+    Ok(HandlerData::from_objects(objs))
 }

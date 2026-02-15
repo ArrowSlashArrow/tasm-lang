@@ -19,9 +19,12 @@ pub enum MemType {
 
 #[derive(Debug, Clone)]
 pub struct MemInfo {
-    _type: MemType,
-    memreg: TasmValue,
-    ptrpos: TasmValue,
+    pub _type: MemType,
+    pub memreg: TasmValue,
+    pub ptrpos: TasmValue,
+    pub read_group: i16,
+    pub write_group: i16,
+    pub start_counter_id: i16,
 }
 
 #[derive(Debug, Default)]
@@ -35,8 +38,6 @@ pub struct Tasm {
     pub mem_end_counter: i16,
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
-    pub read_group: i16,
-    pub write_group: i16,
     pub displayed_items: usize,
     pub start_rtn_group: i16,
     pub mem_info: Option<MemInfo>,
@@ -66,8 +67,11 @@ impl Tasm {
         self.errors = vec![];
 
         // setup state
+        self.aliases.ptrpos_id = self.mem_end_counter;
         let mut level = Level::new(level_name, &"tasm".to_owned(), None, None);
         let mut curr_group = self.routines.len() as i16;
+
+        let routine_count = self.routines.len();
 
         for routine in self.routines.iter() {
             // setup position variables
@@ -127,9 +131,10 @@ impl Tasm {
                     // since it will either be overwritten or never read
                     memreg: self.aliases.memreg.clone(),
                     ptrpos_id: self.aliases.ptrpos_id,
-                    read_group: self.read_group,
-                    write_group: self.write_group,
                     displayed_items: self.displayed_items,
+                    routine_count,
+                    mem_end_counter: self.mem_end_counter,
+                    mem_info: self.mem_info.clone(),
                 };
 
                 let data = match handler(args) {
@@ -192,14 +197,15 @@ impl Tasm {
                     TasmValue::String("start".into()),
                 ],
                 cfg: GDObjConfig::new(),
+                displayed_items: self.displayed_items,
                 curr_group,
                 ptr_group: 0,
                 ptr_reset_group: 0,
                 memreg: TasmValue::default(),
                 ptrpos_id: 0,
-                read_group: 0,
-                write_group: 0,
-                displayed_items: self.displayed_items,
+                routine_count: 0,
+                mem_end_counter: 0,
+                mem_info: None,
             })
             .unwrap();
 
@@ -251,6 +257,7 @@ impl Routine {
 pub type HandlerReturn = Result<HandlerData, TasmParseError>;
 pub type HandlerFn = fn(HandlerArgs) -> HandlerReturn;
 
+#[derive(Clone)]
 pub struct HandlerArgs {
     /// Arguments to this function. e.g. Counter(C1), Number(2.5)
     pub args: Vec<TasmValue>,
@@ -263,9 +270,10 @@ pub struct HandlerArgs {
     pub ptr_reset_group: i16,
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
-    pub read_group: i16,
-    pub write_group: i16,
     pub displayed_items: usize,
+    pub mem_end_counter: i16,
+    pub routine_count: usize,
+    pub mem_info: Option<MemInfo>,
 }
 
 #[derive(Default)]
