@@ -5,10 +5,9 @@ Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/w
 tasm is currently in **version v0.1.0**.  
 The basic instruction set is defined [here](docs.md), and the working compiler is in the root directory of the repo. Note that the compiler is not a standalone executable, and must be executed from source.
 
-# Important information
-**By default, the compiler OVERWRITES the first level in your savefile.** I have not implemented the patch for this yet, however PLEASE either make a temporary level when compiling or back up your savefile. 
-
-I am currently working on a rust rewrite and polish of this program. For now, the python verion is still available, however it will soon be deprecated. Expect the rewrite to be complete and usable by Feb 15th, 2026.
+# Project information
+The working tasm compiler is located in the `rtasm` directory, and the deprecated python compiler is located in the `pytasm` directory. It is reccomended to use the `rtasm` compiler, since it is faster and more robust.  
+The emulator, located in the `interpreter` directory, is not confirmed to be fully accurate, and should not be considered a 1:1 replica of GD's environment. That said, it is still a good tool for debugging tasm. 
   
 # Guide
 TASM (Trigger Assembly) is an assembly-like language that is made to simplify the process of working with Geometry Dash's mathematical operators. It is designed to take advantage of the new item edit and compare triggers that were added in version 2.2 of Geometry Dash. This toolkit features a documentation, a debugger, and a serialised to convert instructions to triggers that you can use in a level.  

@@ -1,4 +1,5 @@
-# Arithmetic
+# Instructions
+## Arithmetic
 All arithmetic instructions are 1-tick.
 ### ADD
 Arguments: `ADD <item> <number>`, `ADD <item> <item>`, `ADD <item> <item> <item>`
@@ -27,7 +28,7 @@ The result is stored in the first argument.
 ### FLDIV
 Same as `DIV`, except the result is rounded down to the nearest integer.
   
-# Compares
+## Compares
 Spawning a group does not automatically pause the parent group.  
 The spawned group will start execution 2 ticks after the compare instruction
 is executed.  
@@ -49,7 +50,7 @@ All compare instructions are 2-tick.
 * FG: Spawns first routine if a > b otherwise spawns the second routine.
 * FGE: Spawns first routine if a >= b otherwise spawns the second routine.
   
-# Memory
+## Memory
 ### INITMEM
 Arguments: `MALLOC <numbers>`
 Assigns the numbers to memory in order, starting at address 0. Must be done after MALLOC. Numbers must for separated by commas, with no spacing.
@@ -96,7 +97,7 @@ Arguments: `MOV <item> <number>`, `MOV <item> <item>`
 Copies the value of the second argument to the first argument.
 Execution time: 1 tick.  
     
-# Miscellaneous
+## Miscellaneous
 ### NOP
 Arguments: `NOP`
 Does nothing.
