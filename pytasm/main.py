@@ -213,7 +213,7 @@ def main():
         print("Running interpreter...")
         json.dump({"routines": namespace}, open("namespace.json", "w"), indent=4)
         try:
-            executable = "interpreter\\target\\debug\\interpreter.exe" if "--runner" in argv else "interpreter.exe"
+            executable = "..\interpreter\\target\\debug\\interpreter.exe" if "--runner" in argv else "interpreter.exe"
             process = subprocess.Popen([executable, "namespace.json", "--fast" if superfast else ""])  # compiled rust program
             process.wait()
         except KeyboardInterrupt:
