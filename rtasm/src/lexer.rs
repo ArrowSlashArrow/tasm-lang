@@ -192,13 +192,7 @@ impl Tasm {
     }
 
     fn parse_tasm_value(&mut self, t: TasmValue, curr_line: usize) -> Option<TasmValue> {
-        parse_tasm_value(
-            t,
-            &self.routine_group_map,
-            &mut self.errors,
-            self.mem_end_counter,
-            curr_line,
-        )
+        parse_tasm_value(t, &self.routine_group_map, &mut self.errors, curr_line)
     }
 
     pub fn index_routines(&mut self) {
@@ -270,7 +264,6 @@ pub fn parse_tasm_value(
     t: TasmValue,
     routine_group_map: &Vec<(String, i16)>,
     errors: &mut Vec<TasmParseError>,
-    _mem_end_counter: i16,
     curr_line: usize,
 ) -> Option<TasmValue> {
     // if this is a routine ident, add corresponding group

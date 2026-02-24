@@ -125,7 +125,7 @@ impl Tasm {
                     // these two are set only once a MALLOC instruction is processed
                     // if there is no malloc, there is no memory access allowed
                     // and therefore these fields are never read
-                    // TODO: throw err if any memory ops are used but no memory exists\
+                    // TODO: throw err if any memory ops are used but no memory exists
                     // TODO: throw err if memory is created more than once (>1 malloc call)
                     // therefore it does not matter if there is junk data in there
                     // since it will either be overwritten or never read
@@ -160,7 +160,6 @@ impl Tasm {
                 // it is necessary for instructions such as MRESET and MPTR which move the pointer
                 // this information is only updated if it is set. this information is set
                 // only in the malloc methods, which would usually be parsed first.
-                // TODO: handle alias changing in malloc, where the memreg and ptrpos ids are set
 
                 if let Some(m) = data.new_mem {
                     // check that memory does not already exist

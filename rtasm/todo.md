@@ -1,15 +1,14 @@
 ## general
-- serialise instructions
 - add spawn delay + remap support to asm
 - various other comp triggers 
 - do not skip unindented strings that are not routine identifiers
 - add flag args: `INSTR <args> | <flags>`
 - InitRoutineMemoryAccess error
-   - not allowed to run memory instructions in _init routine
+    - not allowed to run memory instructions in _init routine
 - MultipleRoutineDefinitions error
-   - not allowed to define different routines with the same names
-- alias resolution should be done after lexing stage, aliases should be stored as TasmValue::Alias(...). alias type is different by alias
-- malloc/fmalloc handlers must update Tasm.memreg/ptrpos_id
+    - not allowed to define different routines with the same names
+- PointerOutsideMemory error
+    - pointer cannot move more than MEMSIZE amount of spaces in one instruction. if it did, it's outside the memory block.
 - fix disagreement between lexer-assigned group map and Tasm-assigned groups
 - add ability to move pointer a dynamic amount with binary splitting
 - add concurrent instruction prefix (`~`)
@@ -64,6 +63,23 @@ The sum is computed, and then multiplied by the multiplier.
 Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
 
 this could potentially be in stored as a flag
+
+### memory markers
+marker objects that are in the memory structure.  
+could help with moving a pointer to a previous location:
+```
+MOVEMARKER 1 ; move marker 1 to current location of pointer
+; essentially store the current location of the pointer in the marker
+
+MRESET
+MPTR 50 ; goto some memory address
+
+MREAD
+MFUNC ; read it
+
+MPTR M1 ; move pointer back to marker
+```
+the block at mem pos 0 can also be considered a marker  
 
 ### arithmetic
 support some way to assign with an operator to items: `+=`, `/=`, etc.
