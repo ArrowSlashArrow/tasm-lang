@@ -13,8 +13,8 @@ use paste::paste;
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 use crate::core::{
-    HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmPrimitive, TasmValue,
-    TasmValueType,
+    HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError, TasmPrimitive,
+    TasmValue, TasmValueType,
 };
 
 // convert a list of type identifiers into a slice
@@ -711,37 +711,61 @@ fn mptr(args: HandlerArgs) -> HandlerReturn {
     let move_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 + 7.5);
     let add_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 - 7.5);
     let move_amount = args.args[0].to_float().unwrap();
-    Ok(HandlerData::from_objects(vec![
-        move_trigger(
-            &move_cfg,
-            MoveMode::Default(DefaultMove {
-                dx: 30.0 * move_amount,
-                dy: 0.0,
-                x_lock: None,
-                y_lock: None,
-            }),
-            0.0,
-            args.ptr_group,
-            false,
-            false,
-            None,
-        ),
-        item_edit(
-            &add_cfg,
-            None,
-            None,
-            args.ptrpos_id,
-            ItemType::Counter,
-            move_amount,
-            Op::Add,
-            None,
-            None,
-            RoundMode::None,
-            RoundMode::None,
-            SignMode::None,
-            SignMode::None,
-        ),
-    ]))
+    let invalid_move_reason;
+    let is_valid_mem_move = match args.mem_info {
+        Some(mem) => {
+            if move_amount as i16 <= mem.size {
+                invalid_move_reason = String::new();
+                true
+            } else {
+                invalid_move_reason = "Pointer moved more spaces than memory size".into();
+                false
+            }
+        }
+        None => {
+            invalid_move_reason = "Pointer moved while no memory exists".into();
+            false
+        }
+    };
+
+    if is_valid_mem_move {
+        Ok(HandlerData::from_objects(vec![
+            move_trigger(
+                &move_cfg,
+                MoveMode::Default(DefaultMove {
+                    dx: 30.0 * move_amount,
+                    dy: 0.0,
+                    x_lock: None,
+                    y_lock: None,
+                }),
+                0.0,
+                args.ptr_group,
+                false,
+                false,
+                None,
+            ),
+            item_edit(
+                &add_cfg,
+                None,
+                None,
+                args.ptrpos_id,
+                ItemType::Counter,
+                move_amount,
+                Op::Add,
+                None,
+                None,
+                RoundMode::None,
+                RoundMode::None,
+                SignMode::None,
+                SignMode::None,
+            ),
+        ]))
+    } else {
+        Err(TasmParseError::InvalidPointerMove(
+            invalid_move_reason,
+            args.line,
+        ))
+    }
 }
 
 fn mreset(args: HandlerArgs) -> HandlerReturn {
@@ -1073,6 +1097,7 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
             true => TasmValue::Timer(memreg_id),
             false => TasmValue::Counter(memreg_id),
         },
+        size: mem_size,
         ptrpos: TasmValue::Counter(args.ptrpos_id),
         read_group,
         write_group,

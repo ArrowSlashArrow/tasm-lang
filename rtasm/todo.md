@@ -1,17 +1,8 @@
 ## general
 - add spawn delay + remap support to asm
-- various other comp triggers 
-- do not skip unindented strings that are not routine identifiers
 - add flag args: `INSTR <args> | <flags>`
-- InitRoutineMemoryAccess error
-    - not allowed to run memory instructions in _init routine
-- MultipleRoutineDefinitions error
-    - not allowed to define different routines with the same names
-- PointerOutsideMemory error
-    - pointer cannot move more than MEMSIZE amount of spaces in one instruction. if it did, it's outside the memory block.
-- fix disagreement between lexer-assigned group map and Tasm-assigned groups
 - add ability to move pointer a dynamic amount with binary splitting
-- add concurrent instruction prefix (`~`)
+- make macro to generate test functions for files in `tests/`
 - stop using spawn ordered
    - use busy wait for sleep
 
@@ -22,6 +13,8 @@
 float: delay
 remaps: remap dict. e.g. 192:168,0:11
 `+` before `@` always
+
+^ these will be flags
 
 ### `TSPAWN`
 Args: `TSPAWN <timer>, <float>, <routine>`
@@ -160,3 +153,7 @@ concurrent:
     ~MOV C6, 6
 
 ```
+
+## extas, for later
+- make landing page
+- generate actual doc page from docs.md

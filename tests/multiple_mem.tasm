@@ -1,0 +1,7 @@
+; This program attempts to instantiate memory multiple times.
+_init:
+    MALLOC 10
+    FMALLOC 10
+
+_start:
+    MOV C1, C2

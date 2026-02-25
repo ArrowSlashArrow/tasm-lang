@@ -1,0 +1,6 @@
+; This program attempts to 
+_init:
+    MALLOC 10
+    MREAD
+    MPTR 5
+    MFUNC

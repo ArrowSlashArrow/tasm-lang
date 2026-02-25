@@ -1,0 +1,4 @@
+; This program uses memory instructions while no memory exists.
+_start:
+    MREAD ; error
+    MFUNC ; error

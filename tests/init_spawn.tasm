@@ -1,0 +1,6 @@
+; This program attempts to spawn the _init routine.
+_init:
+    DISPLAY C1,
+
+_start:
+    SPAWN _init

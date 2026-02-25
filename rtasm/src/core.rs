@@ -22,6 +22,7 @@ pub struct MemInfo {
     pub _type: MemType,
     pub memreg: TasmValue,
     pub ptrpos: TasmValue,
+    pub size: i16,
     pub read_group: i16,
     pub write_group: i16,
     pub start_counter_id: i16,
@@ -36,6 +37,7 @@ pub struct Tasm {
     pub has_entry_point: bool,
     pub lines: Vec<String>,
     pub mem_end_counter: i16,
+    pub curr_group: i16,
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
     pub displayed_items: usize,
@@ -69,7 +71,7 @@ impl Tasm {
         // setup state
         self.aliases.ptrpos_id = self.mem_end_counter;
         let mut level = Level::new(level_name, &"tasm".to_owned(), None, None);
-        let mut curr_group = self.routines.len() as i16;
+        self.curr_group = self.routines.len() as i16;
 
         let routine_count = self.routines.len();
 
@@ -77,7 +79,7 @@ impl Tasm {
             // setup position variables
             let mut obj_pos = 0.0;
             let rtn_ypos = 75.0 + (routine.group as f64) * 30.0;
-            if curr_group > GROUP_LIMIT {
+            if self.curr_group > GROUP_LIMIT {
                 self.errors.push(TasmParseError::ExceedsGroupLimit);
                 break;
             }
@@ -103,6 +105,13 @@ impl Tasm {
                     }
                 });
 
+                // check that we are not accessing memory in init routine
+                if instr._type == InstrType::Memory && routine.ident == INIT_ROUTINE {
+                    self.errors
+                        .push(TasmParseError::InitRoutineMemoryAccess(instr.line_number));
+                    continue;
+                }
+
                 let cfg = if routine.ident == INIT_ROUTINE {
                     if let InstrType::Init = instr._type {
                         GDObjConfig::default()
@@ -119,9 +128,10 @@ impl Tasm {
                 let args = HandlerArgs {
                     args: instr_args,
                     cfg: cfg.spawnable(true).multitrigger(true),
-                    curr_group, // used as auxiliary group
+                    curr_group: self.curr_group, // used as auxiliary group
                     ptr_group: self.ptr_group,
                     ptr_reset_group: self.ptr_reset_group,
+                    line: instr.line_number,
                     // these two are set only once a MALLOC instruction is processed
                     // if there is no malloc, there is no memory access allowed
                     // and therefore these fields are never read
@@ -149,7 +159,7 @@ impl Tasm {
                 }
 
                 let skip_spaces = data.skip_spaces;
-                curr_group += data.used_extra_groups;
+                self.curr_group += data.used_extra_groups;
                 obj_pos += skip_spaces as f64;
 
                 if data.added_item_display {
@@ -197,7 +207,7 @@ impl Tasm {
                 ],
                 cfg: GDObjConfig::new(),
                 displayed_items: self.displayed_items,
-                curr_group,
+                curr_group: self.curr_group,
                 ptr_group: 0,
                 ptr_reset_group: 0,
                 memreg: TasmValue::default(),
@@ -205,6 +215,7 @@ impl Tasm {
                 routine_count: 0,
                 mem_end_counter: 0,
                 mem_info: None,
+                line: 0,
             })
             .unwrap();
 
@@ -273,6 +284,7 @@ pub struct HandlerArgs {
     pub mem_end_counter: i16,
     pub routine_count: usize,
     pub mem_info: Option<MemInfo>,
+    pub line: usize,
 }
 
 #[derive(Default)]
@@ -350,6 +362,9 @@ pub enum TasmParseError {
     ExceedsGroupLimit,
     InitRoutineSpawnError(usize),
     MultipleMemoryInstances(usize),
+    InvalidPointerMove(String, usize),
+    MultipleRoutineDefintions(String, usize, usize),
+    InitRoutineMemoryAccess(usize),
 }
 
 impl Error for TasmParseError {
@@ -386,13 +401,28 @@ impl Display for TasmParseError {
                 write!(f, "Invalid number. {why}")
             }
             Self::InvalidGroup(why) => {
-                write!(f, "Invalid number. {why}")
+                write!(f, "Invalid group. {why}")
             }
             Self::ExceedsGroupLimit => {
                 write!(f, "Input file exceeds group limit of {GROUP_LIMIT} groups.")
             }
             Self::MultipleMemoryInstances(line) => {
                 write!(f, "Multiple memory instances are not allowed: line {line}")
+            }
+            Self::InvalidPointerMove(reason, line) => {
+                write!(f, "{reason} at line {line}.")
+            }
+            Self::MultipleRoutineDefintions(rtn, line, prev_line) => {
+                write!(
+                    f,
+                    "Routine {rtn}, on line {line}, has already been declared on line {prev_line}."
+                )
+            }
+            Self::InitRoutineMemoryAccess(line) => {
+                write!(
+                    f,
+                    "Memory access attempt on line {line} is forbidden, due to being in the initializer routine."
+                )
             }
         }
     }
@@ -613,7 +643,7 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum InstrType {
     Arithmetic, // any instruction that deals specifically with operations between counters
     Init,       // any instruction that can only go into the _init routine.

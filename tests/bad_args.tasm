@@ -1,0 +1,4 @@
+; This file contains an instruction with bad arguments.
+_start:
+    ; unpossible!
+    MOV C1, C2, C3, C4

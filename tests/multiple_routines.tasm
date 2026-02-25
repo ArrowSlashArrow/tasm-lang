@@ -1,0 +1,12 @@
+; This file redfines the same routine multiple times
+routine:
+    MOV C1, C2
+
+routine:
+    MOV C2, C3
+
+routine:
+    MOV C3, C4
+
+_start:
+    MOV C4, C5

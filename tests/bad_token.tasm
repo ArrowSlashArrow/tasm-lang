@@ -1,0 +1,5 @@
+; This program contains a bad token.
+_start:
+    ADD C1, C2
+
+BAD_TOKEN

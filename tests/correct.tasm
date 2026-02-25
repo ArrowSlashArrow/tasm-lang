@@ -1,0 +1,6 @@
+; Simple valid program.
+routine1:
+    ADD C1, C2
+
+_start:
+    SPAWN routine1

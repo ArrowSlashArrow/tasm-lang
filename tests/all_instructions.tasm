@@ -1,0 +1,42 @@
+; This file uses every single instruction available.
+_init:
+    FMALLOC 25
+    INITMEM 1.5, 2.8, 3.14
+    DISPLAY C1,
+    PERS C1,
+    IOBLOCK routine1, 2, ioblock
+
+routine1:
+    ADD C1, C2
+
+routine2:
+    SUB C1, C2
+
+_start:
+    ADD C1, C2
+    SUB C1, C2
+    MUL C1, C2
+    DIV C1, C2
+    FLDIV C1, C2
+
+    SE routine1, C1, C2
+    SNE routine1, C1, C2
+    SL routine1, C1, C2
+    SLE routine1, C1, C2
+    SG routine1, C1, C2
+    SGE routine1, C1, C2
+    FE routine1, routine2, C1, C2
+    FNE routine1, routine2, C1, C2
+    FL routine1, routine2, C1, C2
+    FLE routine1, routine2, C1, C2
+    FG routine1, routine2, C1, C2
+    FGE routine1, routine2, C1, C2
+
+    MREAD
+    MPTR 5
+    MFUNC
+    MRESET
+    MWRITE
+
+    NOP
+    SPAWN routine1

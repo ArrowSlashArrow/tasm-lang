@@ -47,8 +47,9 @@ use crate::{
 const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
 
 impl Tasm {
-    pub fn parse(&mut self) {
+    pub fn parse(&mut self, group_offset: i16) {
         // index routines before anything else
+        self.curr_group = group_offset;
         self.index_routines();
 
         // push _init routine to the start to process it before anyting else
@@ -196,7 +197,6 @@ impl Tasm {
     }
 
     pub fn index_routines(&mut self) {
-        let mut curr_group = 0i16;
         let mut curr_routine_data = (0usize, String::new(), 0i16, vec![]);
 
         // index all routines
@@ -213,24 +213,37 @@ impl Tasm {
                 let routine_ident = curr_routine_data.1.clone();
                 if routine_ident == INIT_ROUTINE {
                     curr_routine_data.2 = INIT_PLACEHOLDER_GROUP; // init has no group, -1 serves as a unique _init marker
-                    curr_group -= 1;
+                    self.curr_group -= 1;
                 } else {
-                    self.routine_group_map.push((routine_ident, curr_group));
+                    self.routine_group_map
+                        .push((routine_ident, self.curr_group));
                 }
                 self.routine_data.push(curr_routine_data.clone());
 
                 // no indent, check for routine identifier.
                 let mut strip = line.trim().to_string();
                 if strip.ends_with(':') && !strip.contains(' ') {
-                    curr_group += 1;
+                    self.curr_group += 1;
                     // now we are certain that this is a routine ident
                     strip.pop();
                     let routine_ident = strip;
                     if routine_ident == ENTRY_POINT {
                         self.has_entry_point = true;
                     }
+
+                    // check that this routine was not already declared
+                    for rtn in self.routine_data.iter() {
+                        if routine_ident == rtn.1 {
+                            self.errors.push(TasmParseError::MultipleRoutineDefintions(
+                                routine_ident.clone(),
+                                line_idx,
+                                rtn.0,
+                            ));
+                        }
+                    }
+
                     // clear out bad data
-                    curr_routine_data = (line_idx, routine_ident, curr_group, vec![]);
+                    curr_routine_data = (line_idx, routine_ident, self.curr_group, vec![]);
                     in_routine = true;
                 } else {
                     // this is not a routine identifier, so it is a bad token
@@ -251,7 +264,8 @@ impl Tasm {
         if routine_ident == INIT_ROUTINE {
             curr_routine_data.2 = 0i16; // init has no group
         } else {
-            self.routine_group_map.push((routine_ident, curr_group));
+            self.routine_group_map
+                .push((routine_ident, self.curr_group));
         }
         self.routine_data.push(curr_routine_data.clone());
 
@@ -292,6 +306,7 @@ pub fn parse_tasm_value(
 pub fn parse_file<T: AsRef<str>>(
     in_str: T,
     mem_end_counter: i16,
+    group_offset: i16,
 ) -> Result<Tasm, Vec<TasmParseError>> {
     let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
     let lines = in_str
@@ -301,7 +316,7 @@ pub fn parse_file<T: AsRef<str>>(
         .collect::<Vec<String>>();
 
     tasm.lines = lines;
-    tasm.parse();
+    tasm.parse(group_offset);
 
     if tasm.errors.len() == 0 {
         Ok(tasm)

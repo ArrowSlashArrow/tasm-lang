@@ -24,21 +24,19 @@ struct Args {
     #[arg(long)]
     release: bool,
 
-    #[arg(
-        value_parser = clap::value_parser!(i16),
-        default_value_t = 9999i16,
-        long
-    )]
+    #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
-    /* args todo:
-     * group offset
-     */
     /// Whether to export the copmiled level as a .gmd
     #[arg(long)]
     gmd: bool,
 
+    /// Name of exported level
     #[arg(long, value_name = "STRING")]
     level_name: Option<String>,
+
+    /// Starting group offset. Default value is 0
+    #[arg(long, default_value_t = 0i16, value_parser = clap::value_parser!(i16))]
+    group_offset: i16,
 }
 
 fn main() -> Result<(), Error> {
@@ -46,7 +44,7 @@ fn main() -> Result<(), Error> {
     println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
-    let mut tasm = match lexer::parse_file(file, args.mem_end_counter) {
+    let mut tasm = match lexer::parse_file(file, args.mem_end_counter, args.group_offset) {
         Ok(t) => {
             println!("Parsed file with 0 errors.");
             t
