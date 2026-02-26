@@ -19,6 +19,7 @@ Features:
 * Optimised trigger placement and group usage
 * Built-in memory system
 * Compiles quickly and directly to trigger objects
+* Integration with dedicated backend: [GDlib](https://crates.io/crates/gdlib)
 <!-- * Versatile compiler, lots of options. -->
   
 To create a program, first make a `.tasm` file.

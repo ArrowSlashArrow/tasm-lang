@@ -1,0 +1,3 @@
+; This program runs instructions with flags
+_start:
+    ADD C1, C2 | mod: 1.5, all: floor+

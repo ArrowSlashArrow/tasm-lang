@@ -2,7 +2,8 @@
 - add spawn delay + remap support to asm
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
-- make macro to generate test functions for files in `tests/`
+-       make macro to generate test functions for files in `tests/`
+- add verbose logging flag to allow for the compiler to log its actions (via stdout)
 - stop using spawn ordered
    - use busy wait for sleep
 
@@ -14,7 +15,7 @@ float: delay
 remaps: remap dict. e.g. 192:168,0:11
 `+` before `@` always
 
-^ these will be flags
+^ these will be flags, delay:float, remap:{group:group}
 
 ### `TSPAWN`
 Args: `TSPAWN <timer>, <float>, <routine>`
@@ -55,7 +56,7 @@ This instruction is 1-tick.
 The sum is computed, and then multiplied by the multiplier.
 Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
 
-this could potentially be in stored as a flag
+^ this will be a flag, mod:float
 
 ### memory markers
 marker objects that are in the memory structure.  
@@ -77,7 +78,7 @@ the block at mem pos 0 can also be considered a marker
 ### arithmetic
 support some way to assign with an operator to items: `+=`, `/=`, etc.
 
-this could potentially be in stored as a flag
+this will be a flag: {op}= (+=, -=, *=, /=)
 
 ### flags
 a.k.a. "extra args"/ "extras"  

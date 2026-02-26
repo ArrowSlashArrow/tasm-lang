@@ -37,6 +37,10 @@ struct Args {
     /// Starting group offset. Default value is 0
     #[arg(long, default_value_t = 0i16, value_parser = clap::value_parser!(i16))]
     group_offset: i16,
+
+    /// Toggles verbose logging from the compiler
+    #[arg(long)]
+    verbose_logs: bool,
 }
 
 fn main() -> Result<(), Error> {
@@ -44,7 +48,12 @@ fn main() -> Result<(), Error> {
     println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
-    let mut tasm = match lexer::parse_file(file, args.mem_end_counter, args.group_offset) {
+    let mut tasm = match lexer::parse_file(
+        file,
+        args.mem_end_counter,
+        args.group_offset,
+        args.verbose_logs,
+    ) {
         Ok(t) => {
             println!("Parsed file with 0 errors.");
             t

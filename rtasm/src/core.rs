@@ -45,6 +45,15 @@ pub struct Tasm {
     pub mem_info: Option<MemInfo>,
     // aliases get resolved through the map:
     pub aliases: Aliases,
+    pub logs_enabled: bool,
+}
+#[macro_export]
+macro_rules! verbose_log {
+    ($this:expr, $($arg:tt)*) => {
+        if $this.logs_enabled {
+            println!($($arg)*);
+        }
+    };
 }
 
 /// Aliases lookup container

@@ -42,6 +42,7 @@ use crate::{
         fits_arg_signature, get_instr_type,
     },
     instr::INSTR_SPEC,
+    verbose_log,
 };
 
 const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
@@ -49,8 +50,13 @@ const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
 impl Tasm {
     pub fn parse(&mut self, group_offset: i16) {
         // index routines before anything else
+
+        verbose_log!(self, "Indexing routines.");
         self.curr_group = group_offset;
         self.index_routines();
+
+        verbose_log!(self, "Finished indexing routines.");
+        verbose_log!(self, "Pushing _init to front of routine data");
 
         // push _init routine to the start to process it before anyting else
         // important to do for alias resolution, since memtype is determined in init.
@@ -65,6 +71,7 @@ impl Tasm {
             self.errors.push(TasmParseError::NoEntryPoint);
         }
 
+        verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
     }
 
@@ -74,6 +81,7 @@ impl Tasm {
     }
 
     pub fn handle_instructions(&mut self) {
+        verbose_log!(self, "Restructuring routine data.");
         let mut routines: Vec<(Vec<(usize, String)>, Routine)> = self
             .routine_data
             .iter()
@@ -101,6 +109,7 @@ impl Tasm {
                 // parse instruction and args
                 self.parse_instr_line(routine, *curr_line, trimmed_line);
             }
+            verbose_log!(self, "Parsed {} routine instructions", routine.ident);
             self.routines.push(routine.clone());
         }
     }
@@ -130,6 +139,7 @@ impl Tasm {
                 })
                 .collect();
             if erroneous_instr {
+                verbose_log!(self, "Got bad args.");
                 self.errors.push(TasmParseError::InvalidInstruction((
                     "Failed to parse instruction: invalid argset".into(),
                     curr_line,
@@ -216,8 +226,9 @@ impl Tasm {
                     self.curr_group -= 1;
                 } else {
                     self.routine_group_map
-                        .push((routine_ident, self.curr_group));
+                        .push((routine_ident.clone(), self.curr_group));
                 }
+                verbose_log!(self, "Got routine: {} on line {}", routine_ident, line_idx);
                 self.routine_data.push(curr_routine_data.clone());
 
                 // no indent, check for routine identifier.
@@ -234,6 +245,7 @@ impl Tasm {
                     // check that this routine was not already declared
                     for rtn in self.routine_data.iter() {
                         if routine_ident == rtn.1 {
+                            verbose_log!(self, "Routine was already declared.");
                             self.errors.push(TasmParseError::MultipleRoutineDefintions(
                                 routine_ident.clone(),
                                 line_idx,
@@ -247,6 +259,7 @@ impl Tasm {
                     in_routine = true;
                 } else {
                     // this is not a routine identifier, so it is a bad token
+                    verbose_log!(self, "Found bad token on line {line_idx}");
                     self.errors
                         .push(TasmParseError::BadToken((line.to_string(), line_idx)));
                 }
@@ -259,6 +272,7 @@ impl Tasm {
             }
         }
 
+        verbose_log!(self, "Pushing routine data.");
         // commit last routine data
         let routine_ident = curr_routine_data.1.clone();
         if routine_ident == INIT_ROUTINE {
@@ -269,6 +283,7 @@ impl Tasm {
         }
         self.routine_data.push(curr_routine_data.clone());
 
+        verbose_log!(self, "Removing garbage routine data.");
         // first routine was garbage data, so remove it
         self.routine_data.remove(0);
     }
@@ -307,6 +322,7 @@ pub fn parse_file<T: AsRef<str>>(
     in_str: T,
     mem_end_counter: i16,
     group_offset: i16,
+    verbose_logs: bool,
 ) -> Result<Tasm, Vec<TasmParseError>> {
     let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
     let lines = in_str
@@ -316,6 +332,7 @@ pub fn parse_file<T: AsRef<str>>(
         .collect::<Vec<String>>();
 
     tasm.lines = lines;
+    tasm.logs_enabled = verbose_logs;
     tasm.parse(group_offset);
 
     if tasm.errors.len() == 0 {
