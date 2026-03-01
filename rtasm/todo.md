@@ -2,10 +2,15 @@
 - add spawn delay + remap support to asm
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
--       make macro to generate test functions for files in `tests/`
+    - make macro to generate test functions for files in `tests/`
 - add verbose logging flag to allow for the compiler to log its actions (via stdout)
 - stop using spawn ordered
-   - use busy wait for sleep
+    - use busy wait for sleep
+- MEMESIZE alias
+- exectuable releases
+    - x86_64-pc-windows-msvc
+    - x86_64-linux-gnu
+    - x86_64-linux-musl
 
 ## commands
 ### SPAWN command and derivatives
@@ -35,6 +40,8 @@ internally uses time ctrl trigger
 Args: `SRAND <routine>, <float>`
 Args: `FRAND <routine>, <routine>, <float>`
 Spawns/Forks routines based on the chance
+`SRAND` spawns the routine with the float % chance
+`FRAND` spawns routine 1 with chance otherwise spawns routine 2
 internally uses random trigger
 
 ### `RET`
@@ -44,6 +51,15 @@ internally uses stop trigger with ctrl id
 
 all spawn triggers have a ctrl id that is the same as the group they're spawning
 return: stop trigger that stops all objects with that control id (all spawn triggers that activate that group, and by proxy, the group itself)
+
+Related instructions: 
+* `PAUSE <routine>`: pauses the routine. unpausable via:
+* `RESUME <routine>`: unpauses the routine.
+* `STOP <routine>`: pauses and exists the routine. not resumable.
+
+Control flow instructions require that the spawner object has a known control ID. 
+This ID will be set to the group that it is responsible for calling. If it responsible for calling multiple groups, it should not be given any control ID. For example, random and andvanced random triggers will not be given a control ID. This is because each object ma
+As a result, control flow instructions are not expected to work if the routine can be spawned by an advanced random trigger. Alterntaively, a manual control ID flag may be set for the random spawn instructions. This flag may contain anything that corresponds to a group: either a group literal or a routine identifier.
 
 ### `WAIT`
 Args: `WAIT <int>`
