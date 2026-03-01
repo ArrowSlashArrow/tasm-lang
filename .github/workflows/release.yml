@@ -27,6 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: where?
+        run: |
+          pwd
+          ls -R
+
       - name: install rust
         uses: dtolnay/rust-toolchain@master
         with:
