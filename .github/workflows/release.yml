@@ -78,7 +78,7 @@ jobs:
           cd release-${{ matrix.target }}
 
           if [[ "$EXT" == "zip" ]]; then
-            zip -r "../$ARCHIVE" *
+            7z a "../$ARCHIVE" *
           else
             tar czf "../$ARCHIVE" *
           fi
