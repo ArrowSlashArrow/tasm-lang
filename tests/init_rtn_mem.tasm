@@ -1,4 +1,4 @@
-; This program attempts to 
+; This program attempts to access memory in the _init routine.
 _init:
     MALLOC 10
     MREAD

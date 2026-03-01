@@ -3,14 +3,9 @@
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
     - make macro to generate test functions for files in `tests/`
-- add verbose logging flag to allow for the compiler to log its actions (via stdout)
 - stop using spawn ordered
     - use busy wait for sleep
 - MEMESIZE alias
-- exectuable releases
-    - x86_64-pc-windows-msvc
-    - x86_64-linux-gnu
-    - x86_64-linux-musl
 
 ## commands
 ### SPAWN command and derivatives
@@ -55,7 +50,7 @@ return: stop trigger that stops all objects with that control id (all spawn trig
 Related instructions: 
 * `PAUSE <routine>`: pauses the routine. unpausable via:
 * `RESUME <routine>`: unpauses the routine.
-* `STOP <routine>`: pauses and exists the routine. not resumable.
+* `STOP <routine>`: pauses and exits the routine. not resumable.
 
 Control flow instructions require that the spawner object has a known control ID. 
 This ID will be set to the group that it is responsible for calling. If it responsible for calling multiple groups, it should not be given any control ID. For example, random and andvanced random triggers will not be given a control ID. This is because each object ma

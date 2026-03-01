@@ -115,10 +115,17 @@ impl Tasm {
                 });
 
                 // check that we are not accessing memory in init routine
-                if instr._type == InstrType::Memory && routine.ident == INIT_ROUTINE {
-                    self.errors
-                        .push(TasmParseError::InitRoutineMemoryAccess(instr.line_number));
-                    continue;
+                if instr._type == InstrType::Memory {
+                    if routine.ident == INIT_ROUTINE {
+                        self.errors
+                            .push(TasmParseError::InitRoutineMemoryAccess(instr.line_number));
+                        continue;
+                    }
+                    if let None = self.mem_info {
+                        self.errors
+                            .push(TasmParseError::NonexistentMemoryAccess(instr.line_number));
+                        continue;
+                    }
                 }
 
                 let cfg = if routine.ident == INIT_ROUTINE {
@@ -374,6 +381,7 @@ pub enum TasmParseError {
     InvalidPointerMove(String, usize),
     MultipleRoutineDefintions(String, usize, usize),
     InitRoutineMemoryAccess(usize),
+    NonexistentMemoryAccess(usize),
 }
 
 impl Error for TasmParseError {
@@ -431,6 +439,12 @@ impl Display for TasmParseError {
                 write!(
                     f,
                     "Memory access attempt on line {line} is forbidden, due to being in the initializer routine."
+                )
+            }
+            Self::NonexistentMemoryAccess(line) => {
+                write!(
+                    f,
+                    "Attempted to access memory while none exists on line {line}."
                 )
             }
         }
@@ -501,7 +515,16 @@ pub enum TasmPrimitive {
 impl TasmValue {
     pub fn to_value(s: &str) -> Result<Self, TasmParseError> {
         let mut iter = s.chars();
-        let pref = iter.next().unwrap();
+        let pref = match iter.next() {
+            Some(c) => c,
+            None => {
+                // there's nothing in this string
+                return Err(TasmParseError::BadToken((
+                    "Got a 0-length string. Perhaps there is a trailing comma".into(),
+                    0,
+                )));
+            }
+        };
         let postf = s.chars().last().unwrap();
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
 

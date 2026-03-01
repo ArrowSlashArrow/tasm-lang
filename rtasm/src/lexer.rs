@@ -58,6 +58,11 @@ impl Tasm {
         verbose_log!(self, "Finished indexing routines.");
         verbose_log!(self, "Pushing _init to front of routine data");
 
+        if self.routine_data.len() == 0 {
+            // there is nothing to parse
+            return;
+        }
+
         // push _init routine to the start to process it before anyting else
         // important to do for alias resolution, since memtype is determined in init.
         if let Some(init_pos) = self.routine_data.iter().position(|r| r.1 == INIT_ROUTINE) {
@@ -73,6 +78,10 @@ impl Tasm {
 
         verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
+
+        if self.errors.len() > 0 {
+            verbose_log!(self, "Parsed file with some errors.");
+        }
     }
 
     pub fn mem_end_counter(mut self, ctr: i16) -> Self {
