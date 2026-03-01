@@ -2,7 +2,7 @@ name: Build and package
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   build:
@@ -33,6 +33,7 @@ jobs:
         run: rustup target add ${{ matrix.target }}
 
       - name: install mingw
+        shell: bash
         if: ${{ matrix.target }} == 'x86_64-pc-windows-gnu'
         run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
 
