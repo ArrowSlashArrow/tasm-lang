@@ -73,7 +73,7 @@ jobs:
           cp target/${{ matrix.target }}/release/$BIN release-${{ matrix.target }}/
           ARCHIVE="../tasm-${{ github.ref_name }}-${{ matrix.target }}.$EXT"
 
-          cp README.md LICENSE docs.md release-${{ matrix.target }}/
+          cp ../README.md ../LICENSE ../docs.md release-${{ matrix.target }}/
           cd release-${{ matrix.target }}
 
           if [[ "$EXT" == "zip" ]]; then
