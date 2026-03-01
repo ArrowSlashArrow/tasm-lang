@@ -293,9 +293,9 @@ macro_rules! handlers {
     };
 }
 
-fn todo(_args: HandlerArgs) -> HandlerReturn {
-    unimplemented!()
-}
+// fn todo(_args: HandlerArgs) -> HandlerReturn {
+//     unimplemented!()
+// }
 
 // useful for instructions that don't correspond to any objects
 // namely debug instructions
@@ -455,7 +455,7 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
-    let spawn_cfg = cfg
+    let mut spawn_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
@@ -463,6 +463,9 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
 
     let iargs = args.args;
     let (lhs_id, lhs_t) = get_item_spec(&iargs[1]).unwrap();
+
+    let spawning_group = iargs[0].to_group_id().unwrap() as i32;
+    spawn_cfg.material_control_id = spawning_group;
     // SX rtn, I1, 42
     // args: [Group(n), ]
 
@@ -492,7 +495,7 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
         spawn_trigger(
             &spawn_cfg,
-            iargs[0].to_group_id().unwrap() as i32,
+            spawning_group,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -505,7 +508,7 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
-    let spawn_cfg = cfg
+    let mut spawn_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
@@ -514,6 +517,8 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let iargs = args.args;
     let (lhs_id, lhs_t) = get_item_spec(&iargs[1]).unwrap();
     let (rhs_id, rhs_t) = get_item_spec(&iargs[2]).unwrap();
+    let spawning_group = iargs[0].to_group_id().unwrap() as i32;
+    spawn_cfg.material_control_id = spawning_group;
     // SX rtn, I1, 42
     // args: [Group(n), ]
 
@@ -543,7 +548,7 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
         spawn_trigger(
             &spawn_cfg,
-            iargs[0].to_group_id().unwrap() as i32,
+            spawning_group,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -556,13 +561,13 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
-    let spawn_true_cfg = cfg
+    let mut spawn_true_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .scale(0.33, 0.33)
         .groups([args.curr_group]); // use auxiliary group for spawn trigger
 
-    let spawn_false_cfg = cfg
+    let mut spawn_false_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .scale(0.33, 0.33)
@@ -571,6 +576,11 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let iargs = args.args;
     let (lhs_id, lhs_t) = get_item_spec(&iargs[2]).unwrap();
     let num = iargs[3].to_float().unwrap();
+
+    let spawning_true = iargs[0].to_group_id().unwrap() as i32;
+    spawn_true_cfg.material_control_id = spawning_true;
+    let spawning_false = iargs[1].to_group_id().unwrap() as i32;
+    spawn_false_cfg.material_control_id = spawning_false;
     // FX rtn, rtn2, I1, 42
     // args: [Group(n), Group(n), Item, Number]
 
@@ -600,8 +610,7 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
         spawn_trigger(
             &spawn_true_cfg,
-            // spawn true group
-            iargs[0].to_group_id().unwrap() as i32,
+            spawning_true,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -610,8 +619,7 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
         spawn_trigger(
             &spawn_false_cfg,
-            // spawn false group
-            iargs[1].to_group_id().unwrap() as i32,
+            spawning_false,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -624,13 +632,13 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
-    let spawn_true_cfg = cfg
+    let mut spawn_true_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .scale(0.33, 0.33)
         .groups([args.curr_group]); // use auxiliary group for spawn trigger
 
-    let spawn_false_cfg = cfg
+    let mut spawn_false_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .scale(0.33, 0.33)
@@ -639,6 +647,11 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let iargs = args.args;
     let (lhs_id, lhs_t) = get_item_spec(&iargs[2]).unwrap();
     let (rhs_id, rhs_t) = get_item_spec(&iargs[3]).unwrap();
+
+    let spawning_true = iargs[0].to_group_id().unwrap() as i32;
+    spawn_true_cfg.material_control_id = spawning_true;
+    let spawning_false = iargs[1].to_group_id().unwrap() as i32;
+    spawn_false_cfg.material_control_id = spawning_false;
     // FX rtn, rtn2, I1, 42
     // args: [Group(n), Group(n), Item, Item]
 
@@ -668,8 +681,7 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
         spawn_trigger(
             &spawn_true_cfg,
-            // spawn true group
-            iargs[0].to_group_id().unwrap() as i32,
+            spawning_true,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -678,8 +690,7 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         ),
         spawn_trigger(
             &spawn_false_cfg,
-            // spawn false group
-            iargs[1].to_group_id().unwrap() as i32,
+            spawning_false,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -695,9 +706,12 @@ handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_num);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
 fn spawn(args: HandlerArgs) -> HandlerReturn {
+    let mut cfg = args.cfg;
+    let spawning_group = args.args[0].to_group_id().unwrap() as i32;
+    cfg.material_control_id = spawning_group;
     Ok(HandlerData::from_objects(vec![spawn_trigger(
-        &args.cfg,
-        args.args[0].to_group_id().unwrap() as i32,
+        &cfg,
+        spawning_group,
         GROUP_SPAWN_DELAY,
         0.0,
         false,
