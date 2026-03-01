@@ -20,6 +20,10 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    defaults:
+      run:
+        working-directory: ./rtasm
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +46,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: build release
-        working-directory: ./rtasm
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: package release
