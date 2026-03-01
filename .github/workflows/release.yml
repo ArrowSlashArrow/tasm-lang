@@ -1,0 +1,82 @@
+name: Build and package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+
+      - name: add target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: install mingw
+        if: ${{ matrix.target }} == 'x86_64-pc-windows-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      - name: install musl tools
+        if: ${{ matrix.target }} == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: package release
+        shell: bash
+        run: |
+          mkdir -p release-${{ matrix.target }}
+
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            BIN="tasmc.exe"
+            EXT="zip"
+          else
+            BIN="tasmc"
+            EXT="tar.gz"
+          fi
+
+          cp target/${{ matrix.target }}/release/$BIN release-${{ matrix.target }}/
+          ARCHIVE="../tasm-${{ github.ref_name }}-${{ matrix.target }}.$EXT"
+
+          cp README.md LICENSE docs.md release-${{ matrix.target }}/
+          cd release-${{ matrix.target }}
+
+          if [[ "$EXT" == "zip" ]]; then
+            zip -r $ARCHIVE *
+          else
+            tar czf $ARCHIVE *
+          fi
+          cd ..
+
+          # send filename to env
+          echo "FILE=$ARCHIVE" >> $GITHUB_ENV
+
+      - name: upload builds
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.FILE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
