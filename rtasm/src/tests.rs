@@ -15,7 +15,9 @@ macro_rules! tasm_test {
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
                     9999,
                     0,
-                    true
+                    true,
+                    true,
+                    false
                 ).is_ok())
             }
         }
@@ -29,7 +31,9 @@ macro_rules! tasm_test {
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
                     9999,
                     0,
-                    true
+                    true,
+                    true,
+                    false
                 ).is_err())
             }
         }
@@ -43,14 +47,58 @@ macro_rules! tasm_test {
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
                     9999,
                     0,
-                    true
+                    true,
+                    true,
+                    false
                 ).unwrap();
                 assert!(res.handle_routines(&String::new()).is_err())
             }
         }
     };
+    // parser success
+    ($file:literal, example) => {
+        paste! {
+            #[test]
+            fn [<fileparse_example _ $file>]() {
+                assert!(lexer::parse_file(
+                    fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
+                    9999,
+                    0,
+                    true,
+                    true,
+                    false
+                ).is_ok())
+            }
+        }
+    };
+
+    // parser success
+    ($file:literal, exmaple_no_entry_point) => {
+        paste! {
+            #[test]
+            fn [<fileparse_example _ $file>]() {
+                assert!(lexer::parse_file(
+                    fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
+                    9999,
+                    0,
+                    true,
+                    true,
+                    true
+                ).is_ok())
+            }
+        }
+    };
 }
 
+tasm_test!("fetch", exmaple_no_entry_point);
+tasm_test!("fib_in_memory", example);
+tasm_test!("incrementer", example);
+tasm_test!("is_c1_prime", example);
+tasm_test!("pointer_test", example);
+tasm_test!("pointer_test1", example);
+tasm_test!("project_euler_1", example);
+tasm_test!("project_euler_2", example);
+tasm_test!("project_euler_6", example);
 tasm_test!("all_instructions", true);
 tasm_test!("bad_args", false);
 tasm_test!("bad_instruction", false);
@@ -91,19 +139,7 @@ fn no_int_detection() {
 fn parse_tasm() -> anyhow::Result<()> {
     let file = fs::read_to_string("../programs/nuclear_reactor.tasm")?;
     let mut parse_start = Instant::now();
-    let mut tasm = match lexer::parse_file(file, 9999, 0, true) {
-        Ok(t) => {
-            println!("Parsed file with 0 errors.");
-            t
-        }
-        Err(e) => {
-            for err in e.iter() {
-                println!("{err}");
-            }
-            println!("Parsed file with {} errors.", e.len());
-            panic!("bad tasm")
-        }
-    };
+    let mut tasm = lexer::parse_file(file, 9999, 0, true, true, false).unwrap();
 
     println!(
         "Parse time: {:.3}ms",

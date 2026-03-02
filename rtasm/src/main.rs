@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{Error, anyhow};
+use anyhow::Error;
 use clap::Parser;
 use gdlib::gdlevel::Levels;
 
@@ -41,6 +41,15 @@ struct Args {
     /// Toggles verbose logging from the compiler
     #[arg(long)]
     verbose_logs: bool,
+
+    /// Toggles printing of all errors if the input file is parsed with errors
+    #[arg(long)]
+    log_errors: bool,
+
+    /// Does not require an entry point to be present in the input file.
+    /// Useful for compiling utility programs that don't necessary contain an entry point.
+    #[arg(long)]
+    no_entry_point: bool,
 }
 
 fn main() -> Result<(), Error> {
@@ -48,21 +57,15 @@ fn main() -> Result<(), Error> {
     println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
-    let mut tasm = match lexer::parse_file(
+    let mut tasm = lexer::parse_file(
         file,
         args.mem_end_counter,
         args.group_offset,
         args.verbose_logs,
-    ) {
-        Ok(t) => {
-            println!("Parsed file with 0 errors.");
-            t
-        }
-        Err(e) => {
-            show_errors(e, "Unable to parse file");
-            return Err(anyhow!("bad tasm"));
-        }
-    };
+        args.log_errors,
+        args.no_entry_point,
+    )
+    .unwrap();
 
     let level_name = match args.level_name {
         Some(l) => l,

@@ -2,10 +2,26 @@
 - add spawn delay + remap support to asm
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
-    - make macro to generate test functions for files in `tests/`
-- stop using spawn ordered
-    - use busy wait for sleep
-- MEMESIZE alias
+- aliases todo:
+    - MEMSIZE
+    - POINTS
+    - ATTEMPTS
+    - MAINTIME
+- workflow for pr to run all tests
+- define command
+    - defines a constant that can be used as an alias
+    - cannot overwrite existing aliases (any already defined and any of the default ones)
+    - e.g. `DEFINE external_object, g123`
+        - `external_object` now refers to the group `123`
+    - init only
+- make the release mode toggle actually do something
+    - currently it is ignored and everything is compiled in release anyways
+    - debug (not release) mode:
+        - each instruction takes a 30x30 cell
+        - comments are present alongside each routine in the form of text objects
+    - release mode:
+        - everything is compressed
+        - all labels except for "memory" and routine labels are removed
 
 ## commands
 ### SPAWN command and derivatives
