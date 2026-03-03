@@ -1,10 +1,12 @@
+use std::iter;
+
 use gdlib::gdobj::{
-    GDObjConfig, GDObject,
+    GDObjConfig, GDObject, Item, ItemType,
     misc::{default_block, text},
     triggers::{
-        CompareOp, CounterMode, DefaultMove, ItemAlign, ItemType, MoveMode, Op, RoundMode,
+        CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget, Op, RoundMode,
         SignMode, TargetMove, collision_block, collision_trigger, counter_object, item_compare,
-        item_edit, move_trigger, persistent_item, spawn_trigger, toggle_trigger,
+        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, toggle_trigger,
     },
 };
 use paste::paste;
@@ -61,9 +63,7 @@ pub const INSTR_SPEC: &[(
     ("SPAWN", false, &[argset!((Group) => spawn)]),
     // Waits
     ("NOP", false, &[argset!(() => nop)]),
-    // Commented out due to being non-v0.1.0
-    // ("WAIT", false, &[argset!((Int) => wait)]),
-
+    ("WAIT", false, &[argset!((Int) => wait)]),
     // Arithmetic
     (
         "ADD",
@@ -212,10 +212,10 @@ pub const INSTR_SPEC: &[(
 ];
 
 // utils
-fn get_item_spec(item: &TasmValue) -> Option<(i16, ItemType)> {
+fn get_item_spec(item: &TasmValue) -> Option<Item> {
     match item {
-        TasmValue::Counter(c) => Some((*c, ItemType::Counter)),
-        TasmValue::Timer(t) => Some((*t, ItemType::Timer)),
+        TasmValue::Counter(c) => Some(Item::Counter(*c)),
+        TasmValue::Timer(t) => Some(Item::Timer(*t)),
         _ => None,
     }
 }
@@ -311,25 +311,24 @@ fn nop(_args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::default().skip_spaces(1))
 }
 
-// fn wait(args: HandlerArgs) -> HandlerReturn {
-//     // skip specified amount of spaces
-//     Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
-// }
+fn wait(args: HandlerArgs) -> HandlerReturn {
+    // skip specified amount of spaces
+    Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
+}
 
 /* ARITHMETIC */
 
 fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
-    let (res_id, res_t) = get_item_spec(&args.args[0]).unwrap();
-    let (op_id, op_t) = get_item_spec(&args.args[1]).unwrap();
+    let result = get_item_spec(&args.args[0]).unwrap();
+    let operand = get_item_spec(&args.args[1]).unwrap();
     vec![item_edit(
         &args.cfg,
-        Some((op_id as i32, op_t)),
+        Some(operand),
         None,
-        res_id,
-        res_t,
+        result,
         1.0,
         op,
-        None,
+        false,
         None,
         RoundMode::None,
         if round_res {
@@ -342,18 +341,17 @@ fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject
     )]
 }
 fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
-    let (res_id, res_t) = get_item_spec(&args.args[0]).unwrap();
-    let (op1_id, op1_t) = get_item_spec(&args.args[1]).unwrap();
-    let (op2_id, op2_t) = get_item_spec(&args.args[2]).unwrap();
+    let res = get_item_spec(&args.args[0]).unwrap();
+    let op1 = get_item_spec(&args.args[1]).unwrap();
+    let op2 = get_item_spec(&args.args[2]).unwrap();
     vec![item_edit(
         &args.cfg,
-        Some((op1_id as i32, op1_t)),
-        Some((op2_id as i32, op2_t)),
-        res_id,
-        res_t,
+        Some(op1),
+        Some(op2),
+        res,
         1.0,
         Op::Set,
-        None,
+        false,
         Some(op),
         RoundMode::None,
         if round_res {
@@ -366,18 +364,17 @@ fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject
     )]
 }
 fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
-    let (res_id, res_t) = get_item_spec(&args.args[0]).unwrap();
+    let res = get_item_spec(&args.args[0]).unwrap();
     // second arg should always be a number
     let modifier = args.args[1].to_float().unwrap();
     vec![item_edit(
         &args.cfg,
         None,
         None,
-        res_id,
-        res_t,
+        res,
         modifier,
         op,
-        None,
+        false,
         None,
         RoundMode::None,
         if round_res {
@@ -390,19 +387,18 @@ fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObje
     )]
 }
 fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
-    let (res_id, res_t) = get_item_spec(&args.args[0]).unwrap();
-    let (op1_id, op1_t) = get_item_spec(&args.args[1]).unwrap();
+    let res = get_item_spec(&args.args[0]).unwrap();
+    let op1 = get_item_spec(&args.args[1]).unwrap();
     let mult = args.args[2].to_float().unwrap();
     vec![item_edit(
         &args.cfg,
-        Some((op1_id as i32, op1_t)),
+        Some(op1),
         None,
-        res_id,
-        res_t,
+        res,
         mult,
         Op::Set,
+        false,
         Some(op),
-        None,
         RoundMode::None,
         if round_res {
             RoundMode::Nearest
@@ -452,20 +448,19 @@ fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
 /* COMPARES */
 
 fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
-    // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
-    let mut spawn_cfg = cfg
+
+    let iargs = args.args;
+    let lhs = get_item_spec(&iargs[1]).unwrap();
+
+    let spawning_group = iargs[0].to_group_id().unwrap();
+    let spawn_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
-        .groups([args.curr_group]); // use auxiliary group for spawn trigger
-
-    let iargs = args.args;
-    let (lhs_id, lhs_t) = get_item_spec(&iargs[1]).unwrap();
-
-    let spawning_group = iargs[0].to_group_id().unwrap() as i32;
-    spawn_cfg.material_control_id = spawning_group;
+        .groups([args.curr_group])
+        .set_control_id(spawning_group as i32); // use auxiliary group for spawn trigger
     // SX rtn, I1, 42
     // args: [Group(n), ]
 
@@ -474,22 +469,20 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group, // spawn auxiliary group (spawn trigger)
             0,
-            (
-                lhs_id as i32,
-                lhs_t,
-                1.0,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
-            (
-                0,
-                ItemType::Counter,
-                iargs[2].to_float().unwrap(),
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
+            CompareOperand {
+                operand_item: lhs,
+                modifier: 1.0,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
+            CompareOperand {
+                operand_item: Item::Counter(0),
+                modifier: iargs[2].to_float().unwrap(),
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
             op,
             0.0,
         ),
@@ -505,20 +498,19 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     ]
 }
 fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
-    // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
-    let mut spawn_cfg = cfg
+
+    let iargs = args.args;
+    let lhs = get_item_spec(&iargs[1]).unwrap();
+    let rhs = get_item_spec(&iargs[2]).unwrap();
+    let spawning_group = iargs[0].to_group_id().unwrap();
+    let spawn_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
-        .groups([args.curr_group]); // use auxiliary group for spawn trigger
-
-    let iargs = args.args;
-    let (lhs_id, lhs_t) = get_item_spec(&iargs[1]).unwrap();
-    let (rhs_id, rhs_t) = get_item_spec(&iargs[2]).unwrap();
-    let spawning_group = iargs[0].to_group_id().unwrap() as i32;
-    spawn_cfg.material_control_id = spawning_group;
+        .groups([args.curr_group])
+        .set_control_id(spawning_group as i32); // use auxiliary group for spawn trigger
     // SX rtn, I1, 42
     // args: [Group(n), ]
 
@@ -527,22 +519,20 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group, // spawn auxiliary group (spawn trigger)
             0,
-            (
-                lhs_id as i32,
-                lhs_t,
-                1.0,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
-            (
-                rhs_id as i32,
-                rhs_t,
-                1.0,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
+            CompareOperand {
+                operand_item: lhs,
+                modifier: 1.0,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
+            CompareOperand {
+                operand_item: rhs,
+                modifier: 1.0,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
             op,
             0.0,
         ),
@@ -561,26 +551,26 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
-    let mut spawn_true_cfg = cfg
+
+    let iargs = args.args;
+    let lhs = get_item_spec(&iargs[2]).unwrap();
+    let num = iargs[3].to_float().unwrap();
+
+    let spawning_true = iargs[0].to_group_id().unwrap();
+    let spawning_false = iargs[1].to_group_id().unwrap();
+    let spawn_true_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .scale(0.33, 0.33)
-        .groups([args.curr_group]); // use auxiliary group for spawn trigger
+        .groups([args.curr_group])
+        .set_control_id(spawning_true as i32); // use auxiliary group for spawn trigger
 
-    let mut spawn_false_cfg = cfg
+    let spawn_false_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .scale(0.33, 0.33)
-        .groups([args.curr_group + 1]); // use auxiliary group for spawn trigger
-
-    let iargs = args.args;
-    let (lhs_id, lhs_t) = get_item_spec(&iargs[2]).unwrap();
-    let num = iargs[3].to_float().unwrap();
-
-    let spawning_true = iargs[0].to_group_id().unwrap() as i32;
-    spawn_true_cfg.material_control_id = spawning_true;
-    let spawning_false = iargs[1].to_group_id().unwrap() as i32;
-    spawn_false_cfg.material_control_id = spawning_false;
+        .groups([args.curr_group + 1])
+        .set_control_id(spawning_false as i32); // use auxiliary group for spawn trigger
     // FX rtn, rtn2, I1, 42
     // args: [Group(n), Group(n), Item, Number]
 
@@ -589,22 +579,20 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group,     // spawn auxiliary group (true trigger)
             args.curr_group + 1, // spawn 2nd aux group (false trigger)
-            (
-                lhs_id as i32,
-                lhs_t,
-                1.0,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
-            (
-                0,
-                ItemType::Counter,
-                num,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
+            CompareOperand {
+                operand_item: lhs,
+                modifier: 1.0,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
+            CompareOperand {
+                operand_item: Item::Counter(0),
+                modifier: num,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
             op,
             0.0,
         ),
@@ -632,26 +620,26 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
-    let mut spawn_true_cfg = cfg
+
+    let iargs = args.args;
+    let lhs = get_item_spec(&iargs[2]).unwrap();
+    let rhs = get_item_spec(&iargs[3]).unwrap();
+
+    let spawning_true = iargs[0].to_group_id().unwrap();
+    let spawning_false = iargs[1].to_group_id().unwrap();
+    let spawn_true_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .scale(0.33, 0.33)
-        .groups([args.curr_group]); // use auxiliary group for spawn trigger
+        .groups([args.curr_group])
+        .set_control_id(spawning_true as i32); // use auxiliary group for spawn trigger
 
-    let mut spawn_false_cfg = cfg
+    let spawn_false_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .scale(0.33, 0.33)
-        .groups([args.curr_group + 1]); // use auxiliary group for spawn trigger
-
-    let iargs = args.args;
-    let (lhs_id, lhs_t) = get_item_spec(&iargs[2]).unwrap();
-    let (rhs_id, rhs_t) = get_item_spec(&iargs[3]).unwrap();
-
-    let spawning_true = iargs[0].to_group_id().unwrap() as i32;
-    spawn_true_cfg.material_control_id = spawning_true;
-    let spawning_false = iargs[1].to_group_id().unwrap() as i32;
-    spawn_false_cfg.material_control_id = spawning_false;
+        .groups([args.curr_group + 1])
+        .set_control_id(spawning_false as i32); // use auxiliary group for spawn trigger
     // FX rtn, rtn2, I1, 42
     // args: [Group(n), Group(n), Item, Item]
 
@@ -660,22 +648,20 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group,     // spawn auxiliary group (true trigger)
             args.curr_group + 1, // spawn 2nd aux group (false trigger)
-            (
-                lhs_id as i32,
-                lhs_t,
-                1.0,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
-            (
-                rhs_id as i32,
-                rhs_t,
-                1.0,
-                Op::Mul,
-                RoundMode::None,
-                SignMode::None,
-            ),
+            CompareOperand {
+                operand_item: lhs,
+                modifier: 1.0,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
+            CompareOperand {
+                operand_item: rhs,
+                modifier: 1.0,
+                mod_op: Op::Mul,
+                rounding: RoundMode::None,
+                sign: SignMode::None,
+            },
             op,
             0.0,
         ),
@@ -705,10 +691,11 @@ handlers!([eq, ne, le, leq, ge, geq] + 1 => spawn_item_item);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_num);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
+/* PROCESS */
+
 fn spawn(args: HandlerArgs) -> HandlerReturn {
-    let mut cfg = args.cfg;
-    let spawning_group = args.args[0].to_group_id().unwrap() as i32;
-    cfg.material_control_id = spawning_group;
+    let spawning_group = args.args[0].to_group_id().unwrap();
+    let cfg = args.cfg.set_control_id(spawning_group as i32);
     Ok(HandlerData::from_objects(vec![spawn_trigger(
         &cfg,
         spawning_group,
@@ -719,6 +706,8 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
         false,
     )]))
 }
+
+/* MEMORY */
 
 fn mptr(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
@@ -762,11 +751,10 @@ fn mptr(args: HandlerArgs) -> HandlerReturn {
                 &add_cfg,
                 None,
                 None,
-                args.ptrpos_id,
-                ItemType::Counter,
+                Item::Counter(args.ptrpos_id),
                 move_amount,
                 Op::Add,
-                None,
+                false,
                 None,
                 RoundMode::None,
                 RoundMode::None,
@@ -790,7 +778,7 @@ fn mreset(args: HandlerArgs) -> HandlerReturn {
         move_trigger(
             &move_cfg,
             MoveMode::Targeting(TargetMove {
-                target_group_id: args.ptr_reset_group as i32,
+                target_group_id: MoveTarget::Group(args.ptr_reset_group),
                 center_group_id: None,
                 axis_only: None,
             }),
@@ -804,11 +792,10 @@ fn mreset(args: HandlerArgs) -> HandlerReturn {
             &add_cfg,
             None,
             None,
-            args.ptrpos_id,
-            ItemType::Counter,
+            Item::Counter(args.ptrpos_id),
             0.0,
             Op::Set,
-            None,
+            false,
             None,
             RoundMode::None,
             RoundMode::None,
@@ -854,28 +841,15 @@ fn mread(args: HandlerArgs) -> HandlerReturn {
     mem_mode(args, true)
 }
 
+/* INITS */
+
 fn display(args: HandlerArgs) -> HandlerReturn {
-    let (id, t) = get_item_spec(&args.args[0]).unwrap();
+    let item = get_item_spec(&args.args[0]).unwrap();
     let cfg = GDObjConfig::new()
         .pos(-75.0, 75.0 + 30.0 * args.displayed_items as f64)
         .scale(0.5, 0.5);
 
-    let obj = counter_object(
-        &cfg,
-        id,
-        match t {
-            ItemType::Timer => true,
-            _ => false,
-        },
-        ItemAlign::Center,
-        false,
-        match t {
-            ItemType::Attempts => Some(CounterMode::Attempts),
-            ItemType::MainTime => Some(CounterMode::MainTime),
-            ItemType::Points => Some(CounterMode::Points),
-            _ => None,
-        },
-    );
+    let obj = counter_object(&cfg, item, ItemAlign::Center, false);
 
     Ok(HandlerData::from_objects(vec![obj])
         .skip_spaces(0)
@@ -894,7 +868,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
         default_block(&cfg),
         spawn_trigger(
             &spawn_cfg,
-            spawn_group as i32,
+            spawn_group,
             GROUP_SPAWN_DELAY,
             0.0,
             false,
@@ -907,27 +881,20 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
 }
 
 fn pers(args: HandlerArgs) -> HandlerReturn {
-    let (id, t) = get_item_spec(&args.args[0]).unwrap();
+    let item = get_item_spec(&args.args[0]).unwrap();
     Ok(HandlerData::from_objects(vec![persistent_item(
         &args.cfg,
-        id,
-        t as i32 == ItemType::Timer as i32,
+        item.id(),
+        item.get_type() == ItemType::Timer,
         true,
         false,
         false,
     )]))
 }
 
-fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
-    // this function exists because itemtype doesn't implement copy or clone
-    // so we can't copy or clone the thing
-    fn itemtype(float_mem: bool) -> ItemType {
-        match float_mem {
-            true => ItemType::Timer,
-            false => ItemType::Counter,
-        }
-    }
+/* MEM INITS */
 
+fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let (mem_x, mem_y) = (45.0, 165.0 + args.routine_count as f64 * 30.0);
     let mem_size = args.args[0].to_int().unwrap() as i16;
 
@@ -956,7 +923,7 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
         // pointer block
         collision_block(
             &block_cfg.clone().groups([ptr_group]).scale(0.8, 0.8),
-            ptr_collblock_id as i32,
+            ptr_collblock_id,
             true,
         ),
     ];
@@ -964,14 +931,25 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let mut idx = 0i16;
     let mut counter_id = start_counter_id;
 
+    let memreg_item = match float_mem {
+        true => Item::Timer(memreg_id),
+        false => Item::Counter(memreg_id),
+    };
+    let ptrpos_item = Item::Counter(args.ptrpos_id);
+
     while counter_id < memreg_id {
         let item_group = next_free_group;
         let collblock_id = idx + 1;
         let xpos = idx as f64 * 30.0 + mem_x;
 
+        let counter_item = match float_mem {
+            true => Item::Timer(counter_id),
+            false => Item::Counter(counter_id),
+        };
+
         let mut cfg = GDObjConfig::new().pos(xpos, mem_y);
 
-        objs.push(collision_block(&cfg, collblock_id as i32, false));
+        objs.push(collision_block(&cfg, collblock_id, false));
         cfg = cfg
             .pos(mem_x - 71.25, mem_y + (idx + 1) as f64 * 7.5 - 18.75)
             .groups([item_group])
@@ -996,13 +974,12 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
         // write memreg to item
         objs.push(item_edit(
             &cfg,
-            Some((memreg_id as i32, itemtype(float_mem))),
+            Some(memreg_item),
             None,
-            counter_id,
-            itemtype(float_mem),
+            counter_item,
             1.0,
             Op::Set,
-            None,
+            false,
             None,
             RoundMode::None,
             RoundMode::None,
@@ -1014,13 +991,12 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
         // write memreg to item
         objs.push(item_edit(
             &cfg,
-            Some((counter_id as i32, itemtype(float_mem))),
+            Some(counter_item),
             None,
-            memreg_id,
-            itemtype(float_mem),
+            memreg_item,
             1.0,
             Op::Set,
-            None,
+            false,
             None,
             RoundMode::None,
             RoundMode::None,
@@ -1045,15 +1021,12 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
         ));
 
         // counter obj
-        cfg = cfg.y(mem_y - 60.0).groups([]).scale(0.4, 0.4).angle(-30.0);
-        objs.push(counter_object(
-            &cfg,
-            counter_id,
-            float_mem,
-            ItemAlign::Center,
-            false,
-            None,
-        ));
+        cfg = cfg
+            .y(mem_y - 60.0)
+            .groups(iter::empty::<i16>())
+            .scale(0.4, 0.4)
+            .angle(-30.0);
+        objs.push(counter_object(&cfg, counter_item, ItemAlign::Center, false));
 
         next_free_group += 1;
         counter_id += 1;
@@ -1067,22 +1040,18 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
                 .pos(mem_x + mem_size as f64 * 30.0, mem_y - 60.0)
                 .scale(0.4, 0.4)
                 .angle(-30.0),
-            memreg_id,
-            float_mem,
+            memreg_item,
             ItemAlign::Center,
             false,
-            None,
         ),
         counter_object(
             &GDObjConfig::new()
                 .pos(mem_x + (mem_size + 1) as f64 * 30.0, mem_y - 60.0)
                 .scale(0.4, 0.4)
                 .angle(-30.0),
-            args.ptrpos_id,
-            false,
+            ptrpos_item,
             ItemAlign::Center,
             false,
-            None,
         ),
         // memory text
         text(
@@ -1145,14 +1114,13 @@ fn init_mem(args: HandlerArgs) -> HandlerReturn {
             &cfg,
             None,
             None,
-            start_counter + idx as i16,
             match mem_info._type {
-                crate::core::MemType::Float => ItemType::Timer,
-                crate::core::MemType::Int => ItemType::Counter,
+                crate::core::MemType::Float => Item::Timer(start_counter + idx as i16),
+                crate::core::MemType::Int => Item::Counter(start_counter + idx as i16),
             },
             v.to_float().unwrap(),
             Op::Set,
-            None,
+            false,
             None,
             RoundMode::None,
             RoundMode::None,
