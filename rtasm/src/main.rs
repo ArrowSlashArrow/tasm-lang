@@ -16,7 +16,7 @@ mod tests;
 #[derive(Parser)]
 #[command(about, version, author)]
 struct Args {
-    /// Input file.
+    /// Path to input file.
     infile: String,
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
@@ -57,15 +57,20 @@ fn main() -> Result<(), Error> {
     println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
-    let mut tasm = lexer::parse_file(
+    let mut tasm = match lexer::parse_file(
         file,
         args.mem_end_counter,
         args.group_offset,
         args.verbose_logs,
         args.log_errors,
         args.no_entry_point,
-    )
-    .unwrap();
+    ) {
+        Ok(t) => t,
+        Err(es) => {
+            show_errors(es, &format!("Unable to compile {}", &args.infile));
+            return Ok(());
+        }
+    };
 
     let level_name = match args.level_name {
         Some(l) => l,

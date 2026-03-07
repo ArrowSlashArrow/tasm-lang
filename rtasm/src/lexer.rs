@@ -141,6 +141,11 @@ impl Tasm {
         let instr;
         let args: Vec<TasmValue>;
         if let Some(pos) = trimmed_line.trim().find(" ") {
+            if trimmed_line.ends_with(',') {
+                self.errors.push(TasmParseError::TrailingComma(curr_line));
+                return;
+            }
+
             instr = trimmed_line[..pos].to_uppercase();
 
             let mut erroneous_instr = false;

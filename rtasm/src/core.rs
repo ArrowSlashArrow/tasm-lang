@@ -382,6 +382,7 @@ pub enum TasmParseError {
     MultipleRoutineDefintions(String, usize, usize),
     InitRoutineMemoryAccess(usize),
     NonexistentMemoryAccess(usize),
+    TrailingComma(usize),
 }
 
 impl Error for TasmParseError {
@@ -446,6 +447,9 @@ impl Display for TasmParseError {
                     f,
                     "Attempted to access memory while none exists on line {line}."
                 )
+            }
+            Self::TrailingComma(line) => {
+                write!(f, "Trailing comma found at line {line}.")
             }
         }
     }

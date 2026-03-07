@@ -112,6 +112,7 @@ tasm_test!("multiple_mem", false, compile);
 tasm_test!("multiple_routines", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
+tasm_test!("trailing_comma", false);
 
 #[test]
 fn int_detection() {
