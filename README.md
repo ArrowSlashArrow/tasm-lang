@@ -25,15 +25,18 @@ Features:
 # Quick Start and Tutorial
 ## SDK Usage Instructions
 To use the current up-to-date SDK, you may do the following:
-1. Refer to the releases in this repo for pre-built executables, or
+1. Refer to the releases in this repo for pre-built executables
+    ```bash
+    # In the extracted folder with the compiler,
+    .\tasmc <your_file>
+    ```
 2. Clone this repository and run from source.
-
-```bash
-git clone https://github.com/ArrowSlashArrow/tasm-lang
-cd tasm-lang/rtasm
-cargo build --release
-.\target\release\tasm.exe <your_file>
-``` 
+    ```bash
+    git clone https://github.com/ArrowSlashArrow/tasm-lang
+    cd tasm-lang/rtasm
+    cargo build --release
+    .\target\release\tasm.exe <your_file>
+    ``` 
 
 Note that running from source requires Rust v1.90.0. 
 
