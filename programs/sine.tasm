@@ -1,5 +1,4 @@
 _init:
-    MALLOC 10
     DISPLAY T1  ; input value
     DISPLAY T2  ; x squared
     DISPLAY T3  ; x^3

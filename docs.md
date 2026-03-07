@@ -92,11 +92,13 @@ All arithmetic instructions are 1-tick.
 - FLDIV: division, and the result it rounded down (floored).
 #### 3.1.2.2. Compares
 Spawning a group does not automatically pause the parent group.  
-All compare instructions are 2-tick.  
+All compare instructions are 1-tick.  
 Execution timeline:
 - Tick n: the compare trigger is called
-- Tick n + 1: the compare trigger calls the group spawner trigger if it should be called
-- Tick n + 2: the spawned group starts execution, and the parent group executes the next instruction.
+- Tick n + 1: 
+	- the compare trigger calls the group spawner trigger if it should be called
+	- the parent group executes the next instruction.
+- Tick n + 2: the spawned group starts execution
 ##### Spawn if
 `SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`
 
@@ -108,6 +110,8 @@ The specified routine is spawned if the two arguments meet the condition.
 * SG: Spawns routine if a > b
 * SGE: Spawns routine if a >= b
 
+> Here, a and b refer to the first and second operands respectively.
+
 ##### Spawn if-else (Fork)
 `FE`, `FNE`, `FL`, `FLE`, `FG`, `FGE` all accept: `<routine> <routine> <item> <number>`, `<routine> <routine> <item> <item>`
 
@@ -118,6 +122,26 @@ The first routine is spawned if the two arguments meet the condition. Otherwise,
 * FLE: Spawns first routine if a <= b otherwise spawns the second routine.
 * FG: Spawns first routine if a > b otherwise spawns the second routine.
 * FGE: Spawns first routine if a >= b otherwise spawns the second routine.
+
+> Here, a and b refer to the first and second operands respectively.
+
+##### Random Spawns
+`SRAND <routine> <number>`
+
+Spawns the first routine according to the supplied chance (2nd argument).  
+The second argument (the chance) should be a float in the range \[0.0, 100.0].
+
+`FRAND <routine> <routine> <number>`
+
+Spawns the first routine according to the supplied chance (2nd argument).
+If the first routine is not spawned, the second routine is spawned.  
+The third argument (the chance) should be a float in the range \[0.0, 100.0].
+
+Examples:
+```
+SRAND do_stuff, 42.8
+```
+The routine `do_stuff` has a 42.8% chance of being spawned.
 
 #### 3.1.2.3. Memory
 ##### INITMEM

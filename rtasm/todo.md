@@ -8,20 +8,20 @@
     - ATTEMPTS
     - MAINTIME
 - workflow for pr to run all tests
-- define command
+- define command (like #define in c)
     - defines a constant that can be used as an alias
     - cannot overwrite existing aliases (any already defined and any of the default ones)
-    - e.g. `DEFINE external_object, g123`
+    - e.g. `ALIAS external_object, g123`
         - `external_object` now refers to the group `123`
     - init only
 - make the release mode toggle actually do something
     - currently it is ignored and everything is compiled in release anyways
     - debug (not release) mode:
-        - each instruction takes a 30x30 cell
         - comments are present alongside each routine in the form of text objects
     - release mode:
-        - everything is compressed
         - all labels except for "memory" and routine labels are removed
+- add style guidelines to docs
+- refactor error enum with proper formatting via struct fields
 
 ## commands
 ### `TSPAWN`
@@ -40,16 +40,6 @@ Args `TSTOP <timer>`
 stops this timer.
 internally uses time ctrl trigger
 
-### `SRAND` / `FRAND`
-Args: `SRAND <routine>, <float>`
-Args: `FRAND <routine>, <routine>, <float>`
-Spawns/Forks routines based on the chance
-`SRAND` spawns the routine with the float % chance
-`FRAND` spawns routine 1 with chance otherwise spawns routine 2
-internally uses random trigger
-
-Planned for v0.1.1.
-
 ### `RET`
 Args: None
 Returns from this routine.
@@ -67,12 +57,6 @@ Control flow instructions require that the spawner object has a known control ID
 This ID will be set to the group that it is responsible for calling. If it responsible for calling multiple groups, it should not be given any control ID. For example, random and andvanced random triggers will not be given a control ID. This is because each object ma
 As a result, control flow instructions are not expected to work if the routine can be spawned by an advanced random trigger. Alterntaively, a manual control ID flag may be set for the random spawn instructions. This flag may contain anything that corresponds to a group: either a group literal or a routine identifier.  
 Planned for v0.1.3.
-
-### `WAIT`
-Args: `WAIT <int>`
-
-Waits for the given amount of ticks.  
-Planned for v0.1.1.
 
 ### `INSTRM` / `INSTRD`
 Arithmetic instruction, except the result is multiplied/divided by the last argument.
@@ -187,6 +171,10 @@ concurrent:
 ```
 
 planned for v0.4.0
+
+### compiler optimizations
+- single object routine inline
+    - any routine that conatins a single object will be inlined
 
 ## extas, for later
 - make landing page

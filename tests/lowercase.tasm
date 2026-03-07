@@ -1,0 +1,39 @@
+; This program contains instructions that are all lowercase.
+
+_init:
+    display T1  ; input value
+    display T2  ; x squared
+    display T3  ; x^3
+    display T4  ; x^5
+    display T5  ; x^7
+    display T6  ; result
+    display T7  ; result but amplified (to see dp)
+
+_start:
+    mov T1, 0.43
+        
+    mov T2, T1
+    mul T2, T1
+    
+    mov T3, T1
+    mul T3, T2
+
+    mov T4, T3
+    mul T4, T2
+
+    mov T5, T3
+    mul T5, T2
+
+    mov T6, T1
+
+    div T3, 6
+    div T4, 120
+    mul T5, 0.0001984
+
+    sub T6, T3
+    add T6, T4
+    sub T6, T5
+
+    ; not necessary for computation, jsut to see accurarcy
+    mov T7, T6
+    mul T7, 1000000

@@ -24,8 +24,10 @@ struct Args {
     #[arg(long)]
     release: bool,
 
+    /// Ending counter ID of memory block.
     #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
+
     /// Whether to export the copmiled level as a .gmd
     #[arg(long)]
     gmd: bool,
@@ -34,7 +36,7 @@ struct Args {
     #[arg(long, value_name = "STRING")]
     level_name: Option<String>,
 
-    /// Starting group offset. Default value is 0
+    /// Starting group offset.
     #[arg(long, default_value_t = 0i16, value_parser = clap::value_parser!(i16))]
     group_offset: i16,
 
@@ -57,6 +59,15 @@ fn main() -> Result<(), Error> {
     println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
+    let id_limit = 9999;
+    if args.mem_end_counter > id_limit {
+        println!("You may not set the end counter beyond the ID limit of {id_limit}");
+        return Ok(());
+    } else if args.mem_end_counter < 0 {
+        println!("You may not set the end counter to a negative ID.");
+        return Ok(());
+    }
+
     let mut tasm = match lexer::parse_file(
         file,
         args.mem_end_counter,
@@ -71,6 +82,8 @@ fn main() -> Result<(), Error> {
             return Ok(());
         }
     };
+
+    tasm.release_mode = args.release;
 
     let level_name = match args.level_name {
         Some(l) => l,

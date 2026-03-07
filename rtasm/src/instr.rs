@@ -209,7 +209,19 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Number) => fork_item_num_geq),
         ],
     ),
+    ("SRAND", false, &[argset!((Group, Number) => spawn_random)]),
+    (
+        "FRAND",
+        false,
+        &[argset!((Group, Group, Number) => fork_random)],
+    ),
 ];
+
+macro_rules! wrap_objs {
+    ($objs:expr) => {
+        Ok(HandlerData::from_objects($objs))
+    };
+}
 
 // utils
 fn get_item_spec(item: &TasmValue) -> Option<Item> {
@@ -231,7 +243,7 @@ enum LowerOp {
     mov,
 }
 impl LowerOp {
-    pub fn to_op(&self) -> Op {
+    pub const fn to_op(&self) -> Op {
         match self {
             Self::add => Op::Add,
             Self::sub => Op::Sub,
@@ -252,7 +264,7 @@ enum LowerCompOp {
     geq,
 }
 impl LowerCompOp {
-    pub fn to_op(&self) -> CompareOp {
+    pub const fn to_op(&self) -> CompareOp {
         match self {
             Self::eq => CompareOp::Equals,
             Self::ne => CompareOp::NotEquals,
@@ -397,8 +409,9 @@ fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
         res,
         mult,
         Op::Set,
-        false,
-        Some(op),
+        // since we know this is only used for mul and div instructions, this is fine.
+        op == Op::Mul,
+        None,
         RoundMode::None,
         if round_res {
             RoundMode::Nearest
@@ -417,35 +430,31 @@ handlers!((mul, div) => arithmetic_2items_num);
 
 // fldiv instructions are not supported in the macro, so they are defined here.
 fn fldiv_2items(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(arithmetic_2items(
-        args,
-        Op::Div,
-        true,
-    )))
+    wrap_objs!(arithmetic_2items(args, Op::Div, true,))
 }
 fn fldiv_item_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(arithmetic_item_num(
-        args,
-        Op::Div,
-        true,
-    )))
+    wrap_objs!(arithmetic_item_num(args, Op::Div, true,))
 }
 fn fldiv_3items(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(arithmetic_3items(
-        args,
-        Op::Div,
-        true,
-    )))
+    wrap_objs!(arithmetic_3items(args, Op::Div, true,))
 }
 fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(arithmetic_2items_num(
-        args,
-        Op::Div,
-        true,
-    )))
+    wrap_objs!(arithmetic_2items_num(args, Op::Div, true,))
 }
 
 /* COMPARES */
+
+fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
+    spawn_trigger(
+        &spawn_cfg,
+        group,
+        GROUP_SPAWN_DELAY,
+        0.0,
+        false,
+        true,
+        false,
+    )
+}
 
 fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
@@ -469,32 +478,12 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group, // spawn auxiliary group (spawn trigger)
             0,
-            CompareOperand {
-                operand_item: lhs,
-                modifier: 1.0,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
-            CompareOperand {
-                operand_item: Item::Counter(0),
-                modifier: iargs[2].to_float().unwrap(),
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
+            lhs.into(),
+            CompareOperand::number_literal(iargs[2].to_float().unwrap()),
             op,
             0.0,
         ),
-        spawn_trigger(
-            &spawn_cfg,
-            spawning_group,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-        ),
+        spawn_trg(&spawn_cfg, spawning_group),
     ]
 }
 fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
@@ -519,32 +508,12 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group, // spawn auxiliary group (spawn trigger)
             0,
-            CompareOperand {
-                operand_item: lhs,
-                modifier: 1.0,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
-            CompareOperand {
-                operand_item: rhs,
-                modifier: 1.0,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
+            lhs.into(),
+            rhs.into(),
             op,
             0.0,
         ),
-        spawn_trigger(
-            &spawn_cfg,
-            spawning_group,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-        ),
+        spawn_trg(&spawn_cfg, spawning_group),
     ]
 }
 fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
@@ -579,41 +548,13 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group,     // spawn auxiliary group (true trigger)
             args.curr_group + 1, // spawn 2nd aux group (false trigger)
-            CompareOperand {
-                operand_item: lhs,
-                modifier: 1.0,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
-            CompareOperand {
-                operand_item: Item::Counter(0),
-                modifier: num,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
+            lhs.into(),
+            CompareOperand::number_literal(num),
             op,
             0.0,
         ),
-        spawn_trigger(
-            &spawn_true_cfg,
-            spawning_true,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-        ),
-        spawn_trigger(
-            &spawn_false_cfg,
-            spawning_false,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-        ),
+        spawn_trg(&spawn_true_cfg, spawning_true),
+        spawn_trg(&spawn_false_cfg, spawning_false),
     ]
 }
 fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
@@ -648,41 +589,13 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
             &compare_cfg,
             args.curr_group,     // spawn auxiliary group (true trigger)
             args.curr_group + 1, // spawn 2nd aux group (false trigger)
-            CompareOperand {
-                operand_item: lhs,
-                modifier: 1.0,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
-            CompareOperand {
-                operand_item: rhs,
-                modifier: 1.0,
-                mod_op: Op::Mul,
-                rounding: RoundMode::None,
-                sign: SignMode::None,
-            },
+            lhs.into(),
+            rhs.into(),
             op,
             0.0,
         ),
-        spawn_trigger(
-            &spawn_true_cfg,
-            spawning_true,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-        ),
-        spawn_trigger(
-            &spawn_false_cfg,
-            spawning_false,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-        ),
+        spawn_trg(&spawn_true_cfg, spawning_true),
+        spawn_trg(&spawn_false_cfg, spawning_false),
     ]
 }
 
@@ -691,12 +604,69 @@ handlers!([eq, ne, le, leq, ge, geq] + 1 => spawn_item_item);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_num);
 handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
+/* RANDOMS */
+
+fn spawn_random(args: HandlerArgs) -> HandlerReturn {
+    let cfg = args.cfg;
+    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
+
+    let iargs = args.args;
+    let spawning_group = iargs[0].to_group_id().unwrap();
+    let chance = (&iargs[1]).to_float().unwrap();
+
+    let aux_group = args.curr_group;
+    let spawn_cfg = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 + 7.5)
+        .scale(0.5, 0.5)
+        .groups([aux_group])
+        .set_control_id(spawning_group as i32); // use auxiliary group for spawn trigger
+
+    Ok(HandlerData::from_objects(vec![
+        random_trigger(&random_cfg, chance, aux_group, 0),
+        spawn_trg(&spawn_cfg, spawning_group),
+    ])
+    .extra_groups(1))
+}
+
+fn fork_random(args: HandlerArgs) -> HandlerReturn {
+    let cfg = args.cfg;
+    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
+
+    let iargs = args.args;
+    let spawning_group1 = iargs[0].to_group_id().unwrap();
+    let spawning_group2 = iargs[1].to_group_id().unwrap();
+    let chance = (&iargs[2]).to_float().unwrap();
+
+    let aux_group1 = args.curr_group;
+    let aux_group2 = args.curr_group + 1;
+    let spawn_cfg1 = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 + 7.5)
+        .scale(0.5, 0.5)
+        .groups([aux_group1])
+        .set_control_id(spawning_group1 as i32); // use auxiliary group for spawn trigger
+    let spawn_cfg2 = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 - 7.5)
+        .scale(0.5, 0.5)
+        .groups([aux_group2])
+        .set_control_id(spawning_group2 as i32); // use auxiliary group for spawn trigger
+
+    Ok(HandlerData::from_objects(vec![
+        random_trigger(&random_cfg, chance, aux_group1, aux_group2),
+        spawn_trg(&spawn_cfg1, spawning_group1),
+        spawn_trg(&spawn_cfg2, spawning_group2),
+    ])
+    .extra_groups(2))
+}
+
 /* PROCESS */
 
 fn spawn(args: HandlerArgs) -> HandlerReturn {
     let spawning_group = args.args[0].to_group_id().unwrap();
     let cfg = args.cfg.set_control_id(spawning_group as i32);
-    Ok(HandlerData::from_objects(vec![spawn_trigger(
+    wrap_objs!(vec![spawn_trigger(
         &cfg,
         spawning_group,
         GROUP_SPAWN_DELAY,
@@ -704,7 +674,7 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
         false,
         true,
         false,
-    )]))
+    )])
 }
 
 /* MEMORY */
@@ -862,7 +832,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let msg = args.args[2].to_string().unwrap();
     let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
     let text_cfg = cfg.clone().scale(0.25, 0.25);
-    let spawn_cfg = cfg.clone().touchable(true);
+    let spawn_cfg = cfg.clone().touchable(true).multitrigger(true);
 
     Ok(HandlerData::from_objects(vec![
         default_block(&cfg),

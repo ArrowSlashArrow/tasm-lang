@@ -46,6 +46,7 @@ pub struct Tasm {
     // aliases get resolved through the map:
     pub aliases: Aliases,
     pub logs_enabled: bool,
+    pub release_mode: bool,
 }
 #[macro_export]
 macro_rules! verbose_log {
@@ -76,6 +77,11 @@ impl Tasm {
     pub fn handle_routines(&mut self, level_name: &String) -> Result<Level, Vec<TasmParseError>> {
         // clear errors
         self.errors = vec![];
+
+        let spacing = match self.release_mode {
+            true => 1.0,
+            false => 30.0,
+        };
 
         // setup state
         self.aliases.ptrpos_id = self.mem_end_counter;
@@ -176,7 +182,7 @@ impl Tasm {
 
                 let skip_spaces = data.skip_spaces;
                 self.curr_group += data.used_extra_groups;
-                obj_pos += skip_spaces as f64;
+                obj_pos += skip_spaces as f64 * spacing;
 
                 if data.added_item_display {
                     self.displayed_items += 1;
@@ -449,7 +455,7 @@ impl Display for TasmParseError {
                 )
             }
             Self::TrailingComma(line) => {
-                write!(f, "Trailing comma found at line {line}.")
+                write!(f, "Trailing comma found at line {}.", line + 1)
             }
         }
     }

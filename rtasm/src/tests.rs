@@ -99,6 +99,7 @@ tasm_test!("pointer_test1", example);
 tasm_test!("project_euler_1", example);
 tasm_test!("project_euler_2", example);
 tasm_test!("project_euler_6", example);
+tasm_test!("rng", example);
 tasm_test!("all_instructions", true);
 tasm_test!("bad_args", false);
 tasm_test!("bad_instruction", false);
@@ -108,6 +109,7 @@ tasm_test!("empty", true);
 tasm_test!("flags", false); // TODO: CHANGE TO TRUE WHEN FLAGS ARE ADDED
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
+tasm_test!("lowercase", true);
 tasm_test!("multiple_mem", false, compile);
 tasm_test!("multiple_routines", false);
 tasm_test!("no_entry_point", false);
