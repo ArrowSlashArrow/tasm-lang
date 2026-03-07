@@ -48,7 +48,7 @@ use crate::{
 const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
 
 impl Tasm {
-    pub fn parse(&mut self, group_offset: i16) {
+    pub fn parse(&mut self, group_offset: i16, disable_entry_point_check: bool) {
         // index routines before anything else
 
         verbose_log!(self, "Indexing routines.");
@@ -57,6 +57,11 @@ impl Tasm {
 
         verbose_log!(self, "Finished indexing routines.");
         verbose_log!(self, "Pushing _init to front of routine data");
+
+        if self.routine_data.len() == 0 {
+            // there is nothing to parse
+            return;
+        }
 
         // push _init routine to the start to process it before anyting else
         // important to do for alias resolution, since memtype is determined in init.
@@ -67,12 +72,18 @@ impl Tasm {
         }
 
         // error if no entry point
-        if !self.has_entry_point {
+        if !self.has_entry_point && !disable_entry_point_check {
             self.errors.push(TasmParseError::NoEntryPoint);
         }
 
         verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
+
+        if self.errors.len() > 0 {
+            verbose_log!(self, "Parsed file with {} errors.", self.errors.len());
+        } else {
+            verbose_log!(self, "Parsed file successfully with 0 errors.")
+        }
     }
 
     pub fn mem_end_counter(mut self, ctr: i16) -> Self {
@@ -100,6 +111,7 @@ impl Tasm {
             .collect();
 
         for (lines, routine) in routines.iter_mut() {
+            let prev_err_count = self.errors.len();
             for (curr_line, line) in lines {
                 let trimmed_line = line.trim();
                 if trimmed_line == "" {
@@ -109,7 +121,13 @@ impl Tasm {
                 // parse instruction and args
                 self.parse_instr_line(routine, *curr_line, trimmed_line);
             }
-            verbose_log!(self, "Parsed {} routine instructions", routine.ident);
+            let new_err_count = self.errors.len();
+            verbose_log!(
+                self,
+                "Parsed {} routine instructions with {} errors",
+                routine.ident,
+                new_err_count - prev_err_count
+            );
             self.routines.push(routine.clone());
         }
     }
@@ -123,6 +141,11 @@ impl Tasm {
         let instr;
         let args: Vec<TasmValue>;
         if let Some(pos) = trimmed_line.trim().find(" ") {
+            if trimmed_line.ends_with(',') {
+                self.errors.push(TasmParseError::TrailingComma(curr_line));
+                return;
+            }
+
             instr = trimmed_line[..pos].to_uppercase();
 
             let mut erroneous_instr = false;
@@ -228,7 +251,11 @@ impl Tasm {
                     self.routine_group_map
                         .push((routine_ident.clone(), self.curr_group));
                 }
-                verbose_log!(self, "Got routine: {} on line {}", routine_ident, line_idx);
+
+                // ignore the garbage data
+                if self.routine_group_map.len() > 1 {
+                    verbose_log!(self, "Got routine: {} on line {}", routine_ident, line_idx);
+                }
                 self.routine_data.push(curr_routine_data.clone());
 
                 // no indent, check for routine identifier.
@@ -323,6 +350,8 @@ pub fn parse_file<T: AsRef<str>>(
     mem_end_counter: i16,
     group_offset: i16,
     verbose_logs: bool,
+    log_errs: bool,
+    disable_entry_point_check: bool,
 ) -> Result<Tasm, Vec<TasmParseError>> {
     let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
     let lines = in_str
@@ -333,11 +362,16 @@ pub fn parse_file<T: AsRef<str>>(
 
     tasm.lines = lines;
     tasm.logs_enabled = verbose_logs;
-    tasm.parse(group_offset);
+    tasm.parse(group_offset, disable_entry_point_check);
 
     if tasm.errors.len() == 0 {
         Ok(tasm)
     } else {
+        if log_errs && verbose_logs {
+            for err in &tasm.errors {
+                println!("{err}");
+            }
+        }
         Err(tasm.errors)
     }
 }

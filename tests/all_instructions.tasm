@@ -2,8 +2,8 @@
 _init:
     FMALLOC 25
     INITMEM 1.5, 2.8, 3.14
-    DISPLAY C1,
-    PERS C1,
+    DISPLAY C1
+    PERS C1
     IOBLOCK routine1, 2, ioblock
 
 routine1:

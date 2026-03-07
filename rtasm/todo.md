@@ -2,30 +2,34 @@
 - add spawn delay + remap support to asm
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
-    - make macro to generate test functions for files in `tests/`
-- add verbose logging flag to allow for the compiler to log its actions (via stdout)
-- stop using spawn ordered
-    - use busy wait for sleep
-- MEMESIZE alias
-- exectuable releases
-    - x86_64-pc-windows-msvc
-    - x86_64-linux-gnu
-    - x86_64-linux-musl
+- aliases todo:
+    - MEMSIZE
+    - POINTS
+    - ATTEMPTS
+    - MAINTIME
+- workflow for pr to run all tests
+- define command (like #define in c)
+    - defines a constant that can be used as an alias
+    - cannot overwrite existing aliases (any already defined and any of the default ones)
+    - e.g. `ALIAS external_object, g123`
+        - `external_object` now refers to the group `123`
+    - init only
+- make the release mode toggle actually do something
+    - currently it is ignored and everything is compiled in release anyways
+    - debug (not release) mode:
+        - comments are present alongside each routine in the form of text objects
+    - release mode:
+        - all labels except for "memory" and routine labels are removed
+- add style guidelines to docs
+- refactor error enum with proper formatting via struct fields
 
 ## commands
-### SPAWN command and derivatives
-
-`SPAWN group1 + <float> @ <remaps>`
-float: delay
-remaps: remap dict. e.g. 192:168,0:11
-`+` before `@` always
-
-^ these will be flags, delay:float, remap:{group:group}
-
 ### `TSPAWN`
 Args: `TSPAWN <timer>, <float>, <routine>`
 Starts the timer specified, and when it counts up to the specified time (the second argument), the given routine is called.
-internally uses timer trigger
+internally uses timer trigger  
+
+Planned for v0.1.2.
 
 ###  `TSTART`
 Args: `TSTART <timer>`
@@ -35,14 +39,6 @@ internally uses time ctrl trigger
 Args `TSTOP <timer>`
 stops this timer.
 internally uses time ctrl trigger
-
-### `SRAND` / `FRAND`
-Args: `SRAND <routine>, <float>`
-Args: `FRAND <routine>, <routine>, <float>`
-Spawns/Forks routines based on the chance
-`SRAND` spawns the routine with the float % chance
-`FRAND` spawns routine 1 with chance otherwise spawns routine 2
-internally uses random trigger
 
 ### `RET`
 Args: None
@@ -55,16 +51,12 @@ return: stop trigger that stops all objects with that control id (all spawn trig
 Related instructions: 
 * `PAUSE <routine>`: pauses the routine. unpausable via:
 * `RESUME <routine>`: unpauses the routine.
-* `STOP <routine>`: pauses and exists the routine. not resumable.
+* `STOP <routine>`: pauses and exits the routine. not resumable.
 
 Control flow instructions require that the spawner object has a known control ID. 
 This ID will be set to the group that it is responsible for calling. If it responsible for calling multiple groups, it should not be given any control ID. For example, random and andvanced random triggers will not be given a control ID. This is because each object ma
-As a result, control flow instructions are not expected to work if the routine can be spawned by an advanced random trigger. Alterntaively, a manual control ID flag may be set for the random spawn instructions. This flag may contain anything that corresponds to a group: either a group literal or a routine identifier.
-
-### `WAIT`
-Args: `WAIT <int>`
-
-Waits for the given amount of ticks.
+As a result, control flow instructions are not expected to work if the routine can be spawned by an advanced random trigger. Alterntaively, a manual control ID flag may be set for the random spawn instructions. This flag may contain anything that corresponds to a group: either a group literal or a routine identifier.  
+Planned for v0.1.3.
 
 ### `INSTRM` / `INSTRD`
 Arithmetic instruction, except the result is multiplied/divided by the last argument.
@@ -73,6 +65,7 @@ The sum is computed, and then multiplied by the multiplier.
 Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
 
 ^ this will be a flag, mod:float
+^^ ADDM and SUBM will be included as utility functions. if the mod flag on those is specified, it overrides the argument.
 
 ### memory markers
 marker objects that are in the memory structure.  
@@ -90,6 +83,8 @@ MFUNC ; read it
 MPTR M1 ; move pointer back to marker
 ```
 the block at mem pos 0 can also be considered a marker  
+
+planned for v0.3.0
 
 ### arithmetic
 support some way to assign with an operator to items: `+=`, `/=`, etc.
@@ -147,6 +142,10 @@ ADDM    C3, C1, C2, 0.5 | /= res:r- fin:f+  ; a bit cleaner
 Creating an instruction for each possible combinations would result in 5760 instructions total, which is simply unsistainable.  
 While the flag system is arguably better for this situation, it still needs some work. For example, `res:r-` could be optionally written as `result:round-` or `res:-round` for disambiguation purposes. 
 
+for spawning: delay:float, remap:{group:group}
+
+planned for v0.2.0
+
 ### Concurrent instructions
 Concurrent instructions are isntructions that will be placed on the same x-position,
 so that they will be executed on the same tick with spawn ordered.
@@ -171,6 +170,13 @@ concurrent:
 
 ```
 
+planned for v0.4.0
+
+### compiler optimizations
+- single object routine inline
+    - any routine that conatins a single object will be inlined
+
 ## extas, for later
 - make landing page
 - generate actual doc page from docs.md
+- make either an installer or intsall mgr program (like rustup) for tasmc

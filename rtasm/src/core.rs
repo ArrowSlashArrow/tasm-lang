@@ -46,6 +46,7 @@ pub struct Tasm {
     // aliases get resolved through the map:
     pub aliases: Aliases,
     pub logs_enabled: bool,
+    pub release_mode: bool,
 }
 #[macro_export]
 macro_rules! verbose_log {
@@ -76,6 +77,11 @@ impl Tasm {
     pub fn handle_routines(&mut self, level_name: &String) -> Result<Level, Vec<TasmParseError>> {
         // clear errors
         self.errors = vec![];
+
+        let spacing = match self.release_mode {
+            true => 1.0,
+            false => 30.0,
+        };
 
         // setup state
         self.aliases.ptrpos_id = self.mem_end_counter;
@@ -115,10 +121,17 @@ impl Tasm {
                 });
 
                 // check that we are not accessing memory in init routine
-                if instr._type == InstrType::Memory && routine.ident == INIT_ROUTINE {
-                    self.errors
-                        .push(TasmParseError::InitRoutineMemoryAccess(instr.line_number));
-                    continue;
+                if instr._type == InstrType::Memory {
+                    if routine.ident == INIT_ROUTINE {
+                        self.errors
+                            .push(TasmParseError::InitRoutineMemoryAccess(instr.line_number));
+                        continue;
+                    }
+                    if let None = self.mem_info {
+                        self.errors
+                            .push(TasmParseError::NonexistentMemoryAccess(instr.line_number));
+                        continue;
+                    }
                 }
 
                 let cfg = if routine.ident == INIT_ROUTINE {
@@ -169,7 +182,7 @@ impl Tasm {
 
                 let skip_spaces = data.skip_spaces;
                 self.curr_group += data.used_extra_groups;
-                obj_pos += skip_spaces as f64;
+                obj_pos += skip_spaces as f64 * spacing;
 
                 if data.added_item_display {
                     self.displayed_items += 1;
@@ -374,6 +387,8 @@ pub enum TasmParseError {
     InvalidPointerMove(String, usize),
     MultipleRoutineDefintions(String, usize, usize),
     InitRoutineMemoryAccess(usize),
+    NonexistentMemoryAccess(usize),
+    TrailingComma(usize),
 }
 
 impl Error for TasmParseError {
@@ -432,6 +447,15 @@ impl Display for TasmParseError {
                     f,
                     "Memory access attempt on line {line} is forbidden, due to being in the initializer routine."
                 )
+            }
+            Self::NonexistentMemoryAccess(line) => {
+                write!(
+                    f,
+                    "Attempted to access memory while none exists on line {line}."
+                )
+            }
+            Self::TrailingComma(line) => {
+                write!(f, "Trailing comma found at line {}.", line + 1)
             }
         }
     }
@@ -501,7 +525,16 @@ pub enum TasmPrimitive {
 impl TasmValue {
     pub fn to_value(s: &str) -> Result<Self, TasmParseError> {
         let mut iter = s.chars();
-        let pref = iter.next().unwrap();
+        let pref = match iter.next() {
+            Some(c) => c,
+            None => {
+                // there's nothing in this string
+                return Err(TasmParseError::BadToken((
+                    "Got a 0-length string. Perhaps there is a trailing comma".into(),
+                    0,
+                )));
+            }
+        };
         let postf = s.chars().last().unwrap();
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
 

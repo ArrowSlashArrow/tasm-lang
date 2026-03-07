@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{Error, anyhow};
+use anyhow::Error;
 use clap::Parser;
 use gdlib::gdlevel::Levels;
 
@@ -16,7 +16,7 @@ mod tests;
 #[derive(Parser)]
 #[command(about, version, author)]
 struct Args {
-    /// Input file.
+    /// Path to input file.
     infile: String,
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
@@ -24,8 +24,10 @@ struct Args {
     #[arg(long)]
     release: bool,
 
+    /// Ending counter ID of memory block.
     #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
+
     /// Whether to export the copmiled level as a .gmd
     #[arg(long)]
     gmd: bool,
@@ -34,13 +36,22 @@ struct Args {
     #[arg(long, value_name = "STRING")]
     level_name: Option<String>,
 
-    /// Starting group offset. Default value is 0
+    /// Starting group offset.
     #[arg(long, default_value_t = 0i16, value_parser = clap::value_parser!(i16))]
     group_offset: i16,
 
     /// Toggles verbose logging from the compiler
     #[arg(long)]
     verbose_logs: bool,
+
+    /// Toggles printing of all errors if the input file is parsed with errors
+    #[arg(long)]
+    log_errors: bool,
+
+    /// Does not require an entry point to be present in the input file.
+    /// Useful for compiling utility programs that don't necessary contain an entry point.
+    #[arg(long)]
+    no_entry_point: bool,
 }
 
 fn main() -> Result<(), Error> {
@@ -48,21 +59,31 @@ fn main() -> Result<(), Error> {
     println!("Parsing tasm...");
     let file = fs::read_to_string(&args.infile).unwrap();
 
+    let id_limit = 9999;
+    if args.mem_end_counter > id_limit {
+        println!("You may not set the end counter beyond the ID limit of {id_limit}");
+        return Ok(());
+    } else if args.mem_end_counter < 0 {
+        println!("You may not set the end counter to a negative ID.");
+        return Ok(());
+    }
+
     let mut tasm = match lexer::parse_file(
         file,
         args.mem_end_counter,
         args.group_offset,
         args.verbose_logs,
+        args.log_errors,
+        args.no_entry_point,
     ) {
-        Ok(t) => {
-            println!("Parsed file with 0 errors.");
-            t
-        }
-        Err(e) => {
-            show_errors(e, "Unable to parse file");
-            return Err(anyhow!("bad tasm"));
+        Ok(t) => t,
+        Err(es) => {
+            show_errors(es, &format!("Unable to compile {}", &args.infile));
+            return Ok(());
         }
     };
+
+    tasm.release_mode = args.release;
 
     let level_name = match args.level_name {
         Some(l) => l,

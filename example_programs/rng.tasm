@@ -1,0 +1,25 @@
+; Sample implementation of a random number generator.
+_init:
+    DISPLAY T1
+    DISPLAY T2
+    DISPLAY T3
+
+set1:
+    MOV T2, 1
+set0:
+    MOV T2, 0
+
+rand_iter:
+    FRAND set0, set1, 50
+    WAIT 2  ; wait for T2 to be set
+    
+    MUL T2, T3
+    ADD T1, T2
+
+    DIV T3, 2
+    SG rand_iter, T3, 0.1
+
+_start:
+    MOV T3, 8388608 ; factor
+    MUL T1, T3, -1  ; result
+    SPAWN rand_iter
