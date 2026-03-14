@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
-    gdobj::{GDObjConfig, GDObject, misc::text},
+    gdobj::{GDObjConfig, GDObject, Item, misc::text},
 };
 
 use crate::instr::ioblock;
@@ -63,6 +63,7 @@ macro_rules! verbose_log {
 pub struct Aliases {
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
+    pub memsize: i16,
 }
 
 impl Aliases {
@@ -70,6 +71,10 @@ impl Aliases {
         match v {
             AliasType::MEMREG => self.memreg.clone(),
             AliasType::PTRPOS => TasmValue::Counter(self.ptrpos_id),
+            AliasType::MEMSIZE => TasmValue::Number(self.memsize as f64),
+            AliasType::ATTEMPTS => TasmValue::GDItem(Item::Attempts),
+            AliasType::MAINTIME => TasmValue::GDItem(Item::MainTime),
+            AliasType::POINTS => TasmValue::GDItem(Item::Points),
         }
     }
 }
@@ -209,6 +214,7 @@ impl Tasm {
                     // assign to alias map
                     self.aliases.memreg = m.memreg;
                     self.aliases.ptrpos_id = m.ptrpos.to_counter_id().unwrap();
+                    self.aliases.memsize = m.size;
                     // assign aliases themselves
                 }
 
@@ -471,6 +477,7 @@ impl Display for TasmParseError {
 pub enum TasmValue {
     Counter(i16),
     Timer(i16),
+    GDItem(Item),
     Number(f64),
     Group(i16),
     Alias(AliasType),
@@ -482,6 +489,10 @@ pub enum TasmValue {
 pub enum AliasType {
     MEMREG,
     PTRPOS,
+    MEMSIZE,
+    POINTS,
+    ATTEMPTS,
+    MAINTIME,
 }
 
 #[derive(Debug)]
@@ -495,6 +506,10 @@ impl AliasType {
         match s {
             "MEMREG" => Some(Self::MEMREG),
             "PTRPOS" => Some(Self::PTRPOS),
+            "MEMSIZE" => Some(Self::MEMSIZE),
+            "POINTS" => Some(Self::POINTS),
+            "ATTEMPTS" => Some(Self::ATTEMPTS),
+            "MAINTIME" => Some(Self::MAINTIME),
             _ => None,
         }
     }
@@ -503,6 +518,10 @@ impl AliasType {
         match self {
             Self::MEMREG => TasmPrimitive::Item,
             Self::PTRPOS => TasmPrimitive::Item,
+            Self::MEMSIZE => TasmPrimitive::Number, // cannot be Int, since otherwise it isn;t recognized as a number
+            Self::POINTS => TasmPrimitive::Item,
+            Self::ATTEMPTS => TasmPrimitive::Item,
+            Self::MAINTIME => TasmPrimitive::Item,
         }
     }
 }
@@ -589,6 +608,7 @@ impl TasmValue {
         match self {
             Self::Counter(_) => TasmPrimitive::Item,
             Self::Timer(_) => TasmPrimitive::Item,
+            Self::GDItem(_) => TasmPrimitive::Item,
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,

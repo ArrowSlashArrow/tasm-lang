@@ -1,11 +1,6 @@
 ## general
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
-- aliases todo:
-    - MEMSIZE
-    - POINTS
-    - ATTEMPTS
-    - MAINTIME
 - workflow for pr to run all tests
 - alias command (like #define in c)
     - defines a constant that can be used as an alias
@@ -22,6 +17,8 @@
         - all labels except for "memory" and routine labels are removed
 - add style guidelines to docs
 - refactor error enum with proper formatting via struct fields
+    - add warning level
+        - warning: modifying ptrpos. this counter should never be modified unless by actually moving the pointer.
 
 ## commands
 ### `TSPAWN`

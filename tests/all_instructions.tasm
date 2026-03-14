@@ -1,5 +1,7 @@
 ; This file uses every single instruction available.
 _init:
+    ; MALLOC is omitted, because multiple memory instances are not allowed.
+    ; FMALLOC uses the same object constructors internally
     FMALLOC 25
     INITMEM 1.5, 2.8, 3.14
     DISPLAY C1
@@ -31,6 +33,8 @@ _start:
     FLE routine1, routine2, C1, C2
     FG routine1, routine2, C1, C2
     FGE routine1, routine2, C1, C2
+    SRAND routine1, 50
+    FRAND routine1, routine2, 50
 
     MREAD
     MPTR 5

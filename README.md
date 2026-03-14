@@ -45,7 +45,7 @@ Note that running from source requires Rust v1.90.0.
 - Use GNU if you are not able to use MSVC.
 
 ## Tutorial
-In this tutorial, we will create the fibonacci program.
+In this tutorial, we will create the fibonacci program. This program can be found at `example_programs/fib_in_memory.tasm`.
 
 ### Setup
 To create a program, first make a `.tasm` file. For the sake of the tutorial, this file will be called `fib.tasm`.  
@@ -99,10 +99,14 @@ Then, we save the sum as the next number in the sequence:
 Finally, we spawn the routine from `_start` and again if we have more memory space.
 ```
     ; continue in routine fib
-    ; spawn is pointer position is less than memsize (50)
-    SL fib, PTRPOS, 50
+    ; spawn is pointer position is less than memsize - 1, which is set in _start
+    SL fib, PTRPOS, C2
 
 _start:
+    ; set iteration limit so that the pointer does not escape the memory area
+    MOV C2, MEMSIZE
+    SUB C2, 1
+    ; spawn the fibonacci loop
     SPAWN fib
 ```
 ### Compiling the program

@@ -40,6 +40,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
+<!-- Version number -->
 The current version, as of March 14, 2026 is **v0.1.1**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
@@ -318,9 +319,14 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 ### 3.3.4. Aliases
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
-As of TASM v0.1.0, the aliases that exist are:
+<!-- Version number -->
+As of TASM v0.1.1, the aliases that exist are:
 - `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
+- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
+- `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
+- `POINTS`: refers to the points counter. This is a built-in item in GD.
+- `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.
 ### 3.3.6. Argsets 
@@ -342,7 +348,8 @@ Below is the specification for all instructions and how many extra groups are us
 | Non-initializer memory command | 0           | none                                                                                   |
 | MALLOC/FMALLOC                 | memsize + 4 | one for the pointer, pointer reset, read and write groups, and one per allocated cell. |
 ## 3.5. Comments
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.1.0. 
+<!-- Version Number -->
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.1.1. 
 ## 3.6. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.

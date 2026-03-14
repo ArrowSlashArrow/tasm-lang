@@ -1,0 +1,4 @@
+; This program tries to assign to MAINTIME and ATTEMPTS.
+_start:
+    MOV MAINTIME, 1
+    MOV ATTEMPTS, 2

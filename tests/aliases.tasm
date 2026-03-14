@@ -1,0 +1,9 @@
+; This program uses all available aliases.
+_init:
+    MALLOC 10
+
+_start:
+    MOV MEMREG, PTRPOS
+    MOV POINTS, ATTEMPTS
+    MOV T1, MEMSIZE
+    ADD T1, MAINTIME
