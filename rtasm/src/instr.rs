@@ -1,7 +1,7 @@
 use std::iter;
 
 use gdlib::gdobj::{
-    GDObjConfig, GDObject, Item, ItemType,
+    GDObjConfig, GDObject, Item, ItemType, ZLayer,
     misc::{default_block, text},
     triggers::{
         CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget, Op, RoundMode,
@@ -831,7 +831,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let position = args.args[1].to_int().unwrap();
     let msg = args.args[2].to_string().unwrap();
     let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
-    let text_cfg = cfg.clone().scale(0.25, 0.25);
+    let text_cfg = cfg.clone().scale(0.25, 0.25).set_z_layer(ZLayer::T2);
     let spawn_cfg = cfg.clone().touchable(true).multitrigger(true);
 
     Ok(HandlerData::from_objects(vec![

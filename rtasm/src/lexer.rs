@@ -38,8 +38,8 @@
 //! Finally, all instructions are parsed in each group sequentially.
 use crate::{
     core::{
-        ENTRY_POINT, INIT_ROUTINE, Instruction, Routine, Tasm, TasmParseError, TasmValue,
-        fits_arg_signature, get_instr_type,
+        ENTRY_POINT, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm, TasmParseError,
+        TasmValue, fits_arg_signature, get_instr_type,
     },
     instr::INSTR_SPEC,
     verbose_log,
@@ -153,9 +153,18 @@ impl Tasm {
                 .split(',')
                 .filter_map(|v| match TasmValue::to_value(v.trim()) {
                     Ok(t) => self.parse_tasm_value(t, curr_line),
-                    Err(e) => {
+                    Err((etype, msg)) => {
                         // error if unable to parse argument value
-                        self.errors.push(e);
+                        self.errors.push(match etype {
+                            ParseErrorType::BadID => TasmParseError::BadID((msg, curr_line)),
+                            ParseErrorType::TrailingComma => {
+                                TasmParseError::TrailingComma(curr_line)
+                            }
+                            ParseErrorType::InvalidNumber => {
+                                TasmParseError::InvalidNumber((msg, v.to_string(), curr_line))
+                            }
+                        });
+
                         erroneous_instr = true;
                         None
                     }
@@ -216,9 +225,12 @@ impl Tasm {
                 });
             }
             None => {
+                let argtypes = &args.iter().map(|a| a.get_type()).collect::<Vec<_>>();
                 // otherwise, error
                 self.errors.push(TasmParseError::InvalidInstruction((
-                    format!("Instruction {instr} has no argument handler for the given arguments."),
+                    format!(
+                        "Instruction {instr} has no argument handler for the argset {argtypes:?}"
+                    ),
                     curr_line,
                 )));
             }
@@ -363,6 +375,7 @@ pub fn parse_file<T: AsRef<str>>(
 
     tasm.lines = lines;
     tasm.logs_enabled = verbose_logs;
+    tasm.group_offset = group_offset;
     tasm.parse(group_offset, disable_entry_point_check);
 
     if tasm.errors.len() == 0 {

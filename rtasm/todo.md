@@ -22,7 +22,6 @@
         - all labels except for "memory" and routine labels are removed
 - add style guidelines to docs
 - refactor error enum with proper formatting via struct fields
-- add group literals
 
 ## commands
 ### `TSPAWN`

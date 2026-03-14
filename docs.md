@@ -296,9 +296,15 @@ It is also important to recognize that all floats in GD are 32 bits floats. This
 An item literal represents a GD item, most commonly a counter or timer item. It is denoted as such:
 - Counter: `CXXXX`, where `XXXX` represents the ID of the counter. Example: `C123` represents the counter with ID 123.
 - Timer: `TXXXX`, where `XXXX` represents the ID of the timer. Example: `T456` represents the timer with ID 456.
-IDs do not have to be 0-padded, and they should be in decimal form.
+IDs do not have to be 0-padded, and they must be in decimal form. They are only valid if they are in the range [1, 9999]. The same goes for IDs in group literals.   
 Item literals are parsed by first checking for a prefix of either `C` or `T`, and if this is true, the rest of the literal is parsed as a base-10 signed 16-bit integer, since IDs are internally represented as signed 16-bit integers by GD.
-### 3.3.3. Routines
+### 3.3.3. Groups
+Both of the following are interally groups:
+#### 3.3.3.1. Group literals
+Group literals refer to a static group ID. They are written as `g{id}`, where ID is a valid group ID.  
+Group literals are parsed the same way as item literals, except for the prefix.  
+Example: `g123` refers to the group with ID 123.
+#### 3.3.3.2. Routines
 Routines are specified simply by their identifier. Since they are parsed first, any routine name declaration/reference order conflicts are avoided.
 ```
 routine:
@@ -308,6 +314,7 @@ spawner_routine:
 	; spawn the routine here
 	SPAWN routine
 ```
+If the `--group-offset` argument is specified, the groups of each routine will change, which is unlike group literals, since they are static.
 ### 3.3.4. Aliases
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 

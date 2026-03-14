@@ -1,0 +1,14 @@
+; This program uses a variety of values to test the compiler's parsing ability
+_init:
+    FMALLOC 50.0 ; technically an int
+    INITMEM +1, 2e+0, 3.14159265, -4, 5.0e0, 6.023E22 ; various floats 
+    IOBLOCK g58, 1e2, STRING ; 1e2 is also technically an int (100)
+
+routine:
+    MOV T1, T2 ; timers and counters
+    MOV C1, C2 
+
+_start:
+    ; groups
+    SPAWN g42
+    SPAWN routine
