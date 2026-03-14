@@ -1,5 +1,4 @@
 ## general
-- add spawn delay + remap support to asm
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
 - aliases todo:
@@ -8,12 +7,13 @@
     - ATTEMPTS
     - MAINTIME
 - workflow for pr to run all tests
-- define command (like #define in c)
+- alias command (like #define in c)
     - defines a constant that can be used as an alias
     - cannot overwrite existing aliases (any already defined and any of the default ones)
     - e.g. `ALIAS external_object, g123`
-        - `external_object` now refers to the group `123`
+        - `external_object` now refers to group 123
     - init only
+    - alias is resolved anywhere where mentioned
 - make the release mode toggle actually do something
     - currently it is ignored and everything is compiled in release anyways
     - debug (not release) mode:
@@ -22,6 +22,7 @@
         - all labels except for "memory" and routine labels are removed
 - add style guidelines to docs
 - refactor error enum with proper formatting via struct fields
+- add group literals
 
 ## commands
 ### `TSPAWN`
@@ -29,7 +30,7 @@ Args: `TSPAWN <timer>, <float>, <routine>`
 Starts the timer specified, and when it counts up to the specified time (the second argument), the given routine is called.
 internally uses timer trigger  
 
-Planned for v0.1.2.
+Planned for ~~v0.1.2~~ whenever gdlib gets a time trigger constructor.
 
 ###  `TSTART`
 Args: `TSTART <timer>`
@@ -40,15 +41,7 @@ Args `TSTOP <timer>`
 stops this timer.
 internally uses time ctrl trigger
 
-### `RET`
-Args: None
-Returns from this routine.
-internally uses stop trigger with ctrl id
-
-all spawn triggers have a ctrl id that is the same as the group they're spawning
-return: stop trigger that stops all objects with that control id (all spawn triggers that activate that group, and by proxy, the group itself)
-
-Related instructions: 
+### Routine controls
 * `PAUSE <routine>`: pauses the routine. unpausable via:
 * `RESUME <routine>`: unpauses the routine.
 * `STOP <routine>`: pauses and exits the routine. not resumable.
@@ -64,8 +57,7 @@ This instruction is 1-tick.
 The sum is computed, and then multiplied by the multiplier.
 Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
 
-^ this will be a flag, mod:float
-^^ ADDM and SUBM will be included as utility functions. if the mod flag on those is specified, it overrides the argument.
+^ ADDM and SUBM will be included as utility functions. if the mod flag on those is specified, it overrides the argument.
 
 ### memory markers
 marker objects that are in the memory structure.  
@@ -85,11 +77,6 @@ MPTR M1 ; move pointer back to marker
 the block at mem pos 0 can also be considered a marker  
 
 planned for v0.3.0
-
-### arithmetic
-support some way to assign with an operator to items: `+=`, `/=`, etc.
-
-this will be a flag: {op}= (+=, -=, *=, /=)
 
 ### flags
 a.k.a. "extra args"/ "extras"  
@@ -142,9 +129,29 @@ ADDM    C3, C1, C2, 0.5 | /= res:r- fin:f+  ; a bit cleaner
 Creating an instruction for each possible combinations would result in 5760 instructions total, which is simply unsistainable.  
 While the flag system is arguably better for this situation, it still needs some work. For example, `res:r-` could be optionally written as `result:round-` or `res:-round` for disambiguation purposes. 
 
-for spawning: delay:float, remap:{group:group}
-
 planned for v0.2.0
+
+#### planned flags
+- `res`: specifies rounding and sign mode of result between ids
+    - accepts a compound string of the following in any order:
+        - a `-` or `+`
+        - round argument (`r`/`round`, `c`/`ceil`, `f`/`floor`)
+- `fin`: specifies rounding and sign mode of final result
+    - accepts a compound string of the following in any order:
+        - a `-` or `+`
+        - round argument (`r`/`round`, `c`/`ceil`, `f`/`floor`)
+- `mod`: sets itemedit modifier
+    - accepts a float which is the mod is set as.
+    - overrides `ADDM`/`SUBM` mod if specified.
+- `op`: compound assignment operator. result is always assigned to unless this flag is specified. 
+    - accepts one of the following: `+=`, `-=`, `/=`, `*=`
+- `delay`: specifies delay of spawn triggers of this command
+    - accepts a float (amount of seconds) for delay.
+    - delay variation will not be supported.
+- `remap`: spawn remap of the spawn trigger. *only* for `SPAWN`.
+    - accepts a dict in the format `{id:remap}`
+    - e.g. `remap:{125:126, 200:300}` remaps 125 to 126 and 200 to
+
 
 ### Concurrent instructions
 Concurrent instructions are isntructions that will be placed on the same x-position,

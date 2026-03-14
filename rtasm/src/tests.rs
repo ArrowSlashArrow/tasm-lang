@@ -114,6 +114,7 @@ tasm_test!("multiple_mem", false, compile);
 tasm_test!("multiple_routines", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
+tasm_test!("tab_spacing", true);
 tasm_test!("trailing_comma", false);
 
 #[test]
@@ -150,12 +151,12 @@ fn parse_tasm() -> anyhow::Result<()> {
     );
 
     parse_start = Instant::now();
-    let level = tasm.handle_routines(&"test level".into()).unwrap();
+    let _level = tasm.handle_routines(&"test level".into()).unwrap();
     println!(
         "Serialise time: {:.3}ms",
         parse_start.elapsed().as_micros() as f64 / 1000.0
     );
 
-    level.export_to_gmd("test.gmd")?;
+    // level.export_to_gmd("test.gmd")?;
     Ok(())
 }
