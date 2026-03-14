@@ -2,10 +2,10 @@
 A computational language that compiles to Geometry Dash trigger objects. Allows you to write complex trigger programs without actually placing triggers.
 Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/wiki/Turbo_Assembler).  
   
-tasm is currently in **version v0.1.0**.  
+TASM is currently in **version v0.1.1**.  
 The working compiler is in the `rtasm/` directory. Note that the compiler is not a standalone executable, and must be executed from source.
 
-Documentation may be found [here](docs.md).
+Documentation can be found [here](docs.md).
 
 # Overview
 TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of complex programs. 
@@ -20,7 +20,7 @@ Features:
 * Built-in memory system
 * Quick compilation to trigger objects
 * Integration with dedicated backend: [GDlib](https://crates.io/crates/gdlib)
-<!-- * Versatile compiler, lots of options. -->
+* Fast and versatile compiler
 
 # Quick Start and Tutorial
 ## SDK Usage Instructions
@@ -121,8 +121,8 @@ To compile the program, run `tasmc.exe fib.tasm` if you are using the standalone
 The resulting level should have the name of the program file, and is by default at the top.
   
 # Project Information
-The working tasm compiler is located in the `rtasm` directory, and the deprecated python compiler is located in the `pytasm` directory. It is recommended to use the `rtasm` compiler, since it is faster and more robust.  
+The working TASM compiler is located in the `rtasm` directory, and the deprecated python compiler is located in the `pytasm` directory. It is recommended to use the `rtasm` compiler, since it is faster and more robust.  
 Example programs are located in the `example_programs/` directory, and actual programs that I have written myself are located in the `programs/` folder. They serve as examples of programs written for real use cases.  
 The `plse` directory is effectively empty, however, a language will soon be developed that will compile to TASM, since assembly syntax is can be pesky to work with.  
-The emulator, located in the `interpreter` directory, is not confirmed to be fully accurate, and should not be considered a 1:1 replica of GD's environment. That said, it is still a good tool for debugging tasm.  
+The emulator, located in the `interpreter` directory, is not confirmed to be fully accurate, and should not be considered a 1:1 replica of GD's environment. That said, it is still a good tool for debugging TASM.  
 Feel free to reach out to me on discord: @arrowslasharrow to ask me any questions!

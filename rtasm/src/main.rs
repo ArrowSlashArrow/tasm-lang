@@ -49,7 +49,7 @@ struct Args {
     log_errors: bool,
 
     /// Does not require an entry point to be present in the input file.
-    /// Useful for compiling utility programs that don't necessary contain an entry point.
+    /// Useful for compiling utility programs that don't necessarily contain an entry point.
     #[arg(long)]
     no_entry_point: bool,
 }
@@ -57,7 +57,7 @@ struct Args {
 fn main() -> Result<(), Error> {
     let args = Args::parse();
     println!("Parsing tasm...");
-    let file = fs::read_to_string(&args.infile).unwrap();
+    let file = fs::read_to_string(&args.infile)?;
 
     let id_limit = 9999;
     if args.mem_end_counter > id_limit {

@@ -1,0 +1,5 @@
+; This file uses tabs (\t) instead of spaces for indentation and argument separation.
+
+_start:
+	MOV C1, C2
+	ADD	C1,	2

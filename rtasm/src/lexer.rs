@@ -356,6 +356,7 @@ pub fn parse_file<T: AsRef<str>>(
     let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
     let lines = in_str
         .as_ref()
+        .replace('\t', &" ") // tabs converted to spaces, works for parsing purposes.
         .lines() // remove comments
         .map(|l| l.split(';').next().unwrap().trim_end().to_string())
         .collect::<Vec<String>>();
