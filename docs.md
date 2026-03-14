@@ -40,7 +40,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
-The current version, as of February 18, 2026 is **v0.1.0**. 
+The current version, as of March 14, 2026 is **v0.1.1**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
