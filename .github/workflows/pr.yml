@@ -21,5 +21,8 @@ jobs:
         with:
           toolchain: stable
 
+      - name: go to compiler directory
+        run: cd rtasm
+
       - name: run tests
         run: cargo test --verbose -- --fail-fast
