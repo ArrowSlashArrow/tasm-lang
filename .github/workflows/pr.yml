@@ -23,4 +23,4 @@ jobs:
 
       - name: run tests
         working-directory: ./rtasm
-        run: cargo test --verbose -- --fail-fast
+        run: cargo test --verbose
