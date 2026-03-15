@@ -5,9 +5,9 @@ use gdlib::gdobj::{
     misc::{default_block, text},
     triggers::{
         CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget, Op, RoundMode,
-        SignMode, TargetMove, collision_block, collision_trigger, counter_object, item_compare,
-        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, time_control,
-        toggle_trigger,
+        SignMode, StopMode, TargetMove, collision_block, collision_trigger, counter_object,
+        item_compare, item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger,
+        stop_trigger, time_control, toggle_trigger,
     },
 };
 use paste::paste;
@@ -218,6 +218,9 @@ pub const INSTR_SPEC: &[(
     ),
     ("TSTART", false, &[argset!((Timer) => tstart)]),
     ("TSTOP", false, &[argset!((Timer) => tstop)]),
+    ("PAUSE", false, &[argset!((Group) => pause)]),
+    ("RESUME", false, &[argset!((Group) => resume)]),
+    ("STOP", false, &[argset!((Group) => stop)]),
 ];
 
 macro_rules! wrap_objs {
@@ -681,6 +684,33 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
     )])
 }
 
+fn pause(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![stop_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        StopMode::Pause,
+        true,
+    )]))
+}
+
+fn resume(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![stop_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        StopMode::Resume,
+        true,
+    )]))
+}
+
+fn stop(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![stop_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        StopMode::Stop,
+        true,
+    )]))
+}
+
 /* TIMERS */
 
 fn tstart(args: HandlerArgs) -> HandlerReturn {
@@ -854,7 +884,11 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let msg = args.args[2].to_string().unwrap();
     let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
     let text_cfg = cfg.clone().scale(0.25, 0.25).set_z_layer(ZLayer::T2);
-    let spawn_cfg = cfg.clone().touchable(true).multitrigger(true);
+    let spawn_cfg = cfg
+        .clone()
+        .touchable(true)
+        .multitrigger(true)
+        .set_control_id(spawn_group as i32);
 
     Ok(HandlerData::from_objects(vec![
         default_block(&cfg),

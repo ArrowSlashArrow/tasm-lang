@@ -8,13 +8,6 @@
         - `external_object` now refers to group 123
     - init only
     - alias is resolved anywhere where mentioned
-<!-- - make the release mode toggle actually do something
-    - scrapped due to being unnecessary
-    - someone can make a pr for this if they need it
-    - debug (not release) mode:
-        - comments are present alongside each routine in the form of text objects
-    - release mode:
-        - all labels except for "memory" and routine labels are removed -->
 - add style guidelines to docs
 - refactor error enum with proper formatting via struct fields
     - add warning level
@@ -29,16 +22,6 @@ internally uses timer trigger
 Planned for ~~v0.1.2~~ whenever gdlib gets a time trigger constructor.
 
 also, `TINIT`, which is like `TSPAWN`, except the timer starts paused.
-
-### Routine controls
-* `PAUSE <routine>`: pauses the routine. unpausable via:
-* `RESUME <routine>`: unpauses the routine.
-* `STOP <routine>`: pauses and exits the routine. not resumable.
-
-Control flow instructions require that the spawner object has a known control ID. 
-This ID will be set to the group that it is responsible for calling. If it responsible for calling multiple groups, it should not be given any control ID. For example, random and andvanced random triggers will not be given a control ID. This is because each object ma
-As a result, control flow instructions are not expected to work if the routine can be spawned by an advanced random trigger. Alterntaively, a manual control ID flag may be set for the random spawn instructions. This flag may contain anything that corresponds to a group: either a group literal or a routine identifier.  
-Planned for v0.1.3.
 
 ### `INSTRM` / `INSTRD`
 Arithmetic instruction, except the result is multiplied/divided by the last argument.

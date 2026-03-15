@@ -739,12 +739,13 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum InstrType {
-    Arithmetic, // any instruction that deals specifically with operations between counters
+    Arithmetic, // any instruction that performs mathematical operations with counters
     Init,       // any instruction that can only go into the _init routine.
     Memory,     // any instruction that requires/interfaces with memory
     Timer,      // any instruction that interacts with timers non-arithmetically.
     Spawner, // any instruction that spawns a group. comparison instructions fall into this category.
     Stopper, // any instruction that stops a group's execution (RET, STOP)
+    Process, // any instruction that modifies the process flow (PAUSE, RESUME)
     Wait,    // any instruction that waits (NOP, WAIT)
     Debug, // any instruction that is only used by the emulator, and ignored when parsing to GD objects.
 }
@@ -759,6 +760,7 @@ pub fn get_instr_type(ident: &str) -> Option<InstrType> {
         "NOP" | "WAIT" => Some(InstrType::Wait),
         "TSPAWN" | "TSTART" | "TSTOP" => Some(InstrType::Timer),
         "RET" | "STOP" => Some(InstrType::Stopper),
+        "PAUSE" | "RESUME" => Some(InstrType::Process),
         "BREAKPOINT" => Some(InstrType::Debug),
         _ => None,
     }

@@ -204,6 +204,25 @@ Arguments: `SPAWN <routine>`
 Spawns the corresponding routine. Does not pause the current group.  
 Execution time: 1 tick.  
 
+##### PAUSE
+Arguments: `PAUSE <routine>`
+
+Pauses the specified routine via a stop trigger.
+> A routine cannot be paused immediately after is it spawned. If it paused this way, the pause will simply be overshadowed by GD. A minimum of one tick is needed between the execution of the first non-wait instruction of the routine and the PAUSE for it to function. 
+Execution time: 1 tick.
+
+##### RESUME
+Arguments: `RESUME <routine>`
+
+Resumes execution of a paused routine via a stop trigger.  
+Execution time: 1 tick.
+
+##### STOP
+Arguments: `STOP <routine>`
+
+Stops the specified routine via a stop trigger. Unlike `PAUSE`, once a routine is stopped with this instruction, it cannot be resumed.
+Execution time: 1 tick.
+
 #### 3.1.2.5. Wait
 ##### NOP
 Arguments: `NOP`

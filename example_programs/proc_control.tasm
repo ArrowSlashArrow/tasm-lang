@@ -1,0 +1,17 @@
+; This program uses process control instructions added in v0.1.3 to perform instance clumping.
+; Instance clumping is done by spawning a lot of the same group, which pauses itself
+; While paused, a group may be spawned again, regardless of whether the paused group is still active.
+; Once we are ready to release the groups, we simply resume the group spawner.
+; As a result, many group instances are spawned and can be controlled to execute in parallel.  
+_init:
+    IOBLOCK continue, 2, cont.
+    DISPLAY C1
+
+_start:
+    MOV C1, C1      ; dummy op
+    NOP             ; wait 2nd tick
+    PAUSE _start    ; finally, pause this group
+    ADD C1, 1       ; this runs after being unpaused.
+
+continue:
+    RESUME _start   ; resume all paused instances
