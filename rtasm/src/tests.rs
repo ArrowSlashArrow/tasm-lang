@@ -103,7 +103,7 @@ tasm_test!("rng", example);
 tasm_test!("aliases", true);
 tasm_test!("all_instructions", true);
 tasm_test!("bad_args", false);
-tasm_test!("bad_assignment", false);
+tasm_test!("bad_assignment", false, compile);
 tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
 tasm_test!("correct", true);

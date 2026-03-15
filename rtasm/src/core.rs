@@ -2,10 +2,10 @@ use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
-    gdobj::{GDObjConfig, GDObject, Item, misc::text},
+    gdobj::{GDObjConfig, GDObject, Item, ItemType, misc::text},
 };
 
-use crate::instr::ioblock;
+use crate::instr::{get_item_spec, ioblock};
 
 pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
@@ -137,6 +137,19 @@ impl Tasm {
                     if let None = self.mem_info {
                         self.errors
                             .push(TasmParseError::NonexistentMemoryAccess(instr.line_number));
+                        continue;
+                    }
+                }
+
+                // check that any bad assignments aren't happening
+                if instr._type == InstrType::Arithmetic {
+                    // first argument is always the result
+                    let counter_type = get_item_spec(&instr_args[0]).unwrap().get_type();
+                    if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
+                        self.errors.push(TasmParseError::InvalidAssignment((
+                            instr.line_number,
+                            counter_type,
+                        )));
                         continue;
                     }
                 }
@@ -385,6 +398,7 @@ pub struct Instruction {
 pub enum TasmParseError {
     InvalidInstruction((String, usize)),
     InvalidArguments((String, usize)),
+    InvalidAssignment((usize, ItemType)),
     BadID((String, usize)),
     BadToken((String, usize)),
     NoEntryPoint,
@@ -415,6 +429,9 @@ impl Display for TasmParseError {
             Self::NoEntryPoint => write!(f, "No entry point found. ({ENTRY_POINT} routine)"),
             Self::InvalidArguments((reason, line)) => {
                 write!(f, "Invalid arguments on line {}: {reason}", line + 1)
+            }
+            Self::InvalidAssignment((line, _type)) => {
+                write!(f, "Cannot assign to {_type:?} on line {}", line + 1)
             }
             Self::BadID((msg, line)) => {
                 write!(f, "Bad ID on line {}: {msg}.", line + 1)

@@ -224,10 +224,11 @@ macro_rules! wrap_objs {
 }
 
 // utils
-fn get_item_spec(item: &TasmValue) -> Option<Item> {
+pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
     match item {
         TasmValue::Counter(c) => Some(Item::Counter(*c)),
         TasmValue::Timer(t) => Some(Item::Timer(*t)),
+        TasmValue::GDItem(i) => Some(*i),
         _ => None,
     }
 }

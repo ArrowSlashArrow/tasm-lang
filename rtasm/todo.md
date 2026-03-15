@@ -1,7 +1,6 @@
 ## general
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
-- workflow for pr to run all tests
 - alias command (like #define in c)
     - defines a constant that can be used as an alias
     - cannot overwrite existing aliases (any already defined and any of the default ones)
@@ -9,12 +8,13 @@
         - `external_object` now refers to group 123
     - init only
     - alias is resolved anywhere where mentioned
-- make the release mode toggle actually do something
-    - currently it is ignored and everything is compiled in release anyways
+<!-- - make the release mode toggle actually do something
+    - scrapped due to being unnecessary
+    - someone can make a pr for this if they need it
     - debug (not release) mode:
         - comments are present alongside each routine in the form of text objects
     - release mode:
-        - all labels except for "memory" and routine labels are removed
+        - all labels except for "memory" and routine labels are removed -->
 - add style guidelines to docs
 - refactor error enum with proper formatting via struct fields
     - add warning level
