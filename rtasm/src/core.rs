@@ -533,12 +533,10 @@ impl AliasType {
 
     pub fn get_type(&self) -> TasmPrimitive {
         match self {
-            Self::MEMREG => TasmPrimitive::Item,
-            Self::PTRPOS => TasmPrimitive::Item,
+            Self::MEMREG | Self::PTRPOS | Self::POINTS | Self::ATTEMPTS | Self::MAINTIME => {
+                TasmPrimitive::Item
+            }
             Self::MEMSIZE => TasmPrimitive::Number, // cannot be Int, since otherwise it isn;t recognized as a number
-            Self::POINTS => TasmPrimitive::Item,
-            Self::ATTEMPTS => TasmPrimitive::Item,
-            Self::MAINTIME => TasmPrimitive::Item,
         }
     }
 }
@@ -558,8 +556,9 @@ pub enum TasmValueType {
 #[derive(PartialEq, Debug)]
 pub enum TasmPrimitive {
     Item,
+    Timer,  // subset of item
     Number, // also a float.
-    Int,
+    Int,    // subset of number
     Group,
     String,
 }
@@ -623,9 +622,7 @@ impl TasmValue {
 
     pub fn get_type(&self) -> TasmPrimitive {
         match self {
-            Self::Counter(_) => TasmPrimitive::Item,
-            Self::Timer(_) => TasmPrimitive::Item,
-            Self::GDItem(_) => TasmPrimitive::Item,
+            Self::Counter(_) | Self::Timer(_) | Self::GDItem(_) => TasmPrimitive::Item,
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
@@ -637,6 +634,14 @@ impl TasmValue {
         match self {
             Self::Number(n) => n.fract() == 0.0,
             Self::Alias(a) => a.get_type() == TasmPrimitive::Int,
+            _ => false,
+        }
+    }
+
+    pub fn is_timer(&self) -> bool {
+        match self {
+            Self::Timer(_) => true,
+            Self::Alias(a) => a.get_type() == TasmPrimitive::Timer,
             _ => false,
         }
     }
@@ -691,6 +696,7 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
         // get_type returns `Number` for a `Number` even if it is an `Int`
         match p {
             TasmPrimitive::Int => arg.is_int(),
+            TasmPrimitive::Timer => arg.is_timer(),
             _ => &arg.get_type() == p,
         }
     }

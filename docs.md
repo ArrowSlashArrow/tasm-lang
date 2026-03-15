@@ -82,16 +82,20 @@ All arithmetic instructions are 1-tick.
 | Argset                   | Result (in the example case of division) | Commands that use it           |
 | ------------------------ | ---------------------------------------- | ------------------------------ |
 | `<item> <number>`        | `item = item / number`                   | ADD, SUB, MUL, DIV, FLDIV, MOV |
-| `<item> <item>`          | `1st item = 1st item / 2nd item`         | ADD, SUB, MUL, DIV, FLDIV, MOV |
+| `<item> <item>`          | `1st item = 1st item / 2nd item`         | ADD, SUB, MUL, DIV, FLDIV, MOV\* |
 | `<item> <item> <number>` | `1st item = 2nd item / number`           | MUL, DIV, FLDIV                |
 | `<item> <item> <item>`   | `1st item = 2nd item / 3rd item`         | MUL, DIV, FLDIV, ADD, SUB      |
-#### Instruction operations
+
+Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are immutable.
+##### Instruction operations
 - ADD: addition
 - SUB: subtraction
 - MUL: multiplication
 - DIV: division
 - FLDIV: division, and the result it rounded down (floored).
-#### 3.1.2.2. Compares
+- MOV: assignment
+> \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+#### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
 Execution timeline:
@@ -190,27 +194,38 @@ Arguments: `MRESET`
 
 Resets the pointer position to 0.  
 Execution time: 1 tick.  
-##### MOV
-Arguments: `MOV <item> <number>`, `MOV <item> <item>`
-
-Copies the value of the second argument to the first argument.  
-Execution time: 1 tick.  
-
 ##### 3.1.2.3.1. Memory safety guarantees
 If the pointer is outside of the memory range \[0, memsize), no memory will be read. This means that nothing will be read from or written to the MEMREG, but the pointer will still move upwards.
 If INITMEM is not called, the default values of each memory cell will remain, which are 0 for both counters and timers.
-#### 3.1.2.4 Miscellaneous
-##### NOP
-Arguments: `NOP`
-
-Does nothing on that tick. Useful for waiting.  
-Execution time: 1 tick.  
+#### 3.1.2.4. Process
 ##### SPAWN
 Arguments: `SPAWN <routine>`
 
-Spawns the corresponding routine.
-Does not pause the current group.  
+Spawns the corresponding routine. Does not pause the current group.  
 Execution time: 1 tick.  
+
+#### 3.1.2.5. Wait
+##### NOP
+Arguments: `NOP`
+
+Does nothing on the tick it is called. Useful for waiting.  
+Execution time: 1 tick.  
+
+#### 3.1.2.6. Time
+##### TSTART
+Arguments: `TSTART <timer>`
+
+Unpauses the specified timer. To start, the timer must have first been started by a time trigger.  
+Execution time: 1 tick.
+
+> There is currently no way to place a time trigger in TASM. The `TSPAWN` command is planned for this, however, it will be added only when GDLib is updated to include a time trigger constructor.
+
+##### TSTOP
+Arguments: `TSTOP <timer>`
+
+Pauses a running timer.  
+Execution time: 1 tick.
+#### 3.1.2.7. Miscellaneous
 ##### PERS
 Arguments: `PERS <item>`
 

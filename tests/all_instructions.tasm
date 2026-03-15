@@ -20,6 +20,10 @@ _start:
     MUL C1, C2
     DIV C1, C2
     FLDIV C1, C2
+    MOV C1, C2
+
+    TSTART T1
+    WAIT 1
 
     SE routine1, C1, C2
     SNE routine1, C1, C2
@@ -35,6 +39,8 @@ _start:
     FGE routine1, routine2, C1, C2
     SRAND routine1, 50
     FRAND routine1, routine2, 50
+
+    TSTOP T1
 
     MREAD
     MPTR 5

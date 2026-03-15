@@ -28,14 +28,7 @@ internally uses timer trigger
 
 Planned for ~~v0.1.2~~ whenever gdlib gets a time trigger constructor.
 
-###  `TSTART`
-Args: `TSTART <timer>`
-Starts this timer.
-internally uses time ctrl trigger
-### `TSTOP`
-Args `TSTOP <timer>`
-stops this timer.
-internally uses time ctrl trigger
+also, `TINIT`, which is like `TSPAWN`, except the timer starts paused.
 
 ### Routine controls
 * `PAUSE <routine>`: pauses the routine. unpausable via:
@@ -59,7 +52,7 @@ Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <numbe
 marker objects that are in the memory structure.  
 could help with moving a pointer to a previous location:
 ```
-MOVEMARKER 1 ; move marker 1 to current location of pointer
+MVMARK 1 ; move marker 1 to current location of pointer
 ; essentially store the current location of the pointer in the marker
 
 MRESET

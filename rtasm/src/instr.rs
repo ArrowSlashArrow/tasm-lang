@@ -6,7 +6,8 @@ use gdlib::gdobj::{
     triggers::{
         CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget, Op, RoundMode,
         SignMode, TargetMove, collision_block, collision_trigger, counter_object, item_compare,
-        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, toggle_trigger,
+        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, time_control,
+        toggle_trigger,
     },
 };
 use paste::paste;
@@ -215,6 +216,8 @@ pub const INSTR_SPEC: &[(
         false,
         &[argset!((Group, Group, Number) => fork_random)],
     ),
+    ("TSTART", false, &[argset!((Timer) => tstart)]),
+    ("TSTOP", false, &[argset!((Timer) => tstop)]),
 ];
 
 macro_rules! wrap_objs {
@@ -676,6 +679,24 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
         true,
         false,
     )])
+}
+
+/* TIMERS */
+
+fn tstart(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![time_control(
+        &args.cfg,
+        get_item_spec(&args.args[0]).unwrap().id(),
+        false,
+    )]))
+}
+
+fn tstop(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![time_control(
+        &args.cfg,
+        get_item_spec(&args.args[0]).unwrap().id(),
+        true,
+    )]))
 }
 
 /* MEMORY */
