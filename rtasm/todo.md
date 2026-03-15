@@ -22,15 +22,6 @@ internally uses timer trigger
 Planned for ~~v0.1.2~~ whenever gdlib gets a time trigger constructor.
 
 also, `TINIT`, which is like `TSPAWN`, except the timer starts paused.
-
-### `INSTRM` / `INSTRD`
-Arithmetic instruction, except the result is multiplied/divided by the last argument.
-This instruction is 1-tick.
-The sum is computed, and then multiplied by the multiplier.
-Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <number>`
-
-^ ADDM and SUBM will be included as utility functions. if the mod flag on those is specified, it overrides the argument.
-
 ### memory markers
 marker objects that are in the memory structure.  
 could help with moving a pointer to a previous location:
@@ -115,7 +106,8 @@ planned for v0.2.0
 - `mod`: sets itemedit modifier
     - accepts a float which is the mod is set as.
     - overrides `ADDM`/`SUBM` mod if specified.
-- `op`: compound assignment operator. result is always assigned to unless this flag is specified. 
+- `finop`: compound assignment operator. result is always assigned to unless this flag is specified. 
+- `resop`: operator between IDs.
     - accepts one of the following: `+=`, `-=`, `/=`, `*=`
 - `delay`: specifies delay of spawn triggers of this command
     - accepts a float (amount of seconds) for delay.

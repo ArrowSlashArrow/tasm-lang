@@ -44,6 +44,12 @@ Note that running from source requires Rust v1.90.0.
 - Use MSVC if you are unsure.
 - Use GNU if you are not able to use MSVC.
 
+## Useful compiler flags
+Below is a list of commonly used compiler flags. This is not the full list of compiler flags, as that can be seen by running `tasmc --help`.
+- `--gmd`: Export to .gmd instead of writing directly to the savefile.
+- `--release`: Compile program with release mode optimizations enabled.
+- `--level-name`: Sets the name of the exported level. Defaults to the name of the file.
+
 ## Tutorial
 In this tutorial, we will create the fibonacci program. This program can be found at `example_programs/fib_in_memory.tasm`.
 
@@ -130,6 +136,5 @@ The resulting level should have the name of the program file, and is by default 
 # Project Information
 The working TASM compiler is located in the `rtasm` directory, and the deprecated python compiler is located in the `pytasm` directory. It is recommended to use the `rtasm` compiler, since it is faster and more robust.  
 Example programs are located in the `example_programs/` directory, and actual programs that I have written myself are located in the `programs/` folder. They serve as examples of programs written for real use cases.  
-The `plse` directory is effectively empty, however, a language will soon be developed that will compile to TASM, since assembly syntax is can be pesky to work with.  
+The `plse` directory is effectively empty, however, a language will ~~soon~~ eventually be created that will compile to TASM, since assembly syntax is can be pesky to work with.  
 The emulator, located in the `interpreter` directory, is not confirmed to be fully accurate, and should not be considered a 1:1 replica of GD's environment. That said, it is still a good tool for debugging TASM.  
-Feel free to reach out to me on discord: @arrowslasharrow to ask me any questions!

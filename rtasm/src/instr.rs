@@ -85,6 +85,38 @@ pub const INSTR_SPEC: &[(
         ],
     ),
     (
+        "ADDM",
+        false,
+        &[
+            argset!((Item, Item, Number) => add_mod_2items_num),
+            argset!((Item, Item, Item, Number) => add_mod_3items_num),
+        ],
+    ),
+    (
+        "SUBM",
+        false,
+        &[
+            argset!((Item, Item, Number) => sub_mod_2items_num),
+            argset!((Item, Item, Item, Number) => sub_mod_3items_num),
+        ],
+    ),
+    (
+        "ADDD",
+        false,
+        &[
+            argset!((Item, Item, Number) => add_div_2items_num),
+            argset!((Item, Item, Item, Number) => add_div_3items_num),
+        ],
+    ),
+    (
+        "SUBD",
+        false,
+        &[
+            argset!((Item, Item, Number) => sub_div_2items_num),
+            argset!((Item, Item, Item, Number) => sub_div_3items_num),
+        ],
+    ),
+    (
         "MUL",
         false,
         &[
@@ -336,7 +368,7 @@ fn wait(args: HandlerArgs) -> HandlerReturn {
 }
 
 /* ARITHMETIC */
-
+// even though all functions return one object, they return Vecs for compatibility with the macro.
 fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let result = get_item_spec(&args.args[0]).unwrap();
     let operand = get_item_spec(&args.args[1]).unwrap();
@@ -434,6 +466,88 @@ handlers!((add, sub, mul, div, mov) => arithmetic_2items);
 handlers!((add, sub, mul, div) => arithmetic_3items);
 handlers!((add, sub, mul, div, mov) => arithmetic_item_num);
 handlers!((mul, div) => arithmetic_2items_num);
+
+fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+    let res = get_item_spec(&args.args[0]).unwrap();
+    let op1 = get_item_spec(&args.args[1]).unwrap();
+    let mult = args.args[2].to_float().unwrap();
+    item_edit(
+        &args.cfg,
+        Some(op1),
+        None,
+        res,
+        mult,
+        op,
+        mul,
+        None,
+        RoundMode::None,
+        RoundMode::None,
+        SignMode::None,
+        SignMode::None,
+    )
+}
+fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+    let res = get_item_spec(&args.args[0]).unwrap();
+    let op1 = get_item_spec(&args.args[1]).unwrap();
+    let op2 = get_item_spec(&args.args[2]).unwrap();
+    let mult = args.args[3].to_float().unwrap();
+    item_edit(
+        &args.cfg,
+        Some(op1),
+        Some(op2),
+        res,
+        mult,
+        op,
+        mul,
+        // id op should be the same as assign op
+        Some(op),
+        RoundMode::None,
+        RoundMode::None,
+        SignMode::None,
+        SignMode::None,
+    )
+}
+
+fn add_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Add, true),
+    ]))
+}
+fn add_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Add, true),
+    ]))
+}
+fn sub_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Sub, true),
+    ]))
+}
+fn sub_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Sub, true),
+    ]))
+}
+fn add_div_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Add, false),
+    ]))
+}
+fn add_div_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Add, false),
+    ]))
+}
+fn sub_div_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Sub, false),
+    ]))
+}
+fn sub_div_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Sub, false),
+    ]))
+}
 
 // fldiv instructions are not supported in the macro, so they are defined here.
 fn fldiv_2items(args: HandlerArgs) -> HandlerReturn {

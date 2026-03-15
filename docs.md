@@ -95,6 +95,25 @@ Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are 
 - FLDIV: division, and the result it rounded down (floored).
 - MOV: assignment
 > \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+##### 3.1.2.1.2. Add/Subtract with modifier
+These instructions are utility instructions included to shorten common expressions.
+###### `ADDM`
+Arguments:
+- `ADDM <item> <item> <number>`: Adds the 2nd item multiplied by the number to the 1st item.
+- `ADDM <item> <item> <item> <number>`: Adds the 2nd item and 3rd item together, multiplies their sum by the number, and adds the product to the 1st item.
+
+This instruction performs addition and multiplication within the same tick. Useful for shortening expressions which follow the form of `result = result + operand * modifier`.
+###### `SUBM`
+Arguments:
+- `SUBM <item> <item> <number>`: Subtracts the 2nd item multiplied by the number from the 1st item.
+- `SUBM <item> <item> <item> <number>`: Subtracts the 3rd item from the 2nd item, multiplies their difference by the number, which is then subtracted from the 1st item.
+
+This instruction performs subtraction and multiplication within the same tick. Useful for shortening expressions which follow the form of `result = result - (operand * modifier)`.
+###### `ADDD`/`SUBD`
+These instruction accept the same arguments and do the same thing as their `ADDM`/`SUBM` counterpart, except that the result between the operand and number is division instead of multiplication.  
+Useful for shortening expression which follow the form of:
+- for `ADDD`, `result = result + operand / modifier`
+- for `SUBD`, `result = result - (operand / modifier)`
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
