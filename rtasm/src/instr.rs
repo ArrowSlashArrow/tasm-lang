@@ -1,12 +1,13 @@
 use std::iter;
 
 use gdlib::gdobj::{
-    GDObjConfig, GDObject, Item, ItemType,
+    GDObjConfig, GDObject, Item, ItemType, ZLayer,
     misc::{default_block, text},
     triggers::{
         CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget, Op, RoundMode,
         SignMode, TargetMove, collision_block, collision_trigger, counter_object, item_compare,
-        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, toggle_trigger,
+        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, time_control,
+        toggle_trigger,
     },
 };
 use paste::paste;
@@ -215,6 +216,8 @@ pub const INSTR_SPEC: &[(
         false,
         &[argset!((Group, Group, Number) => fork_random)],
     ),
+    ("TSTART", false, &[argset!((Timer) => tstart)]),
+    ("TSTOP", false, &[argset!((Timer) => tstop)]),
 ];
 
 macro_rules! wrap_objs {
@@ -224,10 +227,11 @@ macro_rules! wrap_objs {
 }
 
 // utils
-fn get_item_spec(item: &TasmValue) -> Option<Item> {
+pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
     match item {
         TasmValue::Counter(c) => Some(Item::Counter(*c)),
         TasmValue::Timer(t) => Some(Item::Timer(*t)),
+        TasmValue::GDItem(i) => Some(*i),
         _ => None,
     }
 }
@@ -677,6 +681,24 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
     )])
 }
 
+/* TIMERS */
+
+fn tstart(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![time_control(
+        &args.cfg,
+        get_item_spec(&args.args[0]).unwrap().id(),
+        false,
+    )]))
+}
+
+fn tstop(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![time_control(
+        &args.cfg,
+        get_item_spec(&args.args[0]).unwrap().id(),
+        true,
+    )]))
+}
+
 /* MEMORY */
 
 fn mptr(args: HandlerArgs) -> HandlerReturn {
@@ -831,7 +853,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let position = args.args[1].to_int().unwrap();
     let msg = args.args[2].to_string().unwrap();
     let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
-    let text_cfg = cfg.clone().scale(0.25, 0.25);
+    let text_cfg = cfg.clone().scale(0.25, 0.25).set_z_layer(ZLayer::T2);
     let spawn_cfg = cfg.clone().touchable(true).multitrigger(true);
 
     Ok(HandlerData::from_objects(vec![

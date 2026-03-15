@@ -7,22 +7,25 @@ _init:
     INITMEM 0,1
 
 fib:
-    ; read the prevous two values
     MREAD
-    MFUNC
-    MOV C1, MEMREG
+    MFUNC           ; read the first number
+    MOV C1, MEMREG  ; save it to C1
+    MPTR 1          ; go to next number
+    MFUNC           ; read
+    ADD MEMREG, C1  ; add previous number to it
 
-    MPTR 1
-    MFUNC
+    MWRITE
+    MPTR 1          ; increment pointer position
+    MFUNC           ; save the new number
 
-    ; write sum
-    ADD MEMREG, C1
-    MWRITE 
-    MPTR 1
-    MFUNC
-    MPTR -1
+    MPTR -1         ; align pointer to last number
 
-    SL fib, PTRPOS, 50
+    ; spawn is pointer position is less than memsize - 1, which is set in _start
+    SL fib, PTRPOS, C2
 
 _start:
+    ; set iteration limit so that the pointer does not escape the memory area
+    MOV C2, MEMSIZE
+    SUB C2, 1
+    ; spawn the fibonacci loop
     SPAWN fib

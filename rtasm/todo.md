@@ -1,12 +1,6 @@
 ## general
 - add flag args: `INSTR <args> | <flags>`
 - add ability to move pointer a dynamic amount with binary splitting
-- aliases todo:
-    - MEMSIZE
-    - POINTS
-    - ATTEMPTS
-    - MAINTIME
-- workflow for pr to run all tests
 - alias command (like #define in c)
     - defines a constant that can be used as an alias
     - cannot overwrite existing aliases (any already defined and any of the default ones)
@@ -14,15 +8,17 @@
         - `external_object` now refers to group 123
     - init only
     - alias is resolved anywhere where mentioned
-- make the release mode toggle actually do something
-    - currently it is ignored and everything is compiled in release anyways
+<!-- - make the release mode toggle actually do something
+    - scrapped due to being unnecessary
+    - someone can make a pr for this if they need it
     - debug (not release) mode:
         - comments are present alongside each routine in the form of text objects
     - release mode:
-        - all labels except for "memory" and routine labels are removed
+        - all labels except for "memory" and routine labels are removed -->
 - add style guidelines to docs
 - refactor error enum with proper formatting via struct fields
-- add group literals
+    - add warning level
+        - warning: modifying ptrpos. this counter should never be modified unless by actually moving the pointer.
 
 ## commands
 ### `TSPAWN`
@@ -32,14 +28,7 @@ internally uses timer trigger
 
 Planned for ~~v0.1.2~~ whenever gdlib gets a time trigger constructor.
 
-###  `TSTART`
-Args: `TSTART <timer>`
-Starts this timer.
-internally uses time ctrl trigger
-### `TSTOP`
-Args `TSTOP <timer>`
-stops this timer.
-internally uses time ctrl trigger
+also, `TINIT`, which is like `TSPAWN`, except the timer starts paused.
 
 ### Routine controls
 * `PAUSE <routine>`: pauses the routine. unpausable via:
@@ -63,7 +52,7 @@ Arguments: `ADDM <item>, <item>, <number>`, `ADDM <item>, <item>, <item>, <numbe
 marker objects that are in the memory structure.  
 could help with moving a pointer to a previous location:
 ```
-MOVEMARKER 1 ; move marker 1 to current location of pointer
+MVMARK 1 ; move marker 1 to current location of pointer
 ; essentially store the current location of the pointer in the marker
 
 MRESET

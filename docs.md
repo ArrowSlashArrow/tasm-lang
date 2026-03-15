@@ -40,7 +40,8 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
-The current version, as of March 14, 2026 is **v0.1.1**. 
+<!-- Version number -->
+The current version, as of March 14, 2026 is **v0.1.2**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -81,16 +82,20 @@ All arithmetic instructions are 1-tick.
 | Argset                   | Result (in the example case of division) | Commands that use it           |
 | ------------------------ | ---------------------------------------- | ------------------------------ |
 | `<item> <number>`        | `item = item / number`                   | ADD, SUB, MUL, DIV, FLDIV, MOV |
-| `<item> <item>`          | `1st item = 1st item / 2nd item`         | ADD, SUB, MUL, DIV, FLDIV, MOV |
+| `<item> <item>`          | `1st item = 1st item / 2nd item`         | ADD, SUB, MUL, DIV, FLDIV, MOV\* |
 | `<item> <item> <number>` | `1st item = 2nd item / number`           | MUL, DIV, FLDIV                |
 | `<item> <item> <item>`   | `1st item = 2nd item / 3rd item`         | MUL, DIV, FLDIV, ADD, SUB      |
-#### Instruction operations
+
+Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are immutable.
+##### Instruction operations
 - ADD: addition
 - SUB: subtraction
 - MUL: multiplication
 - DIV: division
 - FLDIV: division, and the result it rounded down (floored).
-#### 3.1.2.2. Compares
+- MOV: assignment
+> \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+#### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
 Execution timeline:
@@ -189,27 +194,38 @@ Arguments: `MRESET`
 
 Resets the pointer position to 0.  
 Execution time: 1 tick.  
-##### MOV
-Arguments: `MOV <item> <number>`, `MOV <item> <item>`
-
-Copies the value of the second argument to the first argument.  
-Execution time: 1 tick.  
-
 ##### 3.1.2.3.1. Memory safety guarantees
 If the pointer is outside of the memory range \[0, memsize), no memory will be read. This means that nothing will be read from or written to the MEMREG, but the pointer will still move upwards.
 If INITMEM is not called, the default values of each memory cell will remain, which are 0 for both counters and timers.
-#### 3.1.2.4 Miscellaneous
-##### NOP
-Arguments: `NOP`
-
-Does nothing on that tick. Useful for waiting.  
-Execution time: 1 tick.  
+#### 3.1.2.4. Process
 ##### SPAWN
 Arguments: `SPAWN <routine>`
 
-Spawns the corresponding routine.
-Does not pause the current group.  
+Spawns the corresponding routine. Does not pause the current group.  
 Execution time: 1 tick.  
+
+#### 3.1.2.5. Wait
+##### NOP
+Arguments: `NOP`
+
+Does nothing on the tick it is called. Useful for waiting.  
+Execution time: 1 tick.  
+
+#### 3.1.2.6. Time
+##### TSTART
+Arguments: `TSTART <timer>`
+
+Unpauses the specified timer. To start, the timer must have first been started by a time trigger.  
+Execution time: 1 tick.
+
+> There is currently no way to place a time trigger in TASM. The `TSPAWN` command is planned for this, however, it will be added only when GDLib is updated to include a time trigger constructor.
+
+##### TSTOP
+Arguments: `TSTOP <timer>`
+
+Pauses a running timer.  
+Execution time: 1 tick.
+#### 3.1.2.7. Miscellaneous
 ##### PERS
 Arguments: `PERS <item>`
 
@@ -296,9 +312,15 @@ It is also important to recognize that all floats in GD are 32 bits floats. This
 An item literal represents a GD item, most commonly a counter or timer item. It is denoted as such:
 - Counter: `CXXXX`, where `XXXX` represents the ID of the counter. Example: `C123` represents the counter with ID 123.
 - Timer: `TXXXX`, where `XXXX` represents the ID of the timer. Example: `T456` represents the timer with ID 456.
-IDs do not have to be 0-padded, and they should be in decimal form.
+IDs do not have to be 0-padded, and they must be in decimal form. They are only valid if they are in the range [1, 9999]. The same goes for IDs in group literals.   
 Item literals are parsed by first checking for a prefix of either `C` or `T`, and if this is true, the rest of the literal is parsed as a base-10 signed 16-bit integer, since IDs are internally represented as signed 16-bit integers by GD.
-### 3.3.3. Routines
+### 3.3.3. Groups
+Both of the following are interally groups:
+#### 3.3.3.1. Group literals
+Group literals refer to a static group ID. They are written as `g{id}`, where ID is a valid group ID.  
+Group literals are parsed the same way as item literals, except for the prefix.  
+Example: `g123` refers to the group with ID 123.
+#### 3.3.3.2. Routines
 Routines are specified simply by their identifier. Since they are parsed first, any routine name declaration/reference order conflicts are avoided.
 ```
 routine:
@@ -308,12 +330,18 @@ spawner_routine:
 	; spawn the routine here
 	SPAWN routine
 ```
+If the `--group-offset` argument is specified, the groups of each routine will change, which is unlike group literals, since they are static.
 ### 3.3.4. Aliases
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
-As of TASM v0.1.0, the aliases that exist are:
+<!-- Version number -->
+As of TASM v0.1.2, the aliases that exist are:
 - `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
+- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
+- `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
+- `POINTS`: refers to the points counter. This is a built-in item in GD.
+- `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.
 ### 3.3.6. Argsets 
@@ -335,7 +363,8 @@ Below is the specification for all instructions and how many extra groups are us
 | Non-initializer memory command | 0           | none                                                                                   |
 | MALLOC/FMALLOC                 | memsize + 4 | one for the pointer, pointer reset, read and write groups, and one per allocated cell. |
 ## 3.5. Comments
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.1.0. 
+<!-- Version Number -->
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.1.2. 
 ## 3.6. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.

@@ -2,10 +2,10 @@ use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
-    gdobj::{GDObjConfig, GDObject, misc::text},
+    gdobj::{GDObjConfig, GDObject, Item, ItemType, misc::text},
 };
 
-use crate::instr::ioblock;
+use crate::instr::{get_item_spec, ioblock};
 
 pub const ENTRY_POINT: &str = "_start";
 pub const INIT_ROUTINE: &str = "_init";
@@ -34,6 +34,7 @@ pub struct Tasm {
     pub errors: Vec<TasmParseError>,
     pub routine_data: Vec<(usize, String, i16, Vec<(usize, String)>)>,
     pub routine_group_map: Vec<(String, i16)>,
+    pub group_offset: i16,
     pub has_entry_point: bool,
     pub lines: Vec<String>,
     pub mem_end_counter: i16,
@@ -62,6 +63,7 @@ macro_rules! verbose_log {
 pub struct Aliases {
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
+    pub memsize: i16,
 }
 
 impl Aliases {
@@ -69,6 +71,10 @@ impl Aliases {
         match v {
             AliasType::MEMREG => self.memreg.clone(),
             AliasType::PTRPOS => TasmValue::Counter(self.ptrpos_id),
+            AliasType::MEMSIZE => TasmValue::Number(self.memsize as f64),
+            AliasType::ATTEMPTS => TasmValue::GDItem(Item::Attempts),
+            AliasType::MAINTIME => TasmValue::GDItem(Item::MainTime),
+            AliasType::POINTS => TasmValue::GDItem(Item::Points),
         }
     }
 }
@@ -86,14 +92,15 @@ impl Tasm {
         // setup state
         self.aliases.ptrpos_id = self.mem_end_counter;
         let mut level = Level::new(level_name, &"tasm".to_owned(), None, None);
-        self.curr_group = self.routines.len() as i16;
 
         let routine_count = self.routines.len();
+        self.curr_group = routine_count as i16 + self.group_offset + 1;
 
         for routine in self.routines.iter() {
             // setup position variables
             let mut obj_pos = 0.0;
-            let rtn_ypos = 75.0 + (routine.group as f64) * 30.0;
+            // subtracting from group offset ensures that high group IDs are still placed close to y=0
+            let rtn_ypos = 75.0 + ((routine.group - self.group_offset) as f64) * 30.0;
             if self.curr_group > GROUP_LIMIT {
                 self.errors.push(TasmParseError::ExceedsGroupLimit);
                 break;
@@ -130,6 +137,19 @@ impl Tasm {
                     if let None = self.mem_info {
                         self.errors
                             .push(TasmParseError::NonexistentMemoryAccess(instr.line_number));
+                        continue;
+                    }
+                }
+
+                // check that any bad assignments aren't happening
+                if instr._type == InstrType::Arithmetic {
+                    // first argument is always the result
+                    let counter_type = get_item_spec(&instr_args[0]).unwrap().get_type();
+                    if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
+                        self.errors.push(TasmParseError::InvalidAssignment((
+                            instr.line_number,
+                            counter_type,
+                        )));
                         continue;
                     }
                 }
@@ -207,6 +227,7 @@ impl Tasm {
                     // assign to alias map
                     self.aliases.memreg = m.memreg;
                     self.aliases.ptrpos_id = m.ptrpos.to_counter_id().unwrap();
+                    self.aliases.memsize = m.size;
                     // assign aliases themselves
                 }
 
@@ -377,9 +398,11 @@ pub struct Instruction {
 pub enum TasmParseError {
     InvalidInstruction((String, usize)),
     InvalidArguments((String, usize)),
+    InvalidAssignment((usize, ItemType)),
+    BadID((String, usize)),
     BadToken((String, usize)),
     NoEntryPoint,
-    InvalidNumber(String),
+    InvalidNumber((String, String, usize)),
     InvalidGroup(ParseIntError),
     ExceedsGroupLimit,
     InitRoutineSpawnError(usize),
@@ -407,6 +430,12 @@ impl Display for TasmParseError {
             Self::InvalidArguments((reason, line)) => {
                 write!(f, "Invalid arguments on line {}: {reason}", line + 1)
             }
+            Self::InvalidAssignment((line, _type)) => {
+                write!(f, "Cannot assign to {_type:?} on line {}", line + 1)
+            }
+            Self::BadID((msg, line)) => {
+                write!(f, "Bad ID on line {}: {msg}.", line + 1)
+            }
             Self::BadToken((tok, line)) => {
                 write!(
                     f,
@@ -421,8 +450,8 @@ impl Display for TasmParseError {
                     line + 1
                 )
             }
-            Self::InvalidNumber(why) => {
-                write!(f, "Invalid number. {why}")
+            Self::InvalidNumber((why, num, line)) => {
+                write!(f, "Invalid number {num} on line {}. {why}", line + 1)
             }
             Self::InvalidGroup(why) => {
                 write!(f, "Invalid group. {why}")
@@ -465,6 +494,7 @@ impl Display for TasmParseError {
 pub enum TasmValue {
     Counter(i16),
     Timer(i16),
+    GDItem(Item),
     Number(f64),
     Group(i16),
     Alias(AliasType),
@@ -476,6 +506,10 @@ pub enum TasmValue {
 pub enum AliasType {
     MEMREG,
     PTRPOS,
+    MEMSIZE,
+    POINTS,
+    ATTEMPTS,
+    MAINTIME,
 }
 
 #[derive(Debug)]
@@ -489,14 +523,20 @@ impl AliasType {
         match s {
             "MEMREG" => Some(Self::MEMREG),
             "PTRPOS" => Some(Self::PTRPOS),
+            "MEMSIZE" => Some(Self::MEMSIZE),
+            "POINTS" => Some(Self::POINTS),
+            "ATTEMPTS" => Some(Self::ATTEMPTS),
+            "MAINTIME" => Some(Self::MAINTIME),
             _ => None,
         }
     }
 
     pub fn get_type(&self) -> TasmPrimitive {
         match self {
-            Self::MEMREG => TasmPrimitive::Item,
-            Self::PTRPOS => TasmPrimitive::Item,
+            Self::MEMREG | Self::PTRPOS | Self::POINTS | Self::ATTEMPTS | Self::MAINTIME => {
+                TasmPrimitive::Item
+            }
+            Self::MEMSIZE => TasmPrimitive::Number, // cannot be Int, since otherwise it isn;t recognized as a number
         }
     }
 }
@@ -516,61 +556,65 @@ pub enum TasmValueType {
 #[derive(PartialEq, Debug)]
 pub enum TasmPrimitive {
     Item,
+    Timer,  // subset of item
     Number, // also a float.
-    Int,
+    Int,    // subset of number
     Group,
     String,
 }
 
+pub enum ParseErrorType {
+    BadID,
+    TrailingComma,
+    InvalidNumber,
+}
+
 impl TasmValue {
-    pub fn to_value(s: &str) -> Result<Self, TasmParseError> {
+    pub fn to_value(s: &str) -> Result<Self, (ParseErrorType, String)> {
         let mut iter = s.chars();
         let pref = match iter.next() {
             Some(c) => c,
             None => {
                 // there's nothing in this string
-                return Err(TasmParseError::BadToken((
+                return Err((
+                    ParseErrorType::TrailingComma,
                     "Got a 0-length string. Perhaps there is a trailing comma".into(),
-                    0,
-                )));
+                ));
             }
         };
-        let postf = s.chars().last().unwrap();
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
 
         // aliases are parsed before anything
         if let Some(a) = AliasType::to_alias(s) {
             Ok(Self::Alias(a))
-        } else if pref == 'T'
-            && let Ok(n) = remaining_i16
+        } else if (pref == 'T' || pref == 'C' || pref == 'g')
+            && let Ok(id) = remaining_i16
         {
-            return Ok(Self::Timer(n));
-        } else if pref == 'C'
-            && let Ok(n) = remaining_i16
-        {
-            return Ok(Self::Counter(n));
+            // check that the ID is in range
+            if id <= 0 || id > GROUP_LIMIT {
+                return Err((
+                    ParseErrorType::BadID,
+                    format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+                ));
+            }
+            match pref {
+                'T' => Ok(Self::Timer(id)),
+                'C' => Ok(Self::Counter(id)),
+                'g' => Ok(Self::Group(id)),
+                _ => unreachable!(),
+            }
         } else if let Ok(n) = s.parse::<f64>() {
             // sanity checks
             if !n.is_finite() {
-                return Err(TasmParseError::InvalidNumber(
+                return Err((
+                    ParseErrorType::InvalidNumber,
                     "Infinity not allowed.".into(),
                 ));
             } else if n.is_nan() {
-                return Err(TasmParseError::InvalidNumber("NaN not allowed.".into()));
+                return Err((ParseErrorType::InvalidNumber, "NaN not allowed.".into()));
             }
 
-            // if this is an int and postfixed by 'g', consider it a group literal
-            if postf == 'g' {
-                // chop off one char
-                let mut chopped = s.to_string();
-                chopped.pop();
-                match chopped.parse::<i16>() {
-                    Ok(n) => Ok(Self::Group(n)),
-                    Err(e) => Err(TasmParseError::InvalidGroup(e)),
-                }
-            } else {
-                Ok(Self::Number(n))
-            }
+            Ok(Self::Number(n))
         } else {
             Ok(Self::String(s.into()))
         }
@@ -578,8 +622,7 @@ impl TasmValue {
 
     pub fn get_type(&self) -> TasmPrimitive {
         match self {
-            Self::Counter(_) => TasmPrimitive::Item,
-            Self::Timer(_) => TasmPrimitive::Item,
+            Self::Counter(_) | Self::Timer(_) | Self::GDItem(_) => TasmPrimitive::Item,
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
@@ -591,6 +634,14 @@ impl TasmValue {
         match self {
             Self::Number(n) => n.fract() == 0.0,
             Self::Alias(a) => a.get_type() == TasmPrimitive::Int,
+            _ => false,
+        }
+    }
+
+    pub fn is_timer(&self) -> bool {
+        match self {
+            Self::Timer(_) => true,
+            Self::Alias(a) => a.get_type() == TasmPrimitive::Timer,
             _ => false,
         }
     }
@@ -645,6 +696,7 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
         // get_type returns `Number` for a `Number` even if it is an `Int`
         match p {
             TasmPrimitive::Int => arg.is_int(),
+            TasmPrimitive::Timer => arg.is_timer(),
             _ => &arg.get_type() == p,
         }
     }

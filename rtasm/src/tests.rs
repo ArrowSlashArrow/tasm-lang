@@ -100,8 +100,10 @@ tasm_test!("project_euler_1", example);
 tasm_test!("project_euler_2", example);
 tasm_test!("project_euler_6", example);
 tasm_test!("rng", example);
+tasm_test!("aliases", true);
 tasm_test!("all_instructions", true);
 tasm_test!("bad_args", false);
+tasm_test!("bad_assignment", false, compile);
 tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
 tasm_test!("correct", true);
@@ -112,10 +114,12 @@ tasm_test!("init_spawn", false);
 tasm_test!("lowercase", true);
 tasm_test!("multiple_mem", false, compile);
 tasm_test!("multiple_routines", false);
+tasm_test!("negative_ids", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
 tasm_test!("tab_spacing", true);
 tasm_test!("trailing_comma", false);
+tasm_test!("values", true);
 
 #[test]
 fn int_detection() {

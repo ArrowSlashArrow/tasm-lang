@@ -1,0 +1,11 @@
+; This program uses negative IDs, which are not usable inside of GD.
+_init:
+    DISPLAY C-5
+    DISPLAY C-6
+    DISPLAY C1
+
+_start:
+    MOV C-5, 4
+    MOV C-6, 3
+    ADD C-6, C-5
+    MOV C1, C-6
