@@ -1,0 +1,4 @@
+; All timers are items, but not all items are timers
+_start:
+    MOV T1, T2  ; works, since timers are items
+    TSTART C1   ; does not work, since items are not timers

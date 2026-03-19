@@ -44,9 +44,9 @@ struct Args {
     #[arg(long)]
     verbose_logs: bool,
 
-    /// Toggles printing of all errors if the input file is parsed with errors
+    /// Skips exporting the level.
     #[arg(long)]
-    log_errors: bool,
+    no_export: bool,
 
     /// Does not require an entry point to be present in the input file.
     /// Useful for compiling utility programs that don't necessarily contain an entry point.
@@ -73,7 +73,7 @@ fn main() -> Result<(), Error> {
         args.mem_end_counter,
         args.group_offset,
         args.verbose_logs,
-        args.log_errors,
+        true,
         args.no_entry_point,
     ) {
         Ok(t) => t,
@@ -92,15 +92,19 @@ fn main() -> Result<(), Error> {
 
     println!("Encoding level...");
     match tasm.handle_routines(&level_name) {
-        Ok(level) => match args.gmd {
-            true => level.export_to_gmd(&format!("{}.gmd", level_name))?,
-            false => {
-                let mut savefile = Levels::from_local()?;
-                savefile.add_level(level);
-                savefile.export_to_savefile()?;
-                println!("exported to savefile.")
+        Ok(level) => {
+            if !args.no_export {
+                match args.gmd {
+                    true => level.export_to_gmd(&format!("{}.gmd", level_name))?,
+                    false => {
+                        let mut savefile = Levels::from_local()?;
+                        savefile.add_level(level);
+                        savefile.export_to_savefile()?;
+                        println!("exported to savefile.")
+                    }
+                }
             }
-        },
+        }
         Err(e) => {
             show_errors(e, "Unable to compile to level");
         }

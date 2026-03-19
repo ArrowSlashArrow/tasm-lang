@@ -4,10 +4,10 @@ use gdlib::gdobj::{
     GDObjConfig, GDObject, Item, ItemType, ZLayer,
     misc::{default_block, text},
     triggers::{
-        CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget, Op, RoundMode,
-        SignMode, TargetMove, collision_block, collision_trigger, counter_object, item_compare,
-        item_edit, move_trigger, persistent_item, random_trigger, spawn_trigger, time_control,
-        toggle_trigger,
+        ColliderConfig, CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget,
+        Op, RoundMode, SignMode, StopMode, TargetMove, TimeTriggerConfig, collision_block,
+        collision_trigger, counter_object, item_compare, item_edit, move_trigger, persistent_item,
+        random_trigger, spawn_trigger, stop_trigger, time_control, time_trigger, toggle_trigger,
     },
 };
 use paste::paste;
@@ -82,6 +82,38 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item) => arithmetic_2items_sub),
             argset!((Item, Number) => arithmetic_item_num_sub),
             argset!((Item, Item, Item) => arithmetic_3items_sub),
+        ],
+    ),
+    (
+        "ADDM",
+        false,
+        &[
+            argset!((Item, Item, Number) => add_mod_2items_num),
+            argset!((Item, Item, Item, Number) => add_mod_3items_num),
+        ],
+    ),
+    (
+        "SUBM",
+        false,
+        &[
+            argset!((Item, Item, Number) => sub_mod_2items_num),
+            argset!((Item, Item, Item, Number) => sub_mod_3items_num),
+        ],
+    ),
+    (
+        "ADDD",
+        false,
+        &[
+            argset!((Item, Item, Number) => add_div_2items_num),
+            argset!((Item, Item, Item, Number) => add_div_3items_num),
+        ],
+    ),
+    (
+        "SUBD",
+        false,
+        &[
+            argset!((Item, Item, Number) => sub_div_2items_num),
+            argset!((Item, Item, Item, Number) => sub_div_3items_num),
         ],
     ),
     (
@@ -216,8 +248,16 @@ pub const INSTR_SPEC: &[(
         false,
         &[argset!((Group, Group, Number) => fork_random)],
     ),
+    (
+        "TSPAWN",
+        false,
+        &[argset!((Timer, Number, Number, Group) => tspawn)],
+    ),
     ("TSTART", false, &[argset!((Timer) => tstart)]),
     ("TSTOP", false, &[argset!((Timer) => tstop)]),
+    ("PAUSE", false, &[argset!((Group) => pause)]),
+    ("RESUME", false, &[argset!((Group) => resume)]),
+    ("STOP", false, &[argset!((Group) => stop)]),
 ];
 
 macro_rules! wrap_objs {
@@ -329,11 +369,16 @@ fn nop(_args: HandlerArgs) -> HandlerReturn {
 
 fn wait(args: HandlerArgs) -> HandlerReturn {
     // skip specified amount of spaces
-    Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
+    let wait = args.args[0].to_int().unwrap();
+    if wait >= 0 {
+        Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
+    } else {
+        Err(TasmParseError::InvalidWaitAmount((args.line, wait)))
+    }
 }
 
 /* ARITHMETIC */
-
+// even though all functions return one object, they return Vecs for compatibility with the macro.
 fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let result = get_item_spec(&args.args[0]).unwrap();
     let operand = get_item_spec(&args.args[1]).unwrap();
@@ -432,6 +477,88 @@ handlers!((add, sub, mul, div) => arithmetic_3items);
 handlers!((add, sub, mul, div, mov) => arithmetic_item_num);
 handlers!((mul, div) => arithmetic_2items_num);
 
+fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+    let res = get_item_spec(&args.args[0]).unwrap();
+    let op1 = get_item_spec(&args.args[1]).unwrap();
+    let mult = args.args[2].to_float().unwrap();
+    item_edit(
+        &args.cfg,
+        Some(op1),
+        None,
+        res,
+        mult,
+        op,
+        mul,
+        None,
+        RoundMode::None,
+        RoundMode::None,
+        SignMode::None,
+        SignMode::None,
+    )
+}
+fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+    let res = get_item_spec(&args.args[0]).unwrap();
+    let op1 = get_item_spec(&args.args[1]).unwrap();
+    let op2 = get_item_spec(&args.args[2]).unwrap();
+    let mult = args.args[3].to_float().unwrap();
+    item_edit(
+        &args.cfg,
+        Some(op1),
+        Some(op2),
+        res,
+        mult,
+        op,
+        mul,
+        // id op should be the same as assign op
+        Some(op),
+        RoundMode::None,
+        RoundMode::None,
+        SignMode::None,
+        SignMode::None,
+    )
+}
+
+fn add_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Add, true),
+    ]))
+}
+fn add_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Add, true),
+    ]))
+}
+fn sub_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Sub, true),
+    ]))
+}
+fn sub_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Sub, true),
+    ]))
+}
+fn add_div_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Add, false),
+    ]))
+}
+fn add_div_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Add, false),
+    ]))
+}
+fn sub_div_2items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_2items_num(args, Op::Sub, false),
+    ]))
+}
+fn sub_div_3items_num(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![
+        arithmetic_with_mod_3items_num(args, Op::Sub, false),
+    ]))
+}
+
 // fldiv instructions are not supported in the macro, so they are defined here.
 fn fldiv_2items(args: HandlerArgs) -> HandlerReturn {
     wrap_objs!(arithmetic_2items(args, Op::Div, true,))
@@ -473,7 +600,7 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
         .groups([args.curr_group])
-        .set_control_id(spawning_group as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_group); // use auxiliary group for spawn trigger
     // SX rtn, I1, 42
     // args: [Group(n), ]
 
@@ -503,7 +630,7 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
         .groups([args.curr_group])
-        .set_control_id(spawning_group as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_group); // use auxiliary group for spawn trigger
     // SX rtn, I1, 42
     // args: [Group(n), ]
 
@@ -536,14 +663,14 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         .pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .scale(0.33, 0.33)
         .groups([args.curr_group])
-        .set_control_id(spawning_true as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_true); // use auxiliary group for spawn trigger
 
     let spawn_false_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .scale(0.33, 0.33)
         .groups([args.curr_group + 1])
-        .set_control_id(spawning_false as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_false); // use auxiliary group for spawn trigger
     // FX rtn, rtn2, I1, 42
     // args: [Group(n), Group(n), Item, Number]
 
@@ -577,14 +704,14 @@ fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         .pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .scale(0.33, 0.33)
         .groups([args.curr_group])
-        .set_control_id(spawning_true as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_true); // use auxiliary group for spawn trigger
 
     let spawn_false_cfg = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .scale(0.33, 0.33)
         .groups([args.curr_group + 1])
-        .set_control_id(spawning_false as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_false); // use auxiliary group for spawn trigger
     // FX rtn, rtn2, I1, 42
     // args: [Group(n), Group(n), Item, Item]
 
@@ -624,7 +751,7 @@ fn spawn_random(args: HandlerArgs) -> HandlerReturn {
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
         .groups([aux_group])
-        .set_control_id(spawning_group as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_group); // use auxiliary group for spawn trigger
 
     Ok(HandlerData::from_objects(vec![
         random_trigger(&random_cfg, chance, aux_group, 0),
@@ -649,13 +776,13 @@ fn fork_random(args: HandlerArgs) -> HandlerReturn {
         .pos(cfg.pos.0, cfg.pos.1 + 7.5)
         .scale(0.5, 0.5)
         .groups([aux_group1])
-        .set_control_id(spawning_group1 as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_group1); // use auxiliary group for spawn trigger
     let spawn_cfg2 = cfg
         .clone()
         .pos(cfg.pos.0, cfg.pos.1 - 7.5)
         .scale(0.5, 0.5)
         .groups([aux_group2])
-        .set_control_id(spawning_group2 as i32); // use auxiliary group for spawn trigger
+        .set_control_id(spawning_group2); // use auxiliary group for spawn trigger
 
     Ok(HandlerData::from_objects(vec![
         random_trigger(&random_cfg, chance, aux_group1, aux_group2),
@@ -669,7 +796,7 @@ fn fork_random(args: HandlerArgs) -> HandlerReturn {
 
 fn spawn(args: HandlerArgs) -> HandlerReturn {
     let spawning_group = args.args[0].to_group_id().unwrap();
-    let cfg = args.cfg.set_control_id(spawning_group as i32);
+    let cfg = args.cfg.set_control_id(spawning_group);
     wrap_objs!(vec![spawn_trigger(
         &cfg,
         spawning_group,
@@ -679,6 +806,33 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
         true,
         false,
     )])
+}
+
+fn pause(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![stop_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        StopMode::Pause,
+        true,
+    )]))
+}
+
+fn resume(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![stop_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        StopMode::Resume,
+        true,
+    )]))
+}
+
+fn stop(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![stop_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        StopMode::Stop,
+        true,
+    )]))
 }
 
 /* TIMERS */
@@ -696,6 +850,26 @@ fn tstop(args: HandlerArgs) -> HandlerReturn {
         &args.cfg,
         get_item_spec(&args.args[0]).unwrap().id(),
         true,
+    )]))
+}
+
+fn tspawn(args: HandlerArgs) -> HandlerReturn {
+    let timer = args.args[0].to_timer_id().unwrap();
+    let start_time = args.args[1].to_float().unwrap();
+    let stop_time = args.args[2].to_float().unwrap();
+    Ok(HandlerData::from_objects(vec![time_trigger(
+        &args.cfg,
+        TimeTriggerConfig {
+            start_time,
+            stop_time,
+            pause_when_reached: false,
+            time_mod: 1.0,
+            timer_id: timer,
+            ignore_timewarp: false,
+            start_paused: false,
+            dont_override: false,
+        },
+        args.args[3].to_group_id().unwrap(),
     )]))
 }
 
@@ -854,7 +1028,11 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let msg = args.args[2].to_string().unwrap();
     let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
     let text_cfg = cfg.clone().scale(0.25, 0.25).set_z_layer(ZLayer::T2);
-    let spawn_cfg = cfg.clone().touchable(true).multitrigger(true);
+    let spawn_cfg = cfg
+        .clone()
+        .touchable(true)
+        .multitrigger(true)
+        .set_control_id(spawn_group);
 
     Ok(HandlerData::from_objects(vec![
         default_block(&cfg),
@@ -948,12 +1126,8 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
             .scale(0.25, 0.25);
         objs.push(collision_trigger(
             &cfg,
-            collblock_id,
-            ptr_collblock_id,
+            ColliderConfig::two_colliders(collblock_id, ptr_collblock_id),
             item_group,
-            false,
-            false,
-            false,
             true,
             false,
         ));

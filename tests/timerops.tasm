@@ -1,0 +1,17 @@
+; This program uses the three timer instructions: TSTART, TSTOP, and TSPAWN
+_init:
+    DISPLAY T1
+    IOBLOCK stop, 2, stop.
+    IOBLOCK restart, 4, resume
+
+done:
+    MOV T1, 999
+
+_start:
+    TSPAWN T1, 0, 10, done
+
+stop:
+    TSTOP T1
+
+restart:
+    TSTART T1

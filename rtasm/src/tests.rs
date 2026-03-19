@@ -60,14 +60,15 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<fileparse_example _ $file>]() {
-                assert!(lexer::parse_file(
+                let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
                     9999,
                     0,
                     true,
                     true,
                     false
-                ).is_ok())
+                ).unwrap();
+                assert!(res.handle_routines(&String::new()).is_ok())
             }
         }
     };
@@ -77,14 +78,15 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<fileparse_example _ $file>]() {
-                assert!(lexer::parse_file(
+                let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
                     9999,
                     0,
                     true,
                     true,
                     true
-                ).is_ok())
+                ).unwrap();
+                assert!(res.handle_routines(&String::new()).is_ok())
             }
         }
     };
@@ -96,6 +98,7 @@ tasm_test!("incrementer", example);
 tasm_test!("is_c1_prime", example);
 tasm_test!("pointer_test", example);
 tasm_test!("pointer_test1", example);
+tasm_test!("proc_control", example);
 tasm_test!("project_euler_1", example);
 tasm_test!("project_euler_2", example);
 tasm_test!("project_euler_6", example);
@@ -118,6 +121,8 @@ tasm_test!("negative_ids", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
 tasm_test!("tab_spacing", true);
+tasm_test!("timer_not_counter", false);
+tasm_test!("timerops", true);
 tasm_test!("trailing_comma", false);
 tasm_test!("values", true);
 

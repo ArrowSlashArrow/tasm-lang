@@ -41,7 +41,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of March 14, 2026 is **v0.1.2**. 
+The current version, as of March 18, 2026 is **v0.1.3**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -95,6 +95,25 @@ Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are 
 - FLDIV: division, and the result it rounded down (floored).
 - MOV: assignment
 > \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+##### 3.1.2.1.2. Add/Subtract with modifier
+These instructions are utility instructions included to shorten common expressions.
+###### `ADDM`
+Arguments:
+- `ADDM <item> <item> <number>`: Adds the 2nd item multiplied by the number to the 1st item.
+- `ADDM <item> <item> <item> <number>`: Adds the 2nd item and 3rd item together, multiplies their sum by the number, and adds the product to the 1st item.
+
+This instruction performs addition and multiplication within the same tick. Useful for shortening expressions which follow the form of `result = result + operand * modifier`.
+###### `SUBM`
+Arguments:
+- `SUBM <item> <item> <number>`: Subtracts the 2nd item multiplied by the number from the 1st item.
+- `SUBM <item> <item> <item> <number>`: Subtracts the 3rd item from the 2nd item, multiplies their difference by the number, which is then subtracted from the 1st item.
+
+This instruction performs subtraction and multiplication within the same tick. Useful for shortening expressions which follow the form of `result = result - (operand * modifier)`.
+###### `ADDD`/`SUBD`
+These instruction accept the same arguments and do the same thing as their `ADDM`/`SUBM` counterpart, except that the result between the operand and number is division instead of multiplication.  
+Useful for shortening expression which follow the form of:
+- for `ADDD`, `result = result + operand / modifier`
+- for `SUBD`, `result = result - (operand / modifier)`
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
@@ -204,21 +223,51 @@ Arguments: `SPAWN <routine>`
 Spawns the corresponding routine. Does not pause the current group.  
 Execution time: 1 tick.  
 
+##### PAUSE
+Arguments: `PAUSE <routine>`
+
+Pauses the specified routine via a stop trigger.
+> A routine cannot be paused immediately after is it spawned. If it paused this way, the pause will simply be overshadowed by GD. A minimum of one tick is needed between the execution of the first non-wait instruction of the routine and the PAUSE for it to function. 
+Execution time: 1 tick.
+
+##### RESUME
+Arguments: `RESUME <routine>`
+
+Resumes execution of a paused routine via a stop trigger.  
+Execution time: 1 tick.
+
+##### STOP
+Arguments: `STOP <routine>`
+
+Stops the specified routine via a stop trigger. Unlike `PAUSE`, once a routine is stopped with this instruction, it cannot be resumed.
+Execution time: 1 tick.
+
 #### 3.1.2.5. Wait
 ##### NOP
 Arguments: `NOP`
 
-Does nothing on the tick it is called. Useful for waiting.  
+Does nothing on the tick it is called (equivalent to `WAIT 1`). Useful for waiting.  
 Execution time: 1 tick.  
+##### WAIT
+Arguments: `WAIT <int>`
 
+Does nothing for in following n ticks. Effectively a series of `NOP`s.  
+Wait time cannot be negative. The compiler throws an error if it is specified as such. 
+
+Execution time: variable.
 #### 3.1.2.6. Time
+##### TSPAWN
+Arguments: `TSPAWN <timer> <float> <float> <routine>`
+
+Starts the timer at the given time (2nd argument), and spawns the given routine when the timer reaches the target time (3rd argument).  
+The timer can be written to during the period that it is ticking. This is not recommended for usage of timer items as timers.
+
+Execution time: 1 tick.
 ##### TSTART
 Arguments: `TSTART <timer>`
 
-Unpauses the specified timer. To start, the timer must have first been started by a time trigger.  
+Unpauses the specified timer. To be started, the timer must have first been started by a time trigger via `TSPAWN`.  
 Execution time: 1 tick.
-
-> There is currently no way to place a time trigger in TASM. The `TSPAWN` command is planned for this, however, it will be added only when GDLib is updated to include a time trigger constructor.
 
 ##### TSTOP
 Arguments: `TSTOP <timer>`
@@ -237,7 +286,7 @@ Arguments: `DISPLAY <item>`
 Adds a counter object for the corresponding item.  
 Only allowed in the `_init` routine.
 ##### IOBLOCK
-Arguments: `IOBLOCK <group>, <int>, <string>`,
+Arguments: `IOBLOCK <group> <int> <string>`
 
 Places a block at the bottom of the level, at the specified x-position (2nd argument) with an annotation (3rd argument).
 Also places a touchable spawn trigger that spawns the specified group.
@@ -335,7 +384,7 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.1.2, the aliases that exist are:
+As of TASM v0.1.3, the aliases that exist are:
 - `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
 - `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
@@ -343,7 +392,8 @@ As of TASM v0.1.2, the aliases that exist are:
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
-If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.
+If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
+**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be midful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 
@@ -364,7 +414,7 @@ Below is the specification for all instructions and how many extra groups are us
 | MALLOC/FMALLOC                 | memsize + 4 | one for the pointer, pointer reset, read and write groups, and one per allocated cell. |
 ## 3.5. Comments
 <!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.1.2. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.1.3. 
 ## 3.6. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
