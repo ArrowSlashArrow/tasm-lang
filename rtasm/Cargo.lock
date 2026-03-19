@@ -69,15 +69,21 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.100"
+version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
+name = "bitflags"
+version = "2.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
 
 [[package]]
 name = "cc"
@@ -196,12 +202,14 @@ dependencies = [
 
 [[package]]
 name = "gdlib"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a85053836435791148453cf303cdccbc653cfceb3e878b5f0d8f476fb6dde4c0"
+checksum = "1af729f92b94ac99ed3a3a655b48848dced51f272801c70924815413a0ee7696"
 dependencies = [
  "aho-corasick",
+ "anyhow",
  "base64",
+ "bitflags",
  "crc32fast",
  "dtoa",
  "flate2",

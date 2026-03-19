@@ -121,6 +121,8 @@ tasm_test!("negative_ids", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
 tasm_test!("tab_spacing", true);
+tasm_test!("timer_not_counter", false);
+tasm_test!("timerops", true);
 tasm_test!("trailing_comma", false);
 tasm_test!("values", true);
 

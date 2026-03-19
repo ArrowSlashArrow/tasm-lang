@@ -26,7 +26,8 @@ _start:
     FLDIV C1, C2
     MOV C1, C2
 
-    TSTART T1
+    TSPAWN T1, 0, 10, routine1
+    TSTOP T1
     WAIT 1
 
     SE routine1, C1, C2
@@ -47,7 +48,7 @@ _start:
     SRAND routine1, 50
     FRAND routine1, routine2, 50
 
-    TSTOP T1
+    TSTART T1
 
     MREAD
     MPTR 5

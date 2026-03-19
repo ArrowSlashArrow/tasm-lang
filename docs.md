@@ -246,17 +246,28 @@ Execution time: 1 tick.
 ##### NOP
 Arguments: `NOP`
 
-Does nothing on the tick it is called. Useful for waiting.  
+Does nothing on the tick it is called (equivalent to `WAIT 1`). Useful for waiting.  
 Execution time: 1 tick.  
+##### WAIT
+Arguments: `WAIT <int>`
 
+Does nothing for in following n ticks. Effectively a series of `NOP`s.  
+Wait time cannot be negative. The compiler throws an error if it is specified as such. 
+
+Execution time: variable.
 #### 3.1.2.6. Time
+##### TSPAWN
+Arguments: `TSPAWN <timer> <float> <float> <routine>`
+
+Starts the timer at the given time (2nd argument), and spawns the given routine when the timer reaches the target time (3rd argument).  
+The timer can be written to during the period that it is ticking. This is not recommended for usage of timer items as timers.
+
+Execution time: 1 tick.
 ##### TSTART
 Arguments: `TSTART <timer>`
 
-Unpauses the specified timer. To start, the timer must have first been started by a time trigger.  
+Unpauses the specified timer. To be started, the timer must have first been started by a time trigger via `TSPAWN`.  
 Execution time: 1 tick.
-
-> There is currently no way to place a time trigger in TASM. The `TSPAWN` command is planned for this, however, it will be added only when GDLib is updated to include a time trigger constructor.
 
 ##### TSTOP
 Arguments: `TSTOP <timer>`
@@ -275,7 +286,7 @@ Arguments: `DISPLAY <item>`
 Adds a counter object for the corresponding item.  
 Only allowed in the `_init` routine.
 ##### IOBLOCK
-Arguments: `IOBLOCK <group>, <int>, <string>`,
+Arguments: `IOBLOCK <group> <int> <string>`
 
 Places a block at the bottom of the level, at the specified x-position (2nd argument) with an annotation (3rd argument).
 Also places a touchable spawn trigger that spawns the specified group.
@@ -381,7 +392,8 @@ As of TASM v0.1.2, the aliases that exist are:
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
-If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.
+If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
+**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be midful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 
