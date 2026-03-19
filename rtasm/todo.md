@@ -7,8 +7,6 @@
 - `--no-log` flag to disable everything printed to stdout
 
 ## roadmap
-- 0.1.x: foundational releases
-    - core instructions
 - 0.2.x: utility releases
     - instruction flags (v0.2.0)
     - custom aliases (v0.2.1)
@@ -22,13 +20,6 @@
         - optimizations within the compiler itself
 - 0.4.0
     - un-deprecate emulator
-
-## commands
-### `TSPAWN`
-Args: `TSPAWN <timer>, <float>, <float>, <routine>`
-Starts the timer specified at the given time (2nd arg), and when it counts up to the specified time (the second argument), the given routine is called.
-internally uses timer trigger  
-
 
 ### memory markers
 marker objects that are in the memory structure.  
