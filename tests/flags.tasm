@@ -1,3 +1,4 @@
 ; This program runs instructions with flags
 _start:
-    ADD C1, C2 | mod: 1.5, all: floor+
+    ADD C1, C2  | itemmod:1.5 finmode:floor+
+    SPAWN g123  | delay:1.00 remap: {3:4, 5:6, 7:8} 

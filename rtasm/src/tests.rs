@@ -111,7 +111,7 @@ tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
 tasm_test!("correct", true);
 tasm_test!("empty", true);
-tasm_test!("flags", false); // TODO: CHANGE TO TRUE WHEN FLAGS ARE ADDED
+tasm_test!("flags", true);
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
 tasm_test!("lowercase", true);

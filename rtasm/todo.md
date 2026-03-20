@@ -5,6 +5,7 @@
         - warning: modifying ptrpos. this counter should never be modified unless by actually moving the pointer.
 - add logo to repo in assets/
 - `--no-log` flag to disable everything printed to stdout
+- `--objdump` don't compile, but dump all object info once parsed
 
 ## roadmap
 - 0.2.x: utility releases
@@ -96,20 +97,26 @@ ADDM    C3, C1, C2, 0.5 | /= res:r- fin:f+  ; a bit cleaner
 Creating an instruction for each possible combinations would result in 5760 instructions total, which is simply unsistainable.  
 While the flag system is arguably better for this situation, it still needs some work. For example, `res:r-` could be optionally written as `result:round-` or `res:-round` for disambiguation purposes. 
 
+Flags must be formatted in a very specific way:
+- They must all be after one and only one | in the instruction line
+- All flag-value pairs must be separated by whitespace
+- There must not be any space between the identifer, the colon separator, and its value
+    - Dictionary values may contain spaces, but only between the comma and the next value.
+
 #### planned flags
-- `res`: specifies rounding and sign mode of result between ids
+- `resmode`: specifies rounding and sign mode of result between ids
     - accepts a compound string of the following in any order:
         - a `-` or `+`
         - round argument (`r`/`round`, `c`/`ceil`, `f`/`floor`)
-- `fin`: specifies rounding and sign mode of final result
+- `finmode`: specifies rounding and sign mode of final result
     - accepts a compound string of the following in any order:
         - a `-` or `+`
         - round argument (`r`/`round`, `c`/`ceil`, `f`/`floor`)
-- `mod`: sets itemedit modifier
+- `itemmod`: sets itemedit modifier
     - accepts a float which is the mod is set as.
     - overrides `ADDM`/`SUBM` mod if specified.
-- `finop`: compound assignment operator. result is always assigned to unless this flag is specified. 
-- `resop`: operator between IDs.
+- `iter`: compound assignment operator. result is always assigned to unless this flag is specified. 
+- `op`: operator between IDs.
     - accepts one of the following: `+=`, `-=`, `/=`, `*=`
 - `delay`: specifies delay of spawn triggers of this command
     - accepts a float (amount of seconds) for delay.
@@ -118,9 +125,9 @@ While the flag system is arguably better for this situation, it still needs some
     - accepts a dict in the format `{id:remap}`
     - e.g. `remap:{125:126, 200:300}` remaps 125 to 126 and 200 to 300
 - `startpaused` : bool (starts timer paused)
-- `timemod` : float (timemod for timer)
-- `pause_at_end` : pauses timer when the target time is reached
-- `dont_override` : doesnt start timer according to this rule (docs in gdlib::gdobj::triggers::time_trigger) 
+- `tmod` : float (timemod for timer)
+- `tstop` : pauses timer when the target time is reached
+- `nover` : doesnt start timer according to this rule (docs in gdlib::gdobj::triggers::time_trigger) 
 
 ### Concurrent instructions
 Concurrent instructions are isntructions that will be placed on the same x-position,

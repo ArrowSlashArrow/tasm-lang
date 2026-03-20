@@ -2,7 +2,11 @@ use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
-    gdobj::{GDObjConfig, GDObject, Item, ItemType, misc::text},
+    gdobj::{
+        GDObjConfig, GDObject, Item, ItemType,
+        misc::text,
+        triggers::{Op, RoundMode, SignMode},
+    },
 };
 
 use crate::instr::{get_item_spec, ioblock};
@@ -391,7 +395,173 @@ pub struct Instruction {
     pub _type: InstrType,
     pub line_number: usize,
     pub args: Vec<TasmValue>,
+    pub flags: Vec<Flag>,
     pub handler_fn: HandlerFn,
+}
+
+#[derive(Debug, Clone)]
+pub struct Flag {
+    pub ident: String,
+    pub value: FlagValue,
+    pub _type: FlagValueType,
+}
+
+impl Flag {
+    pub fn from(ident: String, val: &str, t: FlagValueType) -> Option<Self> {
+        let value = FlagValue::try_from(val, &t)?;
+
+        Some(Self {
+            value, // TODO: parse to flag round/sign pair
+            ident,
+            _type: t,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FlagValue {
+    RoundSign((RoundMode, SignMode)),
+    Float(f64),
+    Op(Op),
+    Dict(Vec<(i16, i16)>),
+    Bool(bool),
+}
+
+#[derive(Debug, Clone)]
+pub enum FlagValueType {
+    RoundSign,
+    Float,
+    Op,
+    Dict,
+    Bool,
+}
+
+fn string_to_roundsign(s: &str) -> FlagValue {
+    if s == "" {
+        return FlagValue::RoundSign((RoundMode::None, SignMode::None));
+    }
+    /* values have to be formatted like {round}{sign}:
+     * round+   r+
+     * round-   r-
+     * round    r
+     * floor+   f+
+     * floor-   f-
+     * floor    f
+     * ceil+    c+
+     * ceil-    c-
+     * ceil     c
+     * +        +
+     * -        -
+     *
+     * if the roundmode is not a recognized string, it defaults to none.
+     */
+
+    let suf = s.chars().last().unwrap();
+    let mut pref = s.to_owned();
+
+    let sign = match suf {
+        '+' => {
+            pref.pop();
+            SignMode::Absolute
+        }
+        '-' => {
+            pref.pop();
+            SignMode::Negative
+        }
+        _ => SignMode::None,
+    };
+
+    let round = match pref.as_str() {
+        "round" | "r" => RoundMode::Nearest,
+        "ceil" | "c" => RoundMode::Ceiling,
+        "floor" | "f" => RoundMode::Floor,
+        _ => RoundMode::None,
+    };
+
+    FlagValue::RoundSign((round, sign))
+}
+
+impl FlagValue {
+    fn try_from(value: &str, t: &FlagValueType) -> Option<Self> {
+        match t {
+            FlagValueType::RoundSign => Some(string_to_roundsign(value)),
+            FlagValueType::Float => match value.parse::<f64>() {
+                Ok(f) => {
+                    if f.is_finite() {
+                        Some(Self::Float(f))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+            },
+            FlagValueType::Op => match value {
+                "+" => Some(Self::Op(Op::Add)),
+                "-" => Some(Self::Op(Op::Sub)),
+                "*" => Some(Self::Op(Op::Mul)),
+                "/" => Some(Self::Op(Op::Div)),
+                _ => None,
+            },
+            FlagValueType::Dict => {
+                let mut invalid_dict = false;
+                let kv_pairs = &value[1..value.len() - 1]
+                    .split(',')
+                    .map(|kv| {
+                        let mut split = kv.trim().split(':').into_iter();
+                        let key = match split.next().unwrap().parse::<i16>() {
+                            Ok(n) => n,
+                            Err(_) => {
+                                invalid_dict = true;
+                                0
+                            }
+                        };
+                        let value = match split.next() {
+                            Some(v) => match v.parse::<i16>() {
+                                Ok(n) => n,
+                                Err(_) => {
+                                    invalid_dict = true;
+                                    0
+                                }
+                            },
+                            None => {
+                                invalid_dict = true;
+                                0
+                            }
+                        };
+                        (key, value)
+                    })
+                    .collect::<Vec<_>>();
+
+                if invalid_dict {
+                    None
+                } else {
+                    Some(Self::Dict(kv_pairs.to_owned()))
+                }
+            }
+            FlagValueType::Bool => match value {
+                "true" => Some(Self::Bool(true)),
+                "false" => Some(Self::Bool(false)),
+                _ => None,
+            },
+        }
+    }
+}
+
+pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
+    Some(match ident {
+        "resmode" => FlagValueType::RoundSign,
+        "finmode" => FlagValueType::RoundSign,
+        "itemmod" => FlagValueType::Float,
+        "iter" => FlagValueType::Op,
+        "op" => FlagValueType::Op,
+        "delay" => FlagValueType::Float,
+        "remap" => FlagValueType::Dict,
+        "tpaused" => FlagValueType::Bool,
+        "tmod" => FlagValueType::Bool,
+        "tstop" => FlagValueType::Bool,
+        "nover" => FlagValueType::Bool,
+        _ => return None,
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -402,6 +572,7 @@ pub enum TasmParseError {
     InvalidWaitAmount((usize, i32)),
     BadID((String, usize)),
     BadToken((String, usize)),
+    BadFlag((String, usize)),
     NoEntryPoint,
     InvalidNumber((String, String, usize)),
     InvalidGroup(ParseIntError),
@@ -426,6 +597,9 @@ impl Display for TasmParseError {
         match self {
             Self::InvalidInstruction((cmd, line)) => {
                 write!(f, "Bad command: {cmd} on line {}", line + 1)
+            }
+            Self::BadFlag((cmd, line)) => {
+                write!(f, "Bad flag: {cmd} on line {}", line + 1)
             }
             Self::NoEntryPoint => write!(f, "No entry point found. ({ENTRY_POINT} routine)"),
             Self::InvalidArguments((reason, line)) => {
@@ -570,6 +744,7 @@ pub enum TasmPrimitive {
     String,
 }
 
+#[derive(Debug)]
 pub enum ParseErrorType {
     BadID,
     TrailingComma,
