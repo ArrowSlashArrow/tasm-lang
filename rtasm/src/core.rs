@@ -552,6 +552,7 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "resmode" => FlagValueType::RoundSign,
         "finmode" => FlagValueType::RoundSign,
         "itemmod" => FlagValueType::Float,
+        "divmod" => FlagValueType::Bool,
         "iter" => FlagValueType::Op,
         "op" => FlagValueType::Op,
         "delay" => FlagValueType::Float,

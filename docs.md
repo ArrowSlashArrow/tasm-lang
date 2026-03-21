@@ -352,6 +352,23 @@ routine:
 	INSTRUCTION2  ; this is at x=106
 	... ; and so on
 ```
+### 3.2.4 Recursion
+Routines have the ability to call themselves, udner the condition that the instruction that calls the routine from within itself is not the first logical instruction.  
+Be careful about using recursion with routines that have code after they call themselves.
+In the following example:
+```
+routine:
+	MOV C1, C2 				; do something
+	FL routine, cont, C2, 0 ; call this routine recursively
+	PAUSE routine			; wait for this routine to be unpaused for further execution
+	ADD C3, 1
+	RESUME routine			; resume next instance
+cont:
+	; unpause routine
+	RESUME routine
+```
+
+This is dangerous, because the GD runtime does not specify a call stack. Therefore, upon unpausing `routine`, all paused instances of `routine` get release at once, and it is impossible to release all instances of `routine` one at a time, sequentially. 
 ## 3.3. Types of values 
 ### 3.3.1. Number literals
 A number literal is any string that may be parsed as a float. Unless specified to be strictly an integer, all numbers are parsed as double-precision floats (f64).  

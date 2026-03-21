@@ -115,16 +115,17 @@ Flags must be formatted in a very specific way:
 - `itemmod`: sets itemedit modifier
     - accepts a float which is the mod is set as.
     - overrides `ADDM`/`SUBM` mod if specified.
+- `divmod`: divides id result by modulus instead of multiplying it
 - `iter`: compound assignment operator. result is always assigned to unless this flag is specified. 
 - `op`: operator between IDs.
-    - accepts one of the following: `+=`, `-=`, `/=`, `*=`
+    - accepts one of the following: `+`, `-`, `/`, `*`
 - `delay`: specifies delay of spawn triggers of this command
     - accepts a float (amount of seconds) for delay.
     - delay variation will not be supported.
 - `remap`: spawn remap of the spawn trigger. *only* for `SPAWN`.
     - accepts a dict in the format `{id:remap}`
     - e.g. `remap:{125:126, 200:300}` remaps 125 to 126 and 200 to 300
-- `startpaused` : bool (starts timer paused)
+- `tpaused` : bool (starts timer paused)
 - `tmod` : float (timemod for timer)
 - `tstop` : pauses timer when the target time is reached
 - `nover` : doesnt start timer according to this rule (docs in gdlib::gdobj::triggers::time_trigger) 

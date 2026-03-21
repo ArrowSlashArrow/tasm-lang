@@ -120,6 +120,7 @@ tasm_test!("multiple_routines", false);
 tasm_test!("negative_ids", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
+tasm_test!("recursive", true);
 tasm_test!("tab_spacing", true);
 tasm_test!("timer_not_counter", false);
 tasm_test!("timerops", true);
