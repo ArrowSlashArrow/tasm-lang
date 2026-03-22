@@ -23,6 +23,7 @@ Features:
 * Integration with dedicated backend: [GDlib](https://crates.io/crates/gdlib)
 * Fast and versatile compiler
 <br clear="right" />
+
 # Quick Start and Tutorial
 ## SDK Usage Instructions
 To use the current up-to-date SDK, you may do the following:
