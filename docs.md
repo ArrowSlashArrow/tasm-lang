@@ -308,7 +308,8 @@ MREAD/MWRITE set the read mode by toggling on the respective item group and togg
 - MWRITE toggles on the write group and toggles off the read group
 
 #### 3.1.3.1. Initializer instructions
-The following are all initialiser instructions. They all correspond to custom in-level structures:
+All initiazlier instructions correspond to custom in-level structures, which may not necessarily be single triggers. For this reason, they are allowed only as setup instructions.
+Below is a list of instructions and their corresponding structures:
 - `MALLOC`: Creates a block of memory cells with a pointer collision block and a reset block, where each memory cell contains a:
 	- collision block, for detecting the collision between it and the pointer, triggering the execution of the memory function,
 	- item edit trigger for reading the value of this memory cell to the MEMREG, (on the read group),
@@ -316,11 +317,106 @@ The following are all initialiser instructions. They all correspond to custom in
 	- move trigger, for moving the pointer once the collision with this cell's collider is registered,
 	- counter object, for a visual display of the current memory cell's value,
 	- collision trigger, for registering the collision between the pointer and this cell's collider. This object is placed before x=0 so that it is initialised before anything.
-- `FMALLOC`: Like MALLOC, except that all of the memory cells and the MEMREG are timers (floats).
+- `FMALLOC`: Like `MALLOC`, except that all of the memory cells and the MEMREG are timers (floats), hence the `F` in `FMALLOC`.
 - `INITMEM`: A column of item edit triggers that set each memory cell to the given values. Intended to initialise memory with values.
 - `IOBLOCK`: An [IOBlock](#121-ioblock) that is put at y=75 and some specified x-position that acts as a debug group spawn. The x-position is processed such that it translates to a block position, e.g. 5 becomes 5 blocks (+ 2 for margin) to the right of the y-axis, centered on a cell.
 - `PERS`: Adds a persistent item trigger for the specified item.
 - `DISPLAY`: Displays a counter at some specified height and x=0 of the given counter.
+### 3.1.4. Instruction flags
+The function of a given instructions is usually simple/single-purposed, and only uses a handful of parameters within the trigger that it compiles to. However, triggers are remarkably configurable, and in some cases may simplify otherwise needlessly complex setups.  
+A common example is the implementation of getting the absolute value of a number. The old implementation required a comparison of the target (C1) against 0 to determine its sign, which determined whether it should be negatied. This is much more complex and wasteful of groups than simply using the absolute rounding mode.
+  
+Old method:
+```
+to_positive:
+    MUL C1, -1
+  
+absolute:
+    ; check sign
+    ; uses two groups due to being a compare instruction
+    SL to_positive, C1, 0
+```
+  
+New method, with a flag parameter:
+```
+absolute:
+    MOV C1, C1 | resmode:+
+```
+The new method uses only one object in total.  
+
+Flags are intended as supplemental customization options to existing instructions for the purpose of fine-grained adjustments to reduce object and group usage. 
+They are applied with higher priority than the instruction arguments. For example:
+```
+routine:
+	; itemmod is set to 0.4, which overrides 3.0, even if it specified.
+	ADDM C1, C2, 3.0 | itemmod:0.4 
+```
+#### 3.1.4.1. Supported flags
+Flags are written as `flag:value`. The TASM flag parser is very particular, so below are a set of guidelines to follow when passing flags:
+- Flags MUST be written after a `|` in the instruction line. There must only be one pipe character in the line if flags are used.
+	- `ADD C1, C2 | itemmod:0.5` compiles.
+	- `ADD C1, C2 | itemmod:0.5 | round:+` does not compile. 
+- Flag-value pairs must be separated by whitespace. The flag identifier and its value themselves must be separated by a colon, but with no whitespace in between
+	- `... | itemmod:0.5` compiles.
+	- `... | itemmod: 0.5` does not compile.
+	- `... | itemmod: 0.5, ` does not compile.
+	- This only applies if the flag accepts a data type other than Dict. Dicts must be denoted as such:
+		- `... | dict: {a:b, c:d, ...}`
+		- There must be no spacing between the braces and the key/values.
+		- There must be no spacing between the keys/values and the colon separator.
+		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
+		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
+
+> [!NOTE] Flag value types
+> The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
+
+> [!NOTE] Item result
+> "Item result" refers to the intermediate result between the operands in an item edit trigger (used be arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
+> ![Item Result](./img/item_result.png)
+
+| Flag    | Usage                                                                                                 | Instructions | Type       |     |
+| ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- | --- |
+| resmode | Rounding and sign config for the item result                                                          | Arithmetic   | Round/Sign |     |
+| finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |     |
+| itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |     |
+| divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |     |
+| iter    | Compund assignment operator to target item. Akin to `+=`.                                             | Arithmetic   | Operator   |     |
+| op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |     |
+| delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |     |
+| remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |     |
+| tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |     |
+| tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |     |
+| tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |     |
+| nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |     |
+#### 3.1.4.2. Flag types
+##### Round/Sign
+Rounding and sign (absolute/negative) configuration string.  
+Accepted Values:
+- Optional round mode specifier followed by an optional sign mode specified without any spacing between the two.
+- Examples:
+	- `round+`: round and absolute.
+	- `-`: negate, but don't round in any way.
+	- `ceil`: round up to nearest integer, but don't modify the sign. 
+- The sign mode specifier must be after the round mode specifier if both are given.
+
+Round mode specifiers:
+- `round`/`r`: round to nearest integer
+- `ceil`/`c`: round up to nearest integer
+- `floor`/`f`: round down to nearest integer
+
+Sign mode specifiers:
+- `+`: force positive value (absolute)
+- `-`: force negative value (negative absolute)
+##### Float
+Floating point number. Accepts any number that is not NaN or +/-infinity.
+##### Boolean
+`true` or `false`. Must be written as such.
+##### Operator
+One of the four arithmetic operators: `+`, `-`, `*`, or `/`.
+##### Dict
+A dictionary delimited by braces, with key-value pairs separated by commas. Written like:
+- `{123:456}`
+- `{1:2, 3:4, ...}`
 ## 3.2. Routines 
 ### 3.2.1. Routine declaration 
 A routine is declared as such:
