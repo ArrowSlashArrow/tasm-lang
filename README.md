@@ -10,10 +10,11 @@ Documentation can be found [here](docs.md).
 # Overview
 TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of complex programs. 
 
-
 > [!NOTE]
 > Currently, the language is geared more towards traditional programming, which means that the instruction set is currently made mostly of arithmetic, control flow, and memory. There are plans to expand it in the future to a broader instruction set which covers more of the triggers available in the level editor.
-  
+
+<img src="./img/tasm_logo.png" alt="tasm-lang logo" width="200" align="right">
+
 Features:
 * Turing-complete instruction set
 * Optimised trigger placement and group usage
