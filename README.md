@@ -13,9 +13,8 @@ TASM (Trigger Assembly) is a language with assembly-like syntax made specificall
 > [!NOTE]
 > Currently, the language is geared more towards traditional programming, which means that the instruction set is currently made mostly of arithmetic, control flow, and memory. There are plans to expand it in the future to a broader instruction set which covers more of the triggers available in the level editor.
 
-<img src="./img/tasm_logo.png" alt="tasm-lang logo" width="200" align="right">
-
 Features:
+<img src="./img/tasm_logo.png" alt="tasm-lang logo" width="200" align="right">
 * Turing-complete instruction set
 * Optimised trigger placement and group usage
 * Extensive documentation
@@ -23,7 +22,7 @@ Features:
 * Quick compilation to trigger objects
 * Integration with dedicated backend: [GDlib](https://crates.io/crates/gdlib)
 * Fast and versatile compiler
-
+<br clear="right" />
 # Quick Start and Tutorial
 ## SDK Usage Instructions
 To use the current up-to-date SDK, you may do the following:
