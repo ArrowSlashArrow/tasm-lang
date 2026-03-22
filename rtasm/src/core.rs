@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, num::ParseIntError};
+use std::{error::Error, fmt::Display, io::Sink, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,
@@ -190,6 +190,7 @@ impl Tasm {
                     displayed_items: self.displayed_items,
                     routine_count,
                     mem_end_counter: self.mem_end_counter,
+                    flags: instr.flags.clone(),
                     mem_info: self.mem_info.clone(),
                 };
 
@@ -255,14 +256,7 @@ impl Tasm {
                 cfg: GDObjConfig::new(),
                 displayed_items: self.displayed_items,
                 curr_group: self.curr_group,
-                ptr_group: 0,
-                ptr_reset_group: 0,
-                memreg: TasmValue::default(),
-                ptrpos_id: 0,
-                routine_count: 0,
-                mem_end_counter: 0,
-                mem_info: None,
-                line: 0,
+                ..Default::default()
             })
             .unwrap();
 
@@ -314,7 +308,7 @@ impl Routine {
 pub type HandlerReturn = Result<HandlerData, TasmParseError>;
 pub type HandlerFn = fn(HandlerArgs) -> HandlerReturn;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct HandlerArgs {
     /// Arguments to this function. e.g. Counter(C1), Number(2.5)
     pub args: Vec<TasmValue>,
@@ -331,6 +325,7 @@ pub struct HandlerArgs {
     pub mem_end_counter: i16,
     pub routine_count: usize,
     pub mem_info: Option<MemInfo>,
+    pub flags: Vec<Flag>,
     pub line: usize,
 }
 
@@ -481,6 +476,32 @@ fn string_to_roundsign(s: &str) -> FlagValue {
     FlagValue::RoundSign((round, sign))
 }
 
+impl Into<f64> for FlagValue {
+    fn into(self) -> f64 {
+        self.to_float().unwrap()
+    }
+}
+impl Into<bool> for FlagValue {
+    fn into(self) -> bool {
+        self.to_bool().unwrap()
+    }
+}
+impl Into<Op> for FlagValue {
+    fn into(self) -> Op {
+        self.to_op().unwrap()
+    }
+}
+impl Into<Vec<(i16, i16)>> for FlagValue {
+    fn into(self) -> Vec<(i16, i16)> {
+        self.to_dict().unwrap()
+    }
+}
+impl Into<(RoundMode, SignMode)> for FlagValue {
+    fn into(self) -> (RoundMode, SignMode) {
+        self.to_roundsign().unwrap()
+    }
+}
+
 impl FlagValue {
     fn try_from(value: &str, t: &FlagValueType) -> Option<Self> {
         match t {
@@ -545,6 +566,47 @@ impl FlagValue {
             },
         }
     }
+
+    pub fn get_type(&self) -> FlagValueType {
+        match self {
+            Self::Bool(_) => FlagValueType::Bool,
+            Self::Dict(_) => FlagValueType::Dict,
+            Self::Op(_) => FlagValueType::Op,
+            Self::Float(_) => FlagValueType::Float,
+            Self::RoundSign(_) => FlagValueType::RoundSign,
+        }
+    }
+
+    pub fn to_float(&self) -> Option<f64> {
+        match self {
+            Self::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+    pub fn to_dict(&self) -> Option<Vec<(i16, i16)>> {
+        match self {
+            Self::Dict(d) => Some(d.clone()),
+            _ => None,
+        }
+    }
+    pub fn to_roundsign(&self) -> Option<(RoundMode, SignMode)> {
+        match self {
+            Self::RoundSign(f) => Some(*f),
+            _ => None,
+        }
+    }
+    pub fn to_bool(&self) -> Option<bool> {
+        match self {
+            Self::Bool(f) => Some(*f),
+            _ => None,
+        }
+    }
+    pub fn to_op(&self) -> Option<Op> {
+        match self {
+            Self::Op(f) => Some(*f),
+            _ => None,
+        }
+    }
 }
 
 pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
@@ -558,7 +620,7 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "delay" => FlagValueType::Float,
         "remap" => FlagValueType::Dict,
         "tpaused" => FlagValueType::Bool,
-        "tmod" => FlagValueType::Bool,
+        "tmod" => FlagValueType::Float,
         "tstop" => FlagValueType::Bool,
         "nover" => FlagValueType::Bool,
         _ => return None,

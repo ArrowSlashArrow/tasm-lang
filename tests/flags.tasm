@@ -1,5 +1,5 @@
 ; This program runs instructions with flags
 _start:
-    ADD C1, C2  | itemmod:1.5 finmode:floor+ resmode:round- iter:* divmod:true
+    ADD C1, C2  | itemmod:1.5 finmode:floor+ resmode:round- iter:* divmod:true op:-
     SPAWN g123  | delay:1.00 remap: {3:4, 5:6, 7:8} 
     TSPAWN T1, 0.0, 1.0, _start | tpaused:true tstop:true tmod:1.5 nover:false
