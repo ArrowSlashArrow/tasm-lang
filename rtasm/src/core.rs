@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, io::Sink, num::ParseIntError};
+use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use gdlib::{
     gdlevel::Level,

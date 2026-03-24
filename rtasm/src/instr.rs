@@ -1,4 +1,4 @@
-use std::{default, iter};
+use std::iter;
 
 use gdlib::gdobj::{
     GDObjConfig, GDObject, Item, ItemType, ZLayer,
@@ -16,7 +16,7 @@ use paste::paste;
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 use crate::core::{
-    Flag, FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
+    FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
     TasmPrimitive, TasmValue, TasmValueType,
 };
 
@@ -673,6 +673,7 @@ fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
         false,
         true,
         false,
+        vec![],
     )
 }
 
@@ -894,8 +895,7 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
         false,
         true,
         false,
-        // we do NOT have a spawn remap toggle yet unfortunately
-        // gotta wait for the gdlib maintainer to add that
+        get_flag_value(&args, "remap", FlagValue::Dict(vec![])).into()
     )])
 }
 
@@ -1135,6 +1135,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
             false,
             true,
             false,
+            vec![],
         ),
         text(&text_cfg, msg, 0),
     ])

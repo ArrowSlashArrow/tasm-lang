@@ -202,9 +202,9 @@ dependencies = [
 
 [[package]]
 name = "gdlib"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1af729f92b94ac99ed3a3a655b48848dced51f272801c70924815413a0ee7696"
+checksum = "185ff9a26b5681c423dcf6c045437cd1f73a484dd247f59c8efb836cd0ad3930"
 dependencies = [
  "aho-corasick",
  "anyhow",
