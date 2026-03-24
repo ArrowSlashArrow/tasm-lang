@@ -45,12 +45,6 @@ the block at mem pos 0 can also be considered a marker
     - `external_object` now refers to group 123
 - alias is resolved only when mentioned
 
-### flags
-- `remap`: spawn remap of the spawn trigger. *only* for `SPAWN`.
-    - accepts a dict in the format `{id:remap}`
-    - e.g. `remap:{125:126, 200:300}` remaps 125 to 126 and 200 to 300
-    - add when gdlib adds remaps to spawn trigger
-
 ### Concurrent instructions
 Concurrent instructions are isntructions that will be placed on the same x-position,
 so that they will be executed on the same tick with spawn ordered.
