@@ -111,7 +111,7 @@ tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
 tasm_test!("correct", true);
 tasm_test!("empty", true);
-tasm_test!("flags", false); // TODO: CHANGE TO TRUE WHEN FLAGS ARE ADDED
+tasm_test!("flags", true);
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
 tasm_test!("lowercase", true);
@@ -120,6 +120,7 @@ tasm_test!("multiple_routines", false);
 tasm_test!("negative_ids", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
+tasm_test!("recursive", true);
 tasm_test!("tab_spacing", true);
 tasm_test!("timer_not_counter", false);
 tasm_test!("timerops", true);

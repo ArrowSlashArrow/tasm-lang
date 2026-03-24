@@ -1,8 +1,10 @@
-# .tasm
+# .tasm 
+<img src="./img/tasm_logo.png" alt="tasm-lang logo" width="75" align="right">
+
 A computational language that compiles to Geometry Dash trigger objects. Allows you to write complex trigger programs without actually placing triggers.
 Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/wiki/Turbo_Assembler).  
   
-TASM is currently in **version v0.1.3**.  
+TASM is currently in **version v0.2.0**.  
 The working compiler is in the `rtasm/` directory. Note that the compiler is not a standalone executable, and must be executed from source.
 
 Documentation can be found [here](docs.md).
@@ -10,9 +12,9 @@ Documentation can be found [here](docs.md).
 # Overview
 TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of complex programs. 
 
-
+> [!NOTE]
 > Currently, the language is geared more towards traditional programming, which means that the instruction set is currently made mostly of arithmetic, control flow, and memory. There are plans to expand it in the future to a broader instruction set which covers more of the triggers available in the level editor.
-  
+
 Features:
 * Turing-complete instruction set
 * Optimised trigger placement and group usage

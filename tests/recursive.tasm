@@ -1,0 +1,16 @@
+; This program runs itself recursively
+_init:
+    DISPLAY C1
+    DISPLAY C2
+    DISPLAY C3
+
+factorial:
+    MUL C2, C3
+    SUB C3, 1
+    SGE factorial, C3, 1
+
+_start:
+    MOV C1, 8
+    MOV C2, 1   ; store result here
+    MOV C3, C1  ; temp var
+    SPAWN factorial

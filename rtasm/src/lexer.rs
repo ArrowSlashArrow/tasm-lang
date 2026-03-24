@@ -38,8 +38,8 @@
 //! Finally, all instructions are parsed in each group sequentially.
 use crate::{
     core::{
-        ENTRY_POINT, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm, TasmParseError,
-        TasmValue, fits_arg_signature, get_instr_type,
+        ENTRY_POINT, Flag, FlagValueType, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm,
+        TasmParseError, TasmValue, fits_arg_signature, get_flag_type, get_instr_type,
     },
     instr::INSTR_SPEC,
     verbose_log,
@@ -138,20 +138,53 @@ impl Tasm {
         curr_line: usize,
         trimmed_line: &str,
     ) {
+        // determine the arguments and the flags
+        // line is structured like this:
+        // <whitespace> INSTR [...ARGS] [| ...FLAGS]
+
+        let (args_string, flags) = match split_at_char_once(
+            trimmed_line,
+            '|',
+            TasmParseError::InvalidInstruction(("Bad flag arguments".into(), curr_line)),
+        ) {
+            Ok((left, right)) => {
+                if right == "" {
+                    (left, vec![])
+                } else {
+                    let flags_parsed = match parse_flags_str(right, curr_line) {
+                        Ok(flags) => flags,
+                        Err(e) => {
+                            self.errors.push(e);
+                            return;
+                        }
+                    };
+
+                    (left, flags_parsed)
+                }
+            }
+            Err(e) => {
+                self.errors.push(e);
+                return;
+            }
+        };
+
         let instr;
         let args: Vec<TasmValue>;
-        if let Some(pos) = trimmed_line.trim().find(" ") {
-            if trimmed_line.ends_with(',') {
+
+        if let Some(pos) = args_string.trim().find(" ") {
+            if args_string.ends_with(',') {
                 self.errors.push(TasmParseError::TrailingComma(curr_line));
                 return;
             }
 
-            instr = trimmed_line[..pos].to_uppercase();
+            instr = args_string[..pos].to_uppercase();
 
             let mut erroneous_instr = false;
-            args = trimmed_line[pos + 1..]
+            // get all chars after the first space, which separates the instruction and args
+            args = args_string[pos + 1..]
                 .split(',')
                 .filter_map(|v| match TasmValue::to_value(v.trim()) {
+                    // whitespace is stripped when parsing
                     Ok(t) => self.parse_tasm_value(t, curr_line),
                     Err((etype, msg)) => {
                         // error if unable to parse argument value
@@ -179,7 +212,7 @@ impl Tasm {
             }
         } else {
             // no args or extras (everything after | )
-            instr = trimmed_line.to_uppercase();
+            instr = args_string.to_uppercase();
             args = vec![];
         }
 
@@ -221,6 +254,7 @@ impl Tasm {
                     _type: get_instr_type(&instr).unwrap(),
                     line_number: curr_line,
                     args,
+                    flags,
                     handler_fn: handler,
                 });
             }
@@ -326,6 +360,114 @@ impl Tasm {
         // first routine was garbage data, so remove it
         self.routine_data.remove(0);
     }
+}
+
+fn split_at_char_once(
+    instr: &str,
+    ch: char,
+    err: TasmParseError,
+) -> Result<(&str, &str), TasmParseError> {
+    let mut line_split = instr.split(ch).into_iter();
+
+    // the first part is always present, which is guaranteed to be
+    // the string with the instruction and its arguments
+    let left = line_split.next().unwrap();
+
+    let right = if let Some(contents) = line_split.next() {
+        contents
+    } else {
+        ""
+    };
+
+    if let Some(_) = line_split.next() {
+        return Err(err);
+    }
+
+    Ok((left, right))
+}
+
+fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmParseError> {
+    let raw_flags = flags_str.trim().split(' ').into_iter();
+
+    let mut preprocessed = vec![];
+    let mut in_dict = false;
+    let mut dict_ident = String::new();
+    let mut current_dict = String::new();
+
+    // preprocessing, for joining of dicts
+
+    for flag_segment in raw_flags {
+        if in_dict {
+            // disallow spaces between colons, i.e. no 123: 234
+            current_dict.push_str(flag_segment);
+            if flag_segment.ends_with('}') {
+                in_dict = false;
+                preprocessed.push((
+                    dict_ident.clone(),
+                    current_dict.clone(),
+                    FlagValueType::Dict,
+                ));
+            }
+            continue;
+        }
+
+        match split_at_char_once(
+            flag_segment,
+            ':',
+            TasmParseError::BadFlag((flag_segment.to_owned(), curr_line)),
+        ) {
+            Ok((ident, value)) => {
+                match get_flag_type(ident) {
+                    Some(t) => match t {
+                        FlagValueType::Dict => {
+                            // if a dict flag is identified, it is the beginning of the dict
+                            if value.ends_with('}') {
+                                // dict is contained in one segment
+                                preprocessed.push((
+                                    ident.into(),
+                                    value.into(),
+                                    FlagValueType::Dict,
+                                ));
+                                continue;
+                            }
+
+                            // if a dict does not end with a } , it must be in multiple segments
+                            // therefore, the first char must be a { since the rest of the dict
+                            // is in other segments of the iterator.
+                            // we can set the in_dict flag to find the other segments and concatenate them
+                            in_dict = true;
+                            dict_ident = ident.into();
+                            current_dict = value.into();
+                        }
+                        t => preprocessed.push((ident.into(), value.into(), t)),
+                    },
+                    None => {
+                        return Err(TasmParseError::BadFlag((
+                            format!("Unrecognized flag {flag_segment}"),
+                            curr_line,
+                        )));
+                    }
+                }
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    let mut parsed_flags = vec![];
+
+    for (ident, raw_value, t) in preprocessed {
+        match Flag::from(ident.clone(), &raw_value, t.clone()) {
+            Some(flag) => parsed_flags.push(flag),
+            None => {
+                return Err(TasmParseError::BadFlag((
+                    format!("Unable to parse {ident} with value of {raw_value} and type {t:?}"),
+                    curr_line,
+                )));
+            }
+        }
+    }
+
+    Ok(parsed_flags)
 }
 
 pub fn parse_tasm_value(

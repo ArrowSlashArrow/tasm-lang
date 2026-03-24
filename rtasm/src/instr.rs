@@ -16,8 +16,8 @@ use paste::paste;
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 use crate::core::{
-    HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError, TasmPrimitive,
-    TasmValue, TasmValueType,
+    FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
+    TasmPrimitive, TasmValue, TasmValueType,
 };
 
 // convert a list of type identifiers into a slice
@@ -276,6 +276,29 @@ pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
     }
 }
 
+fn get_flag_value(args: &HandlerArgs, ident: &str, default: FlagValue) -> FlagValue {
+    match args.flags.iter().find(|f| f.ident == ident) {
+        Some(flag) => flag.value.clone(),
+        None => default,
+    }
+}
+
+fn get_flag_value_opt(args: &HandlerArgs, ident: &str) -> Option<FlagValue> {
+    args.flags
+        .iter()
+        .find(|f| f.ident == ident)
+        .and_then(|f| Some(f.clone().value))
+}
+
+fn flag_override<T>(item: &mut T, ident: &str, args: &HandlerArgs)
+where
+    FlagValue: Into<T>,
+{
+    if let Some(value) = args.flags.iter().find(|f| f.ident == ident) {
+        *item = value.value.clone().into()
+    }
+}
+
 // Below enums are created for integration with macro.
 
 #[allow(non_camel_case_types)]
@@ -382,93 +405,141 @@ fn wait(args: HandlerArgs) -> HandlerReturn {
 fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let result = get_item_spec(&args.args[0]).unwrap();
     let operand = get_item_spec(&args.args[1]).unwrap();
-    vec![item_edit(
-        &args.cfg,
-        Some(operand),
-        None,
-        result,
-        1.0,
-        op,
-        false,
-        None,
-        RoundMode::None,
+
+    let mut modifier = 1.0;
+    flag_override(&mut modifier, "itemmod", &args);
+
+    let mut resmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (
         if round_res {
             RoundMode::Nearest
         } else {
             RoundMode::None
         },
         SignMode::None,
-        SignMode::None,
+    );
+    flag_override(&mut finmode, "finmode", &args);
+
+    vec![item_edit(
+        &args.cfg,
+        Some(operand),
+        None,
+        result,
+        modifier,
+        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+        !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+            .to_bool()
+            .unwrap(),
+        get_flag_value_opt(&args, "op").and_then(|f| Some(f.to_op().unwrap())),
+        resmode.0,
+        finmode.0,
+        resmode.1,
+        finmode.1,
     )]
 }
 fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let op2 = get_item_spec(&args.args[2]).unwrap();
-    vec![item_edit(
-        &args.cfg,
-        Some(op1),
-        Some(op2),
-        res,
-        1.0,
-        Op::Set,
-        false,
-        Some(op),
-        RoundMode::None,
+
+    let mut modifier = 1.0;
+    flag_override(&mut modifier, "itemmod", &args);
+    let mut resmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (
         if round_res {
             RoundMode::Nearest
         } else {
             RoundMode::None
         },
         SignMode::None,
-        SignMode::None,
+    );
+    flag_override(&mut finmode, "finmode", &args);
+
+    vec![item_edit(
+        &args.cfg,
+        Some(op1),
+        Some(op2),
+        res,
+        modifier,
+        get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
+        !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+            .to_bool()
+            .unwrap(),
+        Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
+        resmode.0,
+        finmode.0,
+        resmode.1,
+        finmode.1,
     )]
 }
 fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     // second arg should always be a number
-    let modifier = args.args[1].to_float().unwrap();
+    let mut modifier = args.args[1].to_float().unwrap();
+    flag_override(&mut modifier, "itemmod", &args);
+    let mut resmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (
+        if round_res {
+            RoundMode::Nearest
+        } else {
+            RoundMode::None
+        },
+        SignMode::None,
+    );
+    flag_override(&mut finmode, "finmode", &args);
+
     vec![item_edit(
         &args.cfg,
         None,
         None,
         res,
         modifier,
-        op,
-        false,
-        None,
-        RoundMode::None,
-        if round_res {
-            RoundMode::Nearest
-        } else {
-            RoundMode::None
-        },
-        SignMode::None,
-        SignMode::None,
+        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+        !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+            .to_bool()
+            .unwrap(),
+        get_flag_value_opt(&args, "op").and_then(|f| Some(f.to_op().unwrap())),
+        resmode.0,
+        finmode.0,
+        resmode.1,
+        finmode.1,
     )]
 }
 fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
-    let mult = args.args[2].to_float().unwrap();
-    vec![item_edit(
-        &args.cfg,
-        Some(op1),
-        None,
-        res,
-        mult,
-        Op::Set,
-        // since we know this is only used for mul and div instructions, this is fine.
-        op == Op::Mul,
-        None,
-        RoundMode::None,
+    let mut modifier = args.args[2].to_float().unwrap();
+    flag_override(&mut modifier, "itemmod", &args);
+    let mut resmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (
         if round_res {
             RoundMode::Nearest
         } else {
             RoundMode::None
         },
         SignMode::None,
-        SignMode::None,
+    );
+    flag_override(&mut finmode, "finmode", &args);
+    vec![item_edit(
+        &args.cfg,
+        Some(op1),
+        None,
+        res,
+        modifier,
+        get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
+        // since we know this is only used for mul and div instructions, this is fine.
+        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Mul))
+            .to_bool()
+            .unwrap(),
+        Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
+        resmode.0,
+        finmode.0,
+        resmode.1,
+        finmode.1,
     )]
 }
 
@@ -480,37 +551,55 @@ handlers!((mul, div) => arithmetic_2items_num);
 fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
-    let mult = args.args[2].to_float().unwrap();
+
+    let mut modifier = args.args[2].to_float().unwrap();
+    flag_override(&mut modifier, "itemmod", &args);
+    let mut resmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut finmode, "finmode", &args);
+
     item_edit(
         &args.cfg,
         Some(op1),
         None,
         res,
-        mult,
-        op,
-        mul,
-        None,
-        RoundMode::None,
-        RoundMode::None,
-        SignMode::None,
-        SignMode::None,
+        modifier,
+        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+        !get_flag_value(&args, "divmod", FlagValue::Bool(mul))
+            .to_bool()
+            .unwrap(),
+        get_flag_value_opt(&args, "op").and_then(|f| Some(f.into())),
+        resmode.0,
+        finmode.0,
+        resmode.1,
+        finmode.1,
     )
 }
 fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let op2 = get_item_spec(&args.args[2]).unwrap();
-    let mult = args.args[3].to_float().unwrap();
+
+    let mut modifier = args.args[3].to_float().unwrap();
+    flag_override(&mut modifier, "itemmod", &args);
+    let mut resmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (RoundMode::None, SignMode::None);
+    flag_override(&mut finmode, "finmode", &args);
+
     item_edit(
         &args.cfg,
         Some(op1),
         Some(op2),
         res,
-        mult,
-        op,
-        mul,
+        modifier,
+        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+        !get_flag_value(&args, "divmod", FlagValue::Bool(mul))
+            .to_bool()
+            .unwrap(),
         // id op should be the same as assign op
-        Some(op),
+        Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
         RoundMode::None,
         RoundMode::None,
         SignMode::None,
@@ -584,6 +673,7 @@ fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
         false,
         true,
         false,
+        vec![],
     )
 }
 
@@ -796,15 +886,16 @@ fn fork_random(args: HandlerArgs) -> HandlerReturn {
 
 fn spawn(args: HandlerArgs) -> HandlerReturn {
     let spawning_group = args.args[0].to_group_id().unwrap();
-    let cfg = args.cfg.set_control_id(spawning_group);
+    let cfg = args.cfg.clone().set_control_id(spawning_group);
     wrap_objs!(vec![spawn_trigger(
         &cfg,
         spawning_group,
-        GROUP_SPAWN_DELAY,
+        get_flag_value(&args, "delay", FlagValue::Float(GROUP_SPAWN_DELAY)).into(),
         0.0,
         false,
         true,
         false,
+        get_flag_value(&args, "remap", FlagValue::Dict(vec![])).into()
     )])
 }
 
@@ -862,12 +953,12 @@ fn tspawn(args: HandlerArgs) -> HandlerReturn {
         TimeTriggerConfig {
             start_time,
             stop_time,
-            pause_when_reached: false,
-            time_mod: 1.0,
+            pause_when_reached: get_flag_value(&args, "tstop", FlagValue::Bool(false)).into(),
+            time_mod: get_flag_value(&args, "tmod", FlagValue::Float(1.0)).into(),
             timer_id: timer,
             ignore_timewarp: false,
-            start_paused: false,
-            dont_override: false,
+            start_paused: get_flag_value(&args, "tpaused", FlagValue::Bool(false)).into(),
+            dont_override: get_flag_value(&args, "nover", FlagValue::Bool(false)).into(),
         },
         args.args[3].to_group_id().unwrap(),
     )]))
@@ -1044,6 +1135,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
             false,
             true,
             false,
+            vec![],
         ),
         text(&text_cfg, msg, 0),
     ])
