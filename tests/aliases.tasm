@@ -1,9 +1,11 @@
 ; This program uses all available aliases.
 _init:
     MALLOC 10
+    ALIAS custom_alias, g123
 
 _start:
     MOV MEMREG, PTRPOS
     MOV POINTS, ATTEMPTS
     MOV T1, MEMSIZE
     ADD T1, MAINTIME
+    SPAWN custom_alias

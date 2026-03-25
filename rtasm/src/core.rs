@@ -52,6 +52,7 @@ pub struct Tasm {
     pub aliases: Aliases,
     pub logs_enabled: bool,
     pub release_mode: bool,
+    pub defined_aliases: Vec<Alias>,
 }
 #[macro_export]
 macro_rules! verbose_log {
@@ -63,22 +64,28 @@ macro_rules! verbose_log {
 }
 
 /// Aliases lookup container
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Aliases {
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
     pub memsize: i16,
+    pub defined: Vec<Alias>,
 }
 
 impl Aliases {
-    pub fn get_value(&self, v: AliasType) -> TasmValue {
-        match v {
-            AliasType::MEMREG => self.memreg.clone(),
-            AliasType::PTRPOS => TasmValue::Counter(self.ptrpos_id),
-            AliasType::MEMSIZE => TasmValue::Number(self.memsize as f64),
-            AliasType::ATTEMPTS => TasmValue::GDItem(Item::Attempts),
-            AliasType::MAINTIME => TasmValue::GDItem(Item::MainTime),
-            AliasType::POINTS => TasmValue::GDItem(Item::Points),
+    pub fn get_value(&self, ident: &str) -> Option<TasmValue> {
+        match ident {
+            "MEMREG" => Some(self.memreg.clone()),
+            "PTRPOS" => Some(TasmValue::Counter(self.ptrpos_id)),
+            "MEMSIZE" => Some(TasmValue::Number(self.memsize as f64)),
+            "ATTEMPTS" => Some(TasmValue::GDItem(Item::Attempts)),
+            "MAINTIME" => Some(TasmValue::GDItem(Item::MainTime)),
+            "POINTS" => Some(TasmValue::GDItem(Item::Points)),
+            id => self
+                .defined
+                .iter()
+                .find(|a| a.ident == id)
+                .and_then(|a| Some(a.value.clone())),
         }
     }
 }
@@ -125,11 +132,23 @@ impl Tasm {
             // starting position of objects: (15, 75 + curr_group * 15)
             for instr in routine.instructions.iter() {
                 let mut instr_args = instr.args.clone();
+
+                let mut check_argset = false;
+
                 instr_args.iter_mut().for_each(|v| {
                     if let TasmValue::Alias(alias) = v {
-                        *v = self.aliases.get_value(alias.clone())
+                        // builtin alias
+                        *v = self.aliases.get_value(alias).unwrap()
+                    } else if let TasmValue::String(s) = v {
+                        // check if this string is an alias
+                        if let Some(a) = self.aliases.defined.iter().find(|a| a.ident == *s) {
+                            *v = a.value.clone();
+                            check_argset = true;
+                        }
                     }
                 });
+
+                // re-check argset if values were replaced
 
                 // check that we are not accessing memory in init routine
                 if instr._type == InstrType::Memory {
@@ -181,8 +200,6 @@ impl Tasm {
                     // these two are set only once a MALLOC instruction is processed
                     // if there is no malloc, there is no memory access allowed
                     // and therefore these fields are never read
-                    // TODO: throw err if any memory ops are used but no memory exists
-                    // TODO: throw err if memory is created more than once (>1 malloc call)
                     // therefore it does not matter if there is junk data in there
                     // since it will either be overwritten or never read
                     memreg: self.aliases.memreg.clone(),
@@ -192,6 +209,7 @@ impl Tasm {
                     mem_end_counter: self.mem_end_counter,
                     flags: instr.flags.clone(),
                     mem_info: self.mem_info.clone(),
+                    aliases: self.aliases.clone(),
                 };
 
                 let data = match handler(args) {
@@ -203,6 +221,11 @@ impl Tasm {
                 };
                 for obj in data.objects.into_iter() {
                     level.add_object(obj);
+                }
+
+                // if there is a new alias, update the alias map to include it
+                if let Some(new) = data.added_alias {
+                    self.aliases.defined.push(new);
                 }
 
                 let skip_spaces = data.skip_spaces;
@@ -327,6 +350,7 @@ pub struct HandlerArgs {
     pub mem_info: Option<MemInfo>,
     pub flags: Vec<Flag>,
     pub line: usize,
+    pub aliases: Aliases,
 }
 
 #[derive(Default)]
@@ -342,6 +366,7 @@ pub struct HandlerData {
     // set in display instr handler to tell the tasm object to bump displays counter
     pub added_item_display: bool,
     pub new_mem: Option<MemInfo>,
+    pub added_alias: Option<Alias>,
 }
 
 impl HandlerData {
@@ -642,6 +667,7 @@ pub enum TasmParseError {
     ExceedsGroupLimit,
     InitRoutineSpawnError(usize),
     MultipleMemoryInstances(usize),
+    MultipleAliasDefinitions((usize, String, TasmValue)),
     InvalidPointerMove(String, usize),
     MultipleRoutineDefintions(String, usize, usize),
     InitRoutineMemoryAccess(usize),
@@ -706,6 +732,12 @@ impl Display for TasmParseError {
             Self::MultipleMemoryInstances(line) => {
                 write!(f, "Multiple memory instances are not allowed: line {line}")
             }
+            Self::MultipleAliasDefinitions((line, alias, value)) => {
+                write!(
+                    f,
+                    "Line {line}: Alias {alias} cannot be reassigned a value, since it already corresponds to {value:?}"
+                )
+            }
             Self::InvalidPointerMove(reason, line) => {
                 write!(f, "{reason} at line {line}.")
             }
@@ -741,46 +773,31 @@ pub enum TasmValue {
     GDItem(Item),
     Number(f64),
     Group(i16),
-    Alias(AliasType),
+    Alias(String), // use ident instead of alias type
     /// Default
     String(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum AliasType {
-    MEMREG,
-    PTRPOS,
-    MEMSIZE,
-    POINTS,
-    ATTEMPTS,
-    MAINTIME,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Alias {
-    pub _type: AliasType,
+    pub ident: String,
     pub value: TasmValue,
 }
 
-impl AliasType {
-    pub fn to_alias(s: &str) -> Option<Self> {
-        match s {
-            "MEMREG" => Some(Self::MEMREG),
-            "PTRPOS" => Some(Self::PTRPOS),
-            "MEMSIZE" => Some(Self::MEMSIZE),
-            "POINTS" => Some(Self::POINTS),
-            "ATTEMPTS" => Some(Self::ATTEMPTS),
-            "MAINTIME" => Some(Self::MAINTIME),
-            _ => None,
+impl Alias {
+    pub fn to_alias(s: &str, v: TasmValue) -> Self {
+        Self {
+            ident: s.to_owned(),
+            value: v, // garbage default value
         }
     }
 
-    pub fn get_type(&self) -> TasmPrimitive {
-        match self {
-            Self::MEMREG | Self::PTRPOS | Self::POINTS | Self::ATTEMPTS | Self::MAINTIME => {
-                TasmPrimitive::Item
-            }
-            Self::MEMSIZE => TasmPrimitive::Number, // cannot be Int, since otherwise it isn;t recognized as a number
+    /// only works for builtin aliases
+    pub fn get_type(&self) -> Option<TasmPrimitive> {
+        match self.ident.as_str() {
+            "MEMREG" | "PTRPOS" | "POINTS" | "ATTEMPTS" | "MAINTIME" => Some(TasmPrimitive::Item),
+            "MEMSIZE" => Some(TasmPrimitive::Number), // cannot be Int, since otherwise it isn;t recognized as a number
+            _ => None,
         }
     }
 }
@@ -805,6 +822,7 @@ pub enum TasmPrimitive {
     Int,    // subset of number
     Group,
     String,
+    Value, // wildcard
 }
 
 #[derive(Debug)]
@@ -812,6 +830,17 @@ pub enum ParseErrorType {
     BadID,
     TrailingComma,
     InvalidNumber,
+}
+
+fn is_builtin_alias(s: &str) -> bool {
+    match s {
+        "MEMREG" | "PTRPOS" | "MEMSIZE" | "POINTS" | "ATTEMPTS" | "MAINTIME" => true,
+        _ => false,
+    }
+}
+
+fn get_builtin_alias_type(s: &str) -> Option<TasmPrimitive> {
+    Alias::to_alias(s, TasmValue::Number(0.0)).get_type()
 }
 
 impl TasmValue {
@@ -830,8 +859,10 @@ impl TasmValue {
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
 
         // aliases are parsed before anything
-        if let Some(a) = AliasType::to_alias(s) {
-            Ok(Self::Alias(a))
+        if is_builtin_alias(s) {
+            // since values are parsed as lexing stage, only builtin ones are available
+            // user-defined aliases are determined at semantic analysis
+            Ok(Self::Alias(s.to_string()))
         } else if (pref == 'T' || pref == 'C' || pref == 'g')
             && let Ok(id) = remaining_i16
         {
@@ -871,14 +902,14 @@ impl TasmValue {
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
-            Self::Alias(a) => a.get_type(),
+            Self::Alias(a) => get_builtin_alias_type(a).unwrap(),
         }
     }
 
     pub fn is_int(&self) -> bool {
         match self {
             Self::Number(n) => n.fract() == 0.0,
-            Self::Alias(a) => a.get_type() == TasmPrimitive::Int,
+            Self::Alias(a) => get_builtin_alias_type(a).unwrap() == TasmPrimitive::Int,
             _ => false,
         }
     }
@@ -886,7 +917,7 @@ impl TasmValue {
     pub fn is_timer(&self) -> bool {
         match self {
             Self::Timer(_) => true,
-            Self::Alias(a) => a.get_type() == TasmPrimitive::Timer,
+            Self::Alias(a) => get_builtin_alias_type(a).unwrap() == TasmPrimitive::Timer,
             _ => false,
         }
     }
@@ -942,6 +973,7 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
         match p {
             TasmPrimitive::Int => arg.is_int(),
             TasmPrimitive::Timer => arg.is_timer(),
+            TasmPrimitive::Value => true,
             // TasmPrimitive::String => true, // everything can be a string
             // ^ can't use this because TasmValue::to_string doesn't support it
             _ => &arg.get_type() == p,
@@ -1003,7 +1035,9 @@ pub fn get_instr_type(ident: &str) -> Option<InstrType> {
         "ADD" | "SUB" | "ADDM" | "SUBM" | "ADDD" | "SUBD" | "MUL" | "DIV" | "FLDIV" | "MOV" => {
             Some(InstrType::Arithmetic)
         }
-        "INITMEM" | "MALLOC" | "FMALLOC" | "PERS" | "DISPLAY" | "IOBLOCK" => Some(InstrType::Init),
+        "INITMEM" | "MALLOC" | "FMALLOC" | "PERS" | "DISPLAY" | "IOBLOCK" | "ALIAS" => {
+            Some(InstrType::Init)
+        }
         "MFUNC" | "MREAD" | "MWRITE" | "MPTR" | "MRESET" => Some(InstrType::Memory),
         "NOP" | "WAIT" => Some(InstrType::Wait),
         "TSPAWN" | "TSTART" | "TSTOP" => Some(InstrType::Timer),
