@@ -894,10 +894,10 @@ impl TasmValue {
             if !n.is_finite() {
                 return Err((
                     ParseErrorType::InvalidNumber,
-                    "Infinity not allowed.".into(),
+                    "Infinity is not allowed.".into(),
                 ));
             } else if n.is_nan() {
-                return Err((ParseErrorType::InvalidNumber, "NaN not allowed.".into()));
+                return Err((ParseErrorType::InvalidNumber, "NaN is not allowed.".into()));
             }
 
             Ok(Self::Number(n))

@@ -2,6 +2,10 @@
 _init:
     MALLOC 10
     ALIAS custom_alias, g123
+    ALIAS rtn, routine
+
+routine:
+    ADD C1, C2
 
 _start:
     MOV MEMREG, PTRPOS
@@ -9,3 +13,4 @@ _start:
     MOV T1, MEMSIZE
     ADD T1, MAINTIME
     SPAWN custom_alias
+    SPAWN rtn

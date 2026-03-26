@@ -52,6 +52,10 @@ struct Args {
     /// Useful for compiling utility programs that don't necessarily contain an entry point.
     #[arg(long)]
     no_entry_point: bool,
+    // /// Disables logging of any kind from the compiler
+    // // currently does nothing
+    // #[arg(long)]
+    // no_log: bool,
 }
 
 fn main() -> Result<(), Error> {
