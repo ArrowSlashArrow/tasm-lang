@@ -1,6 +1,5 @@
 use std::iter;
 
-use anyhow::anyhow;
 use gdlib::gdobj::{
     GDObjConfig, GDObject, Item, ItemType, ZLayer,
     misc::{default_block, text},
@@ -17,7 +16,7 @@ use paste::paste;
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 use crate::core::{
-    Alias, FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
+    FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
     TasmPrimitive, TasmValue, TasmValueType,
 };
 
@@ -259,7 +258,6 @@ pub const INSTR_SPEC: &[(
     ("PAUSE", false, &[argset!((Group) => pause)]),
     ("RESUME", false, &[argset!((Group) => resume)]),
     ("STOP", false, &[argset!((Group) => stop)]),
-    ("ALIAS", true, &[argset!((String, Value) => alias)]),
 ];
 
 macro_rules! wrap_objs {
@@ -1390,22 +1388,4 @@ fn init_mem(args: HandlerArgs) -> HandlerReturn {
     }
 
     Ok(HandlerData::from_objects(objs))
-}
-
-fn alias(args: HandlerArgs) -> HandlerReturn {
-    let alias_ident = args.args[0].to_string().unwrap();
-    let alias_value = args.args[1].clone();
-
-    // this alias already exists if there is a value
-    if let Some(v) = args.aliases.get_value(&alias_ident) {
-        return Err(TasmParseError::MultipleAliasDefinitions((
-            args.line,
-            alias_ident,
-            v,
-        )));
-    }
-
-    let mut data = HandlerData::default().skip_spaces(0);
-    data.added_alias = Some(Alias::to_alias(&alias_ident, alias_value));
-    Ok(data)
 }

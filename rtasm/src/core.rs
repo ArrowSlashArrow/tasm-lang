@@ -52,7 +52,7 @@ pub struct Tasm {
     pub aliases: Aliases,
     pub logs_enabled: bool,
     pub release_mode: bool,
-    pub defined_aliases: Vec<Alias>,
+    pub defined_aliases: Vec<(String, String)>,
 }
 #[macro_export]
 macro_rules! verbose_log {
@@ -69,7 +69,6 @@ pub struct Aliases {
     pub memreg: TasmValue,
     pub ptrpos_id: i16,
     pub memsize: i16,
-    pub defined: Vec<Alias>,
 }
 
 impl Aliases {
@@ -81,11 +80,7 @@ impl Aliases {
             "ATTEMPTS" => Some(TasmValue::GDItem(Item::Attempts)),
             "MAINTIME" => Some(TasmValue::GDItem(Item::MainTime)),
             "POINTS" => Some(TasmValue::GDItem(Item::Points)),
-            id => self
-                .defined
-                .iter()
-                .find(|a| a.ident == id)
-                .and_then(|a| Some(a.value.clone())),
+            _ => None,
         }
     }
 }
@@ -132,23 +127,12 @@ impl Tasm {
             // starting position of objects: (15, 75 + curr_group * 15)
             for instr in routine.instructions.iter() {
                 let mut instr_args = instr.args.clone();
-
-                let mut check_argset = false;
-
                 instr_args.iter_mut().for_each(|v| {
                     if let TasmValue::Alias(alias) = v {
                         // builtin alias
                         *v = self.aliases.get_value(alias).unwrap()
-                    } else if let TasmValue::String(s) = v {
-                        // check if this string is an alias
-                        if let Some(a) = self.aliases.defined.iter().find(|a| a.ident == *s) {
-                            *v = a.value.clone();
-                            check_argset = true;
-                        }
                     }
                 });
-
-                // re-check argset if values were replaced
 
                 // check that we are not accessing memory in init routine
                 if instr._type == InstrType::Memory {
@@ -209,7 +193,6 @@ impl Tasm {
                     mem_end_counter: self.mem_end_counter,
                     flags: instr.flags.clone(),
                     mem_info: self.mem_info.clone(),
-                    aliases: self.aliases.clone(),
                 };
 
                 let data = match handler(args) {
@@ -221,11 +204,6 @@ impl Tasm {
                 };
                 for obj in data.objects.into_iter() {
                     level.add_object(obj);
-                }
-
-                // if there is a new alias, update the alias map to include it
-                if let Some(new) = data.added_alias {
-                    self.aliases.defined.push(new);
                 }
 
                 let skip_spaces = data.skip_spaces;
@@ -350,7 +328,6 @@ pub struct HandlerArgs {
     pub mem_info: Option<MemInfo>,
     pub flags: Vec<Flag>,
     pub line: usize,
-    pub aliases: Aliases,
 }
 
 #[derive(Default)]
@@ -366,7 +343,6 @@ pub struct HandlerData {
     // set in display instr handler to tell the tasm object to bump displays counter
     pub added_item_display: bool,
     pub new_mem: Option<MemInfo>,
-    pub added_alias: Option<Alias>,
 }
 
 impl HandlerData {
@@ -431,7 +407,7 @@ impl Flag {
         let value = FlagValue::try_from(val, &t)?;
 
         Some(Self {
-            value, // TODO: parse to flag round/sign pair
+            value,
             ident,
             _type: t,
         })
@@ -668,8 +644,9 @@ pub enum TasmParseError {
     InitRoutineSpawnError(usize),
     MultipleMemoryInstances(usize),
     MultipleAliasDefinitions((usize, String, TasmValue)),
-    InvalidPointerMove(String, usize),
     MultipleRoutineDefintions(String, usize, usize),
+    NonInitAliasDefinition(usize),
+    InvalidPointerMove(String, usize),
     InitRoutineMemoryAccess(usize),
     NonexistentMemoryAccess(usize),
     TrailingComma(usize),
@@ -736,6 +713,12 @@ impl Display for TasmParseError {
                 write!(
                     f,
                     "Line {line}: Alias {alias} cannot be reassigned a value, since it already corresponds to {value:?}"
+                )
+            }
+            Self::NonInitAliasDefinition(line) => {
+                write!(
+                    f,
+                    "Cannot define an alias on line {line} since it is not in the _init routine."
                 )
             }
             Self::InvalidPointerMove(reason, line) => {
@@ -822,7 +805,6 @@ pub enum TasmPrimitive {
     Int,    // subset of number
     Group,
     String,
-    Value, // wildcard
 }
 
 #[derive(Debug)]
@@ -973,7 +955,6 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
         match p {
             TasmPrimitive::Int => arg.is_int(),
             TasmPrimitive::Timer => arg.is_timer(),
-            TasmPrimitive::Value => true,
             // TasmPrimitive::String => true, // everything can be a string
             // ^ can't use this because TasmValue::to_string doesn't support it
             _ => &arg.get_type() == p,
