@@ -293,6 +293,50 @@ Also places a touchable spawn trigger that spawns the specified group.
 Intended as a debug feature and/or substitute for user input.  
 
 Only allowed in the `_init` routine.
+#### 3.1.2.8. The `ALIAS` instruction
+`ALIAS` is a special instruction that may only be used in the `_init` routine. It is used for defining custom aliases for values.  
+For readability, the following can be rewritten, from: 
+```
+_start:
+	MOV C1, 10
+	MOV C2, 10
+	MOV C3, 10
+```
+to:
+```
+_init:
+	ALIAS start_value, 10
+
+_start:
+	MOV C1, start_value	; becomes MOV C1, 10
+	MOV C2, start_value ; and so on...
+	MOV C3, start_value
+```
+
+This instruction is parsed before any other instruction to build an alias reference table. This is done to be able to resolve the values of referenced aliases when determining types of argsets.  
+Aliases are intended for developers to improve the readability of code that uses common values and reduce the usage of magic values.
+Defined aliases are global and constant and cannot be re-assigned.  
+The instruction takes two arguments as input: `ALIAS <string> <value>`.
+* The string is the identifier of the alias and the identifier by which it must be referred to. Since aliases are parsed before anything else, aliases are resolved regardless of the location of their definiton within the `_init` routine.
+* The value may be of any type. This value is what is inserted when an alias is referenced by its identifier.
+
+```
+_init:
+	ALIAS value, 42
+
+_start:
+	MOV C1, value
+	; becomes:
+	MOV C1, 42
+```
+
+Aliases will not clone values from other aliases:
+```
+_init:
+	ALIAS value, 42		; alias `value` holds 42
+	ALIAS value2, value	; alias `value2` holds "value", NOT 42. 
+```
+
 ### 3.1.3. In-level object representation 
 All arithmetic instructions use a single Item Edit trigger, including MOV.  
 All spawn compare instructions use 2 triggers: one for the Item Compare, to perform the comparison, and one for the group spawner.  

@@ -40,6 +40,7 @@ use crate::{
     core::{
         ENTRY_POINT, Flag, FlagValueType, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm,
         TasmParseError, TasmValue, fits_arg_signature, get_flag_type, get_instr_type,
+        is_builtin_alias,
     },
     instr::INSTR_SPEC,
     verbose_log,
@@ -56,19 +57,20 @@ impl Tasm {
         self.index_routines();
 
         verbose_log!(self, "Finished indexing routines.");
-        verbose_log!(self, "Pushing _init to front of routine data");
 
         if self.routine_data.len() == 0 {
             // there is nothing to parse
             return;
         }
 
+        verbose_log!(self, "Pushing _init to front of routine data");
         // push _init routine to the start to process it before anyting else
         // important to do for alias resolution, since memtype is determined in init.
         if let Some(init_pos) = self.routine_data.iter().position(|r| r.1 == INIT_ROUTINE) {
             let rtn = self.routine_data[init_pos].clone();
             self.routine_data.remove(init_pos);
             self.routine_data.insert(0, rtn);
+            self.get_aliases_from_init();
         }
 
         // error if no entry point
@@ -86,6 +88,58 @@ impl Tasm {
         }
     }
 
+    pub fn get_aliases_from_init(&mut self) {
+        // _init is at idx 0
+        let init_instructions = &self.routine_data[0].3;
+
+        let mut aliases: Vec<(String, String)> = vec![];
+
+        for (line, raw_instr) in init_instructions {
+            if !raw_instr.starts_with("ALIAS ") {
+                continue;
+            }
+            let args = raw_instr.split('|').next().unwrap();
+            let trimmed = args
+                .strip_prefix("ALIAS ")
+                .unwrap()
+                .split(',')
+                .into_iter()
+                .map(|v| v.trim())
+                .collect::<Vec<_>>();
+            if trimmed.len() != 2 {
+                // otherwise, error
+                self.errors.push(TasmParseError::InvalidInstruction((
+                    format!("Instruction ALIAS must only have two arguments: [String, Any]"),
+                    *line,
+                )));
+            }
+
+            if let Ok(v) = TasmValue::to_value(trimmed[0])
+                && let Some(s) = v.to_string()
+            {
+                let err = if let Some(_) = aliases.iter().find(|(a, _)| *a == s) {
+                    TasmParseError::BadAlias((
+                        format!("Cannot override existing alias {s}."),
+                        *line,
+                    ))
+                } else if is_builtin_alias(&s) {
+                    TasmParseError::BadAlias((format!("Cannot override default alias {s}."), *line))
+                } else {
+                    aliases.push((s, trimmed[1].into()));
+                    continue;
+                };
+
+                self.errors.push(err);
+            } else {
+                self.errors.push(TasmParseError::InvalidInstruction((
+                    format!("Bad alias identifier: {}", trimmed[0]),
+                    *line,
+                )));
+            };
+        }
+
+        self.defined_aliases = aliases;
+    }
     pub fn mem_end_counter(mut self, ctr: i16) -> Self {
         self.mem_end_counter = ctr;
         self
@@ -132,6 +186,25 @@ impl Tasm {
         }
     }
 
+    fn parse_raw_value(&mut self, v: &str, curr_line: usize) -> Option<TasmValue> {
+        match TasmValue::to_value(v.trim()) {
+            // whitespace is stripped when parsing
+            Ok(t) => self.parse_tasm_value(t, curr_line),
+            Err((etype, msg)) => {
+                // error if unable to parse argument value
+                self.errors.push(match etype {
+                    ParseErrorType::BadID => TasmParseError::BadID((msg, curr_line)),
+                    ParseErrorType::TrailingComma => TasmParseError::TrailingComma(curr_line),
+                    ParseErrorType::InvalidNumber => {
+                        TasmParseError::InvalidNumber((msg, v.to_string(), curr_line))
+                    }
+                });
+
+                None
+            }
+        }
+    }
+
     pub fn parse_instr_line(
         &mut self,
         curr_routine: &mut Routine,
@@ -169,7 +242,7 @@ impl Tasm {
         };
 
         let instr;
-        let args: Vec<TasmValue>;
+        let mut args: Vec<TasmValue> = vec![];
 
         if let Some(pos) = args_string.trim().find(" ") {
             if args_string.ends_with(',') {
@@ -179,30 +252,35 @@ impl Tasm {
 
             instr = args_string[..pos].to_uppercase();
 
+            // exclude alias instructions (parsed first thing after lexing)
+            if instr.as_str() == "ALIAS" {
+                if curr_routine.ident.as_str() != "_init" {
+                    self.errors
+                        .push(TasmParseError::NonInitAliasDefinition(curr_line));
+                }
+                return;
+            }
+
             let mut erroneous_instr = false;
             // get all chars after the first space, which separates the instruction and args
-            args = args_string[pos + 1..]
+            let mut raw_args = args_string[pos + 1..]
                 .split(',')
-                .filter_map(|v| match TasmValue::to_value(v.trim()) {
-                    // whitespace is stripped when parsing
-                    Ok(t) => self.parse_tasm_value(t, curr_line),
-                    Err((etype, msg)) => {
-                        // error if unable to parse argument value
-                        self.errors.push(match etype {
-                            ParseErrorType::BadID => TasmParseError::BadID((msg, curr_line)),
-                            ParseErrorType::TrailingComma => {
-                                TasmParseError::TrailingComma(curr_line)
-                            }
-                            ParseErrorType::InvalidNumber => {
-                                TasmParseError::InvalidNumber((msg, v.to_string(), curr_line))
-                            }
-                        });
+                .map(|v| v.trim().to_string())
+                .collect::<Vec<_>>();
 
-                        erroneous_instr = true;
-                        None
-                    }
-                })
-                .collect();
+            for raw in raw_args.iter_mut() {
+                // replace if an alias is referenced
+                if let Some((_, raw_val)) = self.defined_aliases.iter().find(|a| a.0 == *raw) {
+                    *raw = raw_val.clone();
+                }
+            }
+
+            for raw in raw_args {
+                match self.parse_raw_value(&raw, curr_line) {
+                    Some(v) => args.push(v),
+                    None => erroneous_instr = true,
+                }
+            }
             if erroneous_instr {
                 verbose_log!(self, "Got bad args.");
                 self.errors.push(TasmParseError::InvalidInstruction((
@@ -213,7 +291,6 @@ impl Tasm {
         } else {
             // no args or extras (everything after | )
             instr = args_string.to_uppercase();
-            args = vec![];
         }
 
         // find the instruction spec which contains arg handlers

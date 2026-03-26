@@ -8,11 +8,13 @@
 
 ## roadmap
 - 0.2.x: utility releases
-    - instruction flags (v0.2.0)
     - custom aliases (v0.2.1)
     - memory improvements (v0.2.2)
         - memory markers
         - dynamic movement of pointer via binary splitting
+    - implement boolean data operations
+        - single-bit logic gates (AND, NOR, XOR, etc.)
+        - branchless item compares 
 - 0.3.x: optimizations update
     - concurrent instructions (v0.3.0)
     - compiler optimizations (v0.3.1)
