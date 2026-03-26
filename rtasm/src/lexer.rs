@@ -38,9 +38,9 @@
 //! Finally, all instructions are parsed in each group sequentially.
 use crate::{
     core::{
-        Alias, ENTRY_POINT, Flag, FlagValueType, INIT_ROUTINE, Instruction, ParseErrorType,
-        Routine, Tasm, TasmParseError, TasmValue, fits_arg_signature, get_flag_type,
-        get_instr_type,
+        ENTRY_POINT, Flag, FlagValueType, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm,
+        TasmParseError, TasmValue, fits_arg_signature, get_flag_type, get_instr_type,
+        is_builtin_alias,
     },
     instr::INSTR_SPEC,
     verbose_log,
@@ -92,7 +92,7 @@ impl Tasm {
         // _init is at idx 0
         let init_instructions = &self.routine_data[0].3;
 
-        let mut aliases = vec![];
+        let mut aliases: Vec<(String, String)> = vec![];
 
         for (line, raw_instr) in init_instructions {
             if !raw_instr.starts_with("ALIAS ") {
@@ -107,15 +107,34 @@ impl Tasm {
                 .map(|v| v.trim())
                 .collect::<Vec<_>>();
             if trimmed.len() != 2 {
-                // TODO: error (bad alias)
+                // otherwise, error
+                self.errors.push(TasmParseError::InvalidInstruction((
+                    format!("Instruction ALIAS must only have two arguments: [String, Any]"),
+                    *line,
+                )));
             }
 
             if let Ok(v) = TasmValue::to_value(trimmed[0])
                 && let Some(s) = v.to_string()
             {
-                aliases.push((s, trimmed[1].into()))
+                let err = if let Some(_) = aliases.iter().find(|(a, _)| *a == s) {
+                    TasmParseError::BadAlias((
+                        format!("Cannot override existing alias {s}."),
+                        *line,
+                    ))
+                } else if is_builtin_alias(&s) {
+                    TasmParseError::BadAlias((format!("Cannot override default alias {s}."), *line))
+                } else {
+                    aliases.push((s, trimmed[1].into()));
+                    continue;
+                };
+
+                self.errors.push(err);
             } else {
-                // TODO: error bad ident
+                self.errors.push(TasmParseError::InvalidInstruction((
+                    format!("Bad alias identifier: {}", trimmed[0]),
+                    *line,
+                )));
             };
         }
 

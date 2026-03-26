@@ -636,6 +636,7 @@ pub enum TasmParseError {
     InvalidWaitAmount((usize, i32)),
     BadID((String, usize)),
     BadToken((String, usize)),
+    BadAlias((String, usize)),
     BadFlag((String, usize)),
     NoEntryPoint,
     InvalidNumber((String, String, usize)),
@@ -666,6 +667,9 @@ impl Display for TasmParseError {
             }
             Self::BadFlag((cmd, line)) => {
                 write!(f, "Bad flag: {cmd} on line {}", line + 1)
+            }
+            Self::BadAlias((cmd, line)) => {
+                write!(f, "Bad alias: {cmd} on line {}", line + 1)
             }
             Self::NoEntryPoint => write!(f, "No entry point found. ({ENTRY_POINT} routine)"),
             Self::InvalidArguments((reason, line)) => {
@@ -814,7 +818,7 @@ pub enum ParseErrorType {
     InvalidNumber,
 }
 
-fn is_builtin_alias(s: &str) -> bool {
+pub fn is_builtin_alias(s: &str) -> bool {
     match s {
         "MEMREG" | "PTRPOS" | "MEMSIZE" | "POINTS" | "ATTEMPTS" | "MAINTIME" => true,
         _ => false,
