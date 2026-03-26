@@ -72,15 +72,14 @@ pub struct Aliases {
 }
 
 impl Aliases {
-    pub fn get_value(&self, ident: &str) -> Option<TasmValue> {
+    pub fn get_value(&self, ident: BuiltinAlias) -> TasmValue {
         match ident {
-            "MEMREG" => Some(self.memreg.clone()),
-            "PTRPOS" => Some(TasmValue::Counter(self.ptrpos_id)),
-            "MEMSIZE" => Some(TasmValue::Number(self.memsize as f64)),
-            "ATTEMPTS" => Some(TasmValue::GDItem(Item::Attempts)),
-            "MAINTIME" => Some(TasmValue::GDItem(Item::MainTime)),
-            "POINTS" => Some(TasmValue::GDItem(Item::Points)),
-            _ => None,
+            BuiltinAlias::MEMREG => self.memreg.clone(),
+            BuiltinAlias::PTRPOS => TasmValue::Counter(self.ptrpos_id),
+            BuiltinAlias::MEMSIZE => TasmValue::Number(self.memsize as f64),
+            BuiltinAlias::ATTEMPTS => TasmValue::GDItem(Item::Attempts),
+            BuiltinAlias::MAINTIME => TasmValue::GDItem(Item::MainTime),
+            BuiltinAlias::POINTS => TasmValue::GDItem(Item::Points),
         }
     }
 }
@@ -130,7 +129,7 @@ impl Tasm {
                 instr_args.iter_mut().for_each(|v| {
                     if let TasmValue::Alias(alias) = v {
                         // builtin alias
-                        *v = self.aliases.get_value(alias).unwrap()
+                        *v = self.aliases.get_value(*alias)
                     }
                 });
 
@@ -760,7 +759,7 @@ pub enum TasmValue {
     GDItem(Item),
     Number(f64),
     Group(i16),
-    Alias(String), // use ident instead of alias type
+    Alias(BuiltinAlias), // use ident instead of alias type
     /// Default
     String(String),
 }
@@ -775,16 +774,45 @@ impl Alias {
     pub fn to_alias(s: &str, v: TasmValue) -> Self {
         Self {
             ident: s.to_owned(),
-            value: v, // garbage default value
+            value: v,
+        }
+    }
+
+    pub fn get_type(&self) -> TasmPrimitive {
+        self.value.get_type()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BuiltinAlias {
+    MEMREG,
+    PTRPOS,
+    POINTS,
+    ATTEMPTS,
+    MAINTIME,
+    MEMSIZE,
+}
+
+impl BuiltinAlias {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "MEMREG" => Some(Self::MEMREG),
+            "PTRPOS" => Some(Self::PTRPOS),
+            "POINTS" => Some(Self::POINTS),
+            "ATTEMPTS" => Some(Self::ATTEMPTS),
+            "MAINTIME" => Some(Self::MAINTIME),
+            "MEMSIZE" => Some(Self::MEMSIZE),
+            _ => None,
         }
     }
 
     /// only works for builtin aliases
-    pub fn get_type(&self) -> Option<TasmPrimitive> {
-        match self.ident.as_str() {
-            "MEMREG" | "PTRPOS" | "POINTS" | "ATTEMPTS" | "MAINTIME" => Some(TasmPrimitive::Item),
-            "MEMSIZE" => Some(TasmPrimitive::Number), // cannot be Int, since otherwise it isn;t recognized as a number
-            _ => None,
+    pub fn get_type(&self) -> TasmPrimitive {
+        match self {
+            Self::MEMREG | Self::PTRPOS | Self::POINTS | Self::ATTEMPTS | Self::MAINTIME => {
+                TasmPrimitive::Item
+            }
+            Self::MEMSIZE => TasmPrimitive::Number, // cannot be Int, since otherwise it isn;t recognized as a number
         }
     }
 }
@@ -825,10 +853,6 @@ pub fn is_builtin_alias(s: &str) -> bool {
     }
 }
 
-fn get_builtin_alias_type(s: &str) -> Option<TasmPrimitive> {
-    Alias::to_alias(s, TasmValue::Number(0.0)).get_type()
-}
-
 impl TasmValue {
     pub fn to_value(s: &str) -> Result<Self, (ParseErrorType, String)> {
         let mut iter = s.chars();
@@ -845,10 +869,10 @@ impl TasmValue {
         let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
 
         // aliases are parsed before anything
-        if is_builtin_alias(s) {
+        if let Some(a) = BuiltinAlias::from_str(s) {
             // since values are parsed as lexing stage, only builtin ones are available
             // user-defined aliases are determined at semantic analysis
-            Ok(Self::Alias(s.to_string()))
+            Ok(Self::Alias(a))
         } else if (pref == 'T' || pref == 'C' || pref == 'g')
             && let Ok(id) = remaining_i16
         {
@@ -888,14 +912,14 @@ impl TasmValue {
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
-            Self::Alias(a) => get_builtin_alias_type(a).unwrap(),
+            Self::Alias(a) => a.get_type(),
         }
     }
 
     pub fn is_int(&self) -> bool {
         match self {
             Self::Number(n) => n.fract() == 0.0,
-            Self::Alias(a) => get_builtin_alias_type(a).unwrap() == TasmPrimitive::Int,
+            Self::Alias(a) => a.get_type() == TasmPrimitive::Int,
             _ => false,
         }
     }
@@ -903,7 +927,7 @@ impl TasmValue {
     pub fn is_timer(&self) -> bool {
         match self {
             Self::Timer(_) => true,
-            Self::Alias(a) => get_builtin_alias_type(a).unwrap() == TasmPrimitive::Timer,
+            Self::Alias(a) => a.get_type() == TasmPrimitive::Timer,
             _ => false,
         }
     }
