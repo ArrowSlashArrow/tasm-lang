@@ -8,10 +8,10 @@
 
 ## roadmap
 - 0.2.x: utility releases
-    - custom aliases (v0.2.1)
     - memory improvements (v0.2.2)
-        - memory markers
-        - dynamic movement of pointer via binary splitting
+        - refactor memory to be more group efficient
+        - refactor should also include being able to look up memory from any address
+        - possibly retain legacy memory as compiler option
     - implement boolean data operations
         - single-bit logic gates (AND, NOR, XOR, etc.)
         - branchless item compares 
@@ -39,13 +39,6 @@ MFUNC ; read it
 MPTR M1 ; move pointer back to marker
 ```
 the block at mem pos 0 can also be considered a marker  
-
-### `ALIAS` (init-only)
-- defines a constant that can be used as an alias
-- cannot overwrite existing aliases (any already defined and any of the default ones)
-- e.g. `ALIAS external_object, g123`
-    - `external_object` now refers to group 123
-- alias is resolved only when mentioned
 
 ### Concurrent instructions
 Concurrent instructions are isntructions that will be placed on the same x-position,
