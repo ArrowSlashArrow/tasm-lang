@@ -142,7 +142,7 @@ impl Tasm {
                             .push(TasmParseError::InitRoutineMemoryAccess(instr.line_number));
                         continue;
                     }
-                    if let None = self.mem_info {
+                    if self.mem_info.is_none() {
                         self.errors
                             .push(TasmParseError::NonexistentMemoryAccess(instr.line_number));
                         continue;
@@ -232,7 +232,7 @@ impl Tasm {
 
                 if let Some(m) = data.new_mem {
                     // check that memory does not already exist
-                    if let Some(_) = self.mem_info {
+                    if self.mem_info.is_some() {
                         self.errors
                             .push(TasmParseError::MultipleMemoryInstances(instr.line_number));
                         continue;
@@ -278,7 +278,7 @@ impl Tasm {
             }
         }
 
-        if self.errors.len() > 0 {
+        if !self.errors.is_empty() {
             Err(self.errors.clone())
         } else {
             Ok(level)
@@ -360,7 +360,7 @@ impl HandlerData {
     #[inline(always)]
     pub fn default() -> Self {
         Self {
-            skip_spaces: 1, // always advance one space
+            skip_spaces: 1, // advance one space by default
             ..Default::default()
         }
     }
@@ -445,7 +445,7 @@ pub enum FlagValueType {
 }
 
 fn string_to_roundsign(s: &str) -> FlagValue {
-    if s == "" {
+    if s.is_empty() {
         return FlagValue::RoundSign((RoundMode::None, SignMode::None));
     }
     /* values have to be formatted like {round}{sign}:
@@ -489,29 +489,29 @@ fn string_to_roundsign(s: &str) -> FlagValue {
     FlagValue::RoundSign((round, sign))
 }
 
-impl Into<f64> for FlagValue {
-    fn into(self) -> f64 {
-        self.to_float().unwrap()
+impl From<FlagValue> for f64 {
+    fn from(val: FlagValue) -> Self {
+        val.to_float().unwrap()
     }
 }
-impl Into<bool> for FlagValue {
-    fn into(self) -> bool {
-        self.to_bool().unwrap()
+impl From<FlagValue> for bool {
+    fn from(val: FlagValue) -> Self {
+        val.to_bool().unwrap()
     }
 }
-impl Into<Op> for FlagValue {
-    fn into(self) -> Op {
-        self.to_op().unwrap()
+impl From<FlagValue> for Op {
+    fn from(val: FlagValue) -> Self {
+        val.to_op().unwrap()
     }
 }
-impl Into<Vec<(i16, i16)>> for FlagValue {
-    fn into(self) -> Vec<(i16, i16)> {
-        self.to_dict().unwrap()
+impl From<FlagValue> for Vec<(i16, i16)> {
+    fn from(val: FlagValue) -> Self {
+        val.to_dict().unwrap()
     }
 }
-impl Into<(RoundMode, SignMode)> for FlagValue {
-    fn into(self) -> (RoundMode, SignMode) {
-        self.to_roundsign().unwrap()
+impl From<FlagValue> for (RoundMode, SignMode) {
+    fn from(val: FlagValue) -> Self {
+        val.to_roundsign().unwrap()
     }
 }
 
@@ -541,7 +541,7 @@ impl FlagValue {
                 let kv_pairs = &value[1..value.len() - 1]
                     .split(',')
                     .map(|kv| {
-                        let mut split = kv.trim().split(':').into_iter();
+                        let mut split = kv.trim().split(':');
                         let key = match split.next().unwrap().parse::<i16>() {
                             Ok(n) => n,
                             Err(_) => {
@@ -807,7 +807,7 @@ pub enum BuiltinAlias {
 }
 
 impl BuiltinAlias {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_ident(s: &str) -> Option<Self> {
         match s {
             "MEMREG" => Some(Self::MEMREG),
             "PTRPOS" => Some(Self::PTRPOS),
@@ -860,10 +860,10 @@ pub enum ParseErrorType {
 }
 
 pub fn is_builtin_alias(s: &str) -> bool {
-    match s {
-        "MEMREG" | "PTRPOS" | "MEMSIZE" | "POINTS" | "ATTEMPTS" | "MAINTIME" => true,
-        _ => false,
-    }
+    matches!(
+        s,
+        "MEMREG" | "PTRPOS" | "MEMSIZE" | "POINTS" | "ATTEMPTS" | "MAINTIME"
+    )
 }
 
 impl TasmValue {
@@ -879,10 +879,10 @@ impl TasmValue {
                 ));
             }
         };
-        let remaining_i16 = iter.into_iter().collect::<String>().parse::<i16>();
+        let remaining_i16 = iter.collect::<String>().parse::<i16>();
 
         // aliases are parsed before anything
-        if let Some(a) = BuiltinAlias::from_str(s) {
+        if let Some(a) = BuiltinAlias::from_ident(s) {
             // since values are parsed as lexing stage, only builtin ones are available
             // user-defined aliases are determined at semantic analysis
             Ok(Self::Alias(a))
@@ -988,7 +988,7 @@ impl TasmValue {
     }
 }
 
-pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool {
+pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
     // helper fn
     fn check_primitive(p: &TasmPrimitive, arg: &TasmValue) -> bool {
         // check if an int is required here
@@ -1002,11 +1002,11 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
         }
     }
     match sig.len() {
-        0 => args.len() == 0,
+        0 => args.is_empty(),
         1 => match &sig[0] {
             TasmValueType::List(l_type) => {
                 // check that all arguments are of the type in the list
-                args.iter().all(|arg| check_primitive(&l_type, arg))
+                args.iter().all(|arg| check_primitive(l_type, arg))
             }
             TasmValueType::Primitive(p) => {
                 if args.len() != 1 {
@@ -1033,7 +1033,7 @@ pub fn fits_arg_signature(args: &Vec<TasmValue>, sig: &[TasmValueType]) -> bool 
                 }
             }
 
-            return true;
+            true
         }
     }
 }

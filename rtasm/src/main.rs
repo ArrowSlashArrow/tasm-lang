@@ -99,7 +99,7 @@ fn main() -> Result<(), Error> {
         Ok(level) => {
             if !args.no_export {
                 match args.gmd {
-                    true => level.export_to_gmd(&format!("{}.gmd", level_name))?,
+                    true => level.export_to_gmd(format!("{}.gmd", level_name))?,
                     false => {
                         let mut savefile = Levels::from_local()?;
                         savefile.add_level(level);

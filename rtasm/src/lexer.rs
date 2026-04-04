@@ -62,7 +62,7 @@ impl Tasm {
 
         verbose_log!(self, "Finished indexing routines.");
 
-        if self.routine_data.len() == 0 {
+        if self.routine_data.is_empty() {
             // there is nothing to parse
             return;
         }
@@ -85,7 +85,7 @@ impl Tasm {
         verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
 
-        if self.errors.len() > 0 {
+        if !self.errors.is_empty() {
             verbose_log!(self, "Parsed file with {} errors.", self.errors.len());
         } else {
             verbose_log!(self, "Parsed file successfully with 0 errors.")
@@ -107,13 +107,12 @@ impl Tasm {
                 .strip_prefix("ALIAS ")
                 .unwrap()
                 .split(',')
-                .into_iter()
                 .map(|v| v.trim())
                 .collect::<Vec<_>>();
             if trimmed.len() != 2 {
                 // otherwise, error
                 self.errors.push(TasmParseError::InvalidInstruction((
-                    format!("Instruction ALIAS must only have two arguments: [String, Any]"),
+                    "Instruction ALIAS must only have two arguments: [String, Any]".to_string(),
                     *line,
                 )));
             }
@@ -121,7 +120,7 @@ impl Tasm {
             if let Ok(v) = TasmValue::to_value(trimmed[0])
                 && let Some(s) = v.to_string()
             {
-                let err = if let Some(_) = aliases.iter().find(|(a, _)| *a == s) {
+                let err = if aliases.iter().any(|(a, _)| *a == s) {
                     TasmParseError::BadAlias((
                         format!("Cannot override existing alias {s}."),
                         *line,
@@ -163,7 +162,7 @@ impl Tasm {
                             INIT_PLACEHOLDER_GROUP => 0,
                             g => g,
                         })
-                        .ident(&ident), // routine object
+                        .ident(ident), // routine object
                 )
             })
             .collect();
@@ -172,7 +171,7 @@ impl Tasm {
             let prev_err_count = self.errors.len();
             for (curr_line, line) in lines {
                 let trimmed_line = line.trim();
-                if trimmed_line == "" {
+                if trimmed_line.is_empty() {
                     continue; // skip blank line
                 }
 
@@ -225,7 +224,7 @@ impl Tasm {
             TasmParseError::InvalidInstruction(("Bad flag arguments".into(), curr_line)),
         ) {
             Ok((left, right)) => {
-                if right == "" {
+                if right.is_empty() {
                     (left, vec![])
                 } else {
                     let flags_parsed = match parse_flags_str(right, curr_line) {
@@ -257,9 +256,9 @@ impl Tasm {
             }
 
             let instr_raw = args_string[..pos].to_uppercase();
-            if instr_raw.starts_with('~') {
+            if let Some(stripped) = instr_raw.strip_prefix('~') {
                 is_concurrent = true;
-                instr = instr_raw[1..].to_string();
+                instr = stripped.to_string();
             } else {
                 is_concurrent = false;
                 instr = instr_raw;
@@ -304,9 +303,9 @@ impl Tasm {
         } else {
             // no args or extras (everything after | )
             let instr_raw = args_string.to_uppercase();
-            if instr_raw.starts_with('~') {
+            if let Some(stripped) = instr_raw.strip_prefix('~') {
                 is_concurrent = true;
-                instr = instr_raw[1..].to_string();
+                instr = stripped.to_string();
             } else {
                 is_concurrent = false;
                 instr = instr_raw;
@@ -342,7 +341,7 @@ impl Tasm {
         match handlers
             .iter()
             .find(|&(sig, _)| fits_arg_signature(&args, sig))
-            .and_then(|v| Some(v.1))
+            .map(|v| v.1)
         {
             Some(handler) => {
                 // finally, add instruction to routine
@@ -465,19 +464,15 @@ fn split_at_char_once(
     ch: char,
     err: TasmParseError,
 ) -> Result<(&str, &str), TasmParseError> {
-    let mut line_split = instr.split(ch).into_iter();
+    let mut line_split = instr.split(ch);
 
     // the first part is always present, which is guaranteed to be
     // the string with the instruction and its arguments
     let left = line_split.next().unwrap();
 
-    let right = if let Some(contents) = line_split.next() {
-        contents
-    } else {
-        ""
-    };
+    let right = line_split.next().unwrap_or_default();
 
-    if let Some(_) = line_split.next() {
+    if line_split.next().is_some() {
         return Err(err);
     }
 
@@ -485,7 +480,7 @@ fn split_at_char_once(
 }
 
 fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmParseError> {
-    let raw_flags = flags_str.trim().split(' ').into_iter();
+    let raw_flags = flags_str.trim().split(' ');
 
     let mut preprocessed = vec![];
     let mut in_dict = false;
@@ -570,7 +565,7 @@ fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmP
 
 pub fn parse_tasm_value(
     t: TasmValue,
-    routine_group_map: &Vec<(String, i16)>,
+    routine_group_map: &[(String, i16)],
     errors: &mut Vec<TasmParseError>,
     curr_line: usize,
 ) -> Option<TasmValue> {
@@ -579,7 +574,7 @@ pub fn parse_tasm_value(
         match routine_group_map
             .iter()
             .find(|(ident, _)| *ident == s)
-            .and_then(|data| Some(data.1))
+            .map(|data| data.1)
         {
             Some(group) => {
                 if group != INIT_PLACEHOLDER_GROUP {
@@ -608,7 +603,7 @@ pub fn parse_file<T: AsRef<str>>(
     let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
     let lines = in_str
         .as_ref()
-        .replace('\t', &" ") // tabs converted to spaces, works for parsing purposes.
+        .replace('\t', " ") // tabs converted to spaces, works for parsing purposes.
         .lines() // remove comments
         .map(|l| l.split(';').next().unwrap().trim_end().to_string())
         .collect::<Vec<String>>();
@@ -618,7 +613,7 @@ pub fn parse_file<T: AsRef<str>>(
     tasm.group_offset = group_offset;
     tasm.parse(group_offset, disable_entry_point_check);
 
-    if tasm.errors.len() == 0 {
+    if tasm.errors.is_empty() {
         Ok(tasm)
     } else {
         if log_errs && verbose_logs {
