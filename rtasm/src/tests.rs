@@ -128,6 +128,7 @@ tasm_test!("bad_args", false);
 tasm_test!("bad_assignment", false, compile);
 tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
+tasm_test!("concurrent", true);
 tasm_test!("correct", true);
 tasm_test!("empty", true);
 tasm_test!("flags", true);

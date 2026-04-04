@@ -245,8 +245,10 @@ impl Tasm {
             }
         };
 
-        let instr;
+        let instr: String;
         let mut args: Vec<TasmValue> = vec![];
+
+        let is_concurrent: bool;
 
         if let Some(pos) = args_string.trim().find(" ") {
             if args_string.ends_with(',') {
@@ -254,7 +256,14 @@ impl Tasm {
                 return;
             }
 
-            instr = args_string[..pos].to_uppercase();
+            let instr_raw = args_string[..pos].to_uppercase();
+            if instr_raw.starts_with('~') {
+                is_concurrent = true;
+                instr = instr_raw[1..].to_string();
+            } else {
+                is_concurrent = false;
+                instr = instr_raw;
+            }
 
             // exclude alias instructions (parsed first thing after lexing)
             if instr.as_str() == "ALIAS" {
@@ -294,7 +303,14 @@ impl Tasm {
             }
         } else {
             // no args or extras (everything after | )
-            instr = args_string.to_uppercase();
+            let instr_raw = args_string.to_uppercase();
+            if instr_raw.starts_with('~') {
+                is_concurrent = true;
+                instr = instr_raw[1..].to_string();
+            } else {
+                is_concurrent = false;
+                instr = instr_raw;
+            }
         }
 
         // find the instruction spec which contains arg handlers
@@ -337,6 +353,7 @@ impl Tasm {
                     args,
                     flags,
                     handler_fn: handler,
+                    is_concurrent,
                 });
             }
             None => {

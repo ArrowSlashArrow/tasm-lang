@@ -1,0 +1,11 @@
+; This program includes instructions that will be executed concurrently
+_init:
+    ; to verify that the values were all updated at once
+    DISPLAY C1
+    DISPLAY C2
+    DISPLAY C3
+
+_start:
+    MOV C1, 1
+    ~MOV C2, 2
+    ~MOV C3, 3
