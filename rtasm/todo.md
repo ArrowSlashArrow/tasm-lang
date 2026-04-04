@@ -1,5 +1,7 @@
 ## general
-- add style guidelines to docs
+- docs
+    - add style guidelines/best practices
+    - add ptrpos counter inc/dec docs to mptr/mreset instructions
 - refactor error enum with proper formatting via struct fields
     - add warning level
         - warning: modifying ptrpos. this counter should never be modified unless by actually moving the pointer.
@@ -12,9 +14,37 @@
         - refactor memory to be more group efficient
         - refactor should also include being able to look up memory from any address
         - possibly retain legacy memory as compiler option
+        - mem instructions overhaul
+            - `INITMEM <ints>`: keeping it
+            - `(F)MALLOC <start>, <end>`: specify range instead of allocsize. allocsize is stored as `MEMSIZE` alias anyway, so it doesn't matter. removes need for `--mem-end-counter` flag.
+            - `MGET`: gets value at PTRPOS and stores it in memreg.
+            - `MSET`: sets value in memreg to PTRPOS.
+            - `MRESET`: sets addr to 0.
+            - `LMA <addr>`: load mem addr, shorthand for `MOV PTRPOS, <addr>`.
+            - `MPTR`/`MREAD`/`MWRITE`/`MFUNC`: deprecated
     - implement boolean data operations
-        - single-bit logic gates (AND, NOR, XOR, etc.)
-        - branchless item compares 
+        - boolean logic gates
+            - all instructions here work under the pretense that the operand(s) are strictly booleans.
+            - AND, NAND, NOR, OR, XOR, XNOR
+            - spawns group(s) based on condition
+                - in the case of AND, if `a & b`, then group 1 is spawned
+                - `group, counter, counter`: spawn
+                - `group, group, counter, counter`: fork
+                - `counter, counter [counter]`: assignment (value is computed and stored into result without any group spawning)
+        - branchless item compares that return booleans
+            - `==`: floor ( 0.5 / |a-b| + 0.5 )
+            - `!=`: ceil ( |a-b| / |a-b| + 0.5 )
+            - `>=`: floor ( a-b / (|a-b| + 0.5) + 1)
+            - `>` : floor ( a-b / (|a-b| + 0.5) + 0.5)
+            - `<=`: floor ( b-a / (|a-b| + 0.5) + 1)
+            - `<` : floor ( b-a / (|a-b| + 0.5) + 0.5)
+
+    - more utils
+        - `MAX counter, counter, counter`: c1 = max(c2, c3), same for min
+        - `MODZ counter, counter, counter`: c1 = c2 % c3 == 0 (bool)
+        - add spawn/fork variants to the above to immediately spawn groups based on compare if needed
+        - `SWAP item, item`: swaps values
+
 - 0.3.x: optimizations update
     - concurrent instructions (v0.3.0)
     - compiler optimizations (v0.3.1)
@@ -22,6 +52,9 @@
         - optimizations within the compiler itself
 - 0.4.0
     - un-deprecate emulator
+
+- 0.5.0
+    - possibly add tty for console output
 
 ### memory markers
 marker objects that are in the memory structure.  

@@ -411,27 +411,27 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
 		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
 
-> [!NOTE] Flag value types
+> [!NOTE]
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
 
-> [!NOTE] Item result
+> [!NOTE]
 > "Item result" refers to the intermediate result between the operands in an item edit trigger (used be arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
 > ![Item Result](./img/item_result.png)
 
-| Flag    | Usage                                                                                                 | Instructions | Type       |     |
-| ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- | --- |
-| resmode | Rounding and sign config for the item result                                                          | Arithmetic   | Round/Sign |     |
-| finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |     |
-| itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |     |
-| divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |     |
-| iter    | Compund assignment operator to target item. Akin to `+=`.                                             | Arithmetic   | Operator   |     |
-| op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |     |
-| delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |     |
-| remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |     |
-| tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |     |
-| tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |     |
-| tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |     |
-| nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |     |
+| Flag    | Usage                                                                                                 | Instructions | Type       |
+| ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- |
+| resmode | Rounding and sign config for the item result                                                          | Arithmetic   | Round/Sign |
+| finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |
+| itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |
+| divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |
+| iter    | Compund assignment operator to target item. Akin to `+=`.                                             | Arithmetic   | Operator   |
+| op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |
+| delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |
+| remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
+| tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
+| tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
+| tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |
+| nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |
 #### 3.1.4.2. Flag types
 ##### Round/Sign
 Rounding and sign (absolute/negative) configuration string.  
