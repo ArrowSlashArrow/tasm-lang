@@ -416,6 +416,7 @@ pub struct Instruction {
     pub args: Vec<TasmValue>,
     pub flags: Vec<Flag>,
     pub handler_fn: HandlerFn,
+    pub is_concurrent: bool,
 }
 
 impl Routine {
