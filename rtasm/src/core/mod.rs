@@ -72,6 +72,8 @@ impl Tasm {
                 0,
             ));
 
+            let mut previous_spacing_amount = 0.0;
+
             // starting position of objects: (15, 75 + curr_group * 15)
             for instr in routine.instructions.iter() {
                 let mut instr_args = instr.args.clone();
@@ -109,31 +111,55 @@ impl Tasm {
                     }
                 }
 
+                // do not increment x-position if this instruction is concurrent.
+                // in a concurrent chain, all instructions before the last one
+                // will be ignored for extra spacing. therefore, it is the responsibility
+                // of the programmer to manage timing with concurrent instructions.
+                if instr.is_concurrent {
+                    // move back
+                    obj_pos -= previous_spacing_amount;
+                }
+
                 let cfg = if routine.ident == INIT_ROUTINE {
                     if let InstrType::Init = instr._type {
+                        // in the case of a custom init structure,
+                        // leave default obj config since it likely wont be used anyways
                         GDObjConfig::default()
                     } else {
+                        // in the case of a normal position-dependent instruction
+                        // negate usual position to place normal triggers in init routine
+                        // before the x=0 line to make the instantly execute at the level start
                         GDObjConfig::default().pos(-15.0 - obj_pos, rtn_ypos)
                     }
                 } else {
+                    // normal trigger placement for everything else
                     GDObjConfig::default()
                         .pos(105.0 + obj_pos, rtn_ypos)
                         .groups([routine.group])
-                };
+                }
+                .multitrigger(true);
 
                 let handler = instr.handler_fn;
                 let args = HandlerArgs {
                     args: instr_args,
-                    cfg: cfg.spawnable(true).multitrigger(true),
+                    cfg: match routine.ident == INIT_ROUTINE {
+                        // assuming that all init instructions are before x=0,
+                        // which only doesnt happen if the triggers were manually moved,
+                        // then they all execute immediately at the start of the level,
+                        // hence they are "initializers".
+                        // there is nothing to spawn them, since they are on group 0
+                        // therefore, the "spawn triggered" option is omitted
+                        true => cfg,
+                        false => cfg.spawnable(true),
+                    },
                     curr_group: self.curr_group, // used as auxiliary group
                     ptr_group: self.ptr_group,
                     ptr_reset_group: self.ptr_reset_group,
                     line: instr.line_number,
                     // these two are set only once a MALLOC instruction is processed
                     // if there is no malloc, there is no memory access allowed
-                    // and therefore these fields are never read
                     // therefore it does not matter if there is junk data in there
-                    // since it will either be overwritten or never read
+                    // since it will either be overwritten or never used
                     memreg: self.aliases.memreg.clone(),
                     ptrpos_id: self.aliases.ptrpos_id,
                     displayed_items: self.displayed_items,
@@ -157,15 +183,16 @@ impl Tasm {
                 let skip_spaces = data.skip_spaces as f64 * spacing;
                 self.curr_group += data.used_extra_groups;
                 obj_pos += skip_spaces;
+                previous_spacing_amount = skip_spaces;
 
                 if data.added_item_display {
                     self.displayed_items += 1;
                 }
 
-                // these two if statements handle the logic of keeping track of the ptr group
+                // this if statement handles the logic of keeping track of the ptr group
                 // it is necessary for instructions such as MRESET and MPTR which move the pointer
                 // this information is only updated if it is set. this information is set
-                // only in the malloc methods, which would usually be parsed first.
+                // only in the malloc methods, which would be parsed before any mem ops
 
                 if let Some(m) = data.new_mem {
                     // check that memory does not already exist
