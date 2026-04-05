@@ -38,9 +38,13 @@
 //! Finally, all instructions are parsed in each group sequentially.
 use crate::{
     core::{
-        ENTRY_POINT, Flag, FlagValueType, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm,
-        TasmParseError, TasmValue, fits_arg_signature, get_flag_type, get_instr_type,
-        is_builtin_alias,
+        consts::{ENTRY_POINT, INIT_ROUTINE},
+        error::{ParseErrorType, TasmParseError},
+        flags::{Flag, FlagValueType, get_flag_type},
+        structs::{
+            Instruction, Routine, Tasm, TasmValue, fits_arg_signature, get_instr_type,
+            is_builtin_alias,
+        },
     },
     instr::INSTR_SPEC,
     verbose_log,

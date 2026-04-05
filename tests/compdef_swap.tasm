@@ -1,0 +1,13 @@
+; Compiler definition for `SWAP`
+_init:
+    DISPLAY C1
+    DISPLAY C2
+    DISPLAY C3
+    IOBLOCK swap, 0, _swap
+    MOV C1, 1
+    MOV C2, 2
+swap:
+    ; swapping c1 and c2
+    MOV C3, C2
+    ~MOV C2, C1
+    ~MOV C1, C3

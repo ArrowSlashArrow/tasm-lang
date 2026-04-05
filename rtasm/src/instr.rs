@@ -16,8 +16,12 @@ use paste::paste;
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 use crate::core::{
-    FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
-    TasmPrimitive, TasmValue, TasmValueType,
+    HandlerFn, HandlerReturn,
+    error::TasmParseError,
+    flags::FlagValue,
+    structs::{
+        HandlerArgs, HandlerData, MemInfo, MemType, TasmPrimitive, TasmValue, TasmValueType,
+    },
 };
 
 // convert a list of type identifiers into a slice
@@ -287,7 +291,7 @@ fn get_flag_value_opt(args: &HandlerArgs, ident: &str) -> Option<FlagValue> {
     args.flags
         .iter()
         .find(|f| f.ident == ident)
-        .and_then(|f| Some(f.clone().value))
+        .map(|f| f.clone().value)
 }
 
 fn flag_override<T>(item: &mut T, ident: &str, args: &HandlerArgs)
@@ -1331,8 +1335,8 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     data.ptr_group = ptr_group;
     data.new_mem = Some(MemInfo {
         _type: match float_mem {
-            true => crate::core::MemType::Float,
-            false => crate::core::MemType::Int,
+            true => MemType::Float,
+            false => MemType::Int,
         },
         memreg: match float_mem {
             true => TasmValue::Timer(memreg_id),
@@ -1373,8 +1377,8 @@ fn init_mem(args: HandlerArgs) -> HandlerReturn {
             None,
             None,
             match mem_info._type {
-                crate::core::MemType::Float => Item::Timer(start_counter + idx as i16),
-                crate::core::MemType::Int => Item::Counter(start_counter + idx as i16),
+                MemType::Float => Item::Timer(start_counter + idx as i16),
+                MemType::Int => Item::Counter(start_counter + idx as i16),
             },
             v.to_float().unwrap(),
             Op::Set,

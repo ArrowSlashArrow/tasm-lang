@@ -10,18 +10,6 @@
 
 ## roadmap
 - 0.2.x: utility releases
-    - memory improvements (v0.2.2)
-        - refactor memory to be more group efficient
-        - refactor should also include being able to look up memory from any address
-        - possibly retain legacy memory as compiler option
-        - mem instructions overhaul
-            - `INITMEM <ints>`: keeping it
-            - `(F)MALLOC <start>, <end>`: specify range instead of allocsize. allocsize is stored as `MEMSIZE` alias anyway, so it doesn't matter. removes need for `--mem-end-counter` flag.
-            - `MGET`: gets value at PTRPOS and stores it in memreg.
-            - `MSET`: sets value in memreg to PTRPOS.
-            - `MRESET`: sets addr to 0.
-            - `LMA <addr>`: load mem addr, shorthand for `MOV PTRPOS, <addr>`.
-            - `MPTR`/`MREAD`/`MWRITE`/`MFUNC`: deprecated
     - implement boolean data operations
         - boolean logic gates
             - all instructions here work under the pretense that the operand(s) are strictly booleans.
@@ -39,14 +27,28 @@
             - `<=`: floor ( b-a / (|a-b| + 0.5) + 1)
             - `<` : floor ( b-a / (|a-b| + 0.5) + 0.5)
 
-    - more utils
+    - more utils (0.2.2)
         - `MAX counter, counter, counter`: c1 = max(c2, c3), same for min
+        - `CLAMP`, `STEP`
         - `MODZ counter, counter, counter`: c1 = c2 % c3 == 0 (bool)
         - add spawn/fork variants to the above to immediately spawn groups based on compare if needed
         - `SWAP item, item`: swaps values
 
+- memory improvements: v0.3.0
+    - this is a possibly breaking change, so minor release number is increased
+    - refactor memory to be more group efficient
+    - refactor should also include being able to look up memory from any address
+    - possibly retain legacy memory as compiler option
+    - mem instructions overhaul
+        - `INITMEM <ints>`: keeping it
+        - `(F)MALLOC <start>, <end>`: specify range instead of allocsize. allocsize is stored as `MEMSIZE` alias anyway, so it doesn't matter. removes need for `--mem-end-counter` flag.
+        - `MGET`: gets value at PTRPOS and stores it in memreg.
+        - `MSET`: sets value in memreg to PTRPOS.
+        - `MRESET`: sets addr to 0.
+        - `LMA <addr>`: load mem addr, shorthand for `MOV PTRPOS, <addr>`.
+        - `MPTR`/`MREAD`/`MWRITE`/`MFUNC`: deprecated
+
 - 0.3.x: optimizations update
-    - concurrent instructions (v0.3.0)
     - compiler optimizations (v0.3.1)
         - SORI (single object routine inlining)
         - optimizations within the compiler itself

@@ -1,28 +1,29 @@
 use paste::paste;
 use std::time::Instant;
 
-use crate::core::{TasmValue, TasmValueType, fits_arg_signature};
+use crate::core::structs::{TasmPrimitive, TasmValue, TasmValueType, fits_arg_signature};
 
 use super::*;
 
 macro_rules! tasm_test {
-    // parser success
+    // successful compile
     ($file:literal, true) => {
         paste! {
             #[test]
-            fn [<fileparse_pass _ $file>]() {
-                assert!(lexer::parse_file(
+            fn [<compile_success _ $file>]() {
+                let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
                     9999,
                     0,
                     true,
                     true,
                     false
-                ).is_ok())
+                ).unwrap();
+                assert!(res.handle_routines(&String::new()).is_ok())
             }
         }
     };
-    // parser error handler
+    // fail in lexing stage
     ($file:literal, false) => {
         paste! {
             #[test]
@@ -38,11 +39,11 @@ macro_rules! tasm_test {
             }
         }
     };
-    // compiler error handler
+    // fail in translation stage
     ($file:literal, false, compile) => {
         paste! {
             #[test]
-            fn [<fileparse_fail _ $file>]() {
+            fn [<translate_fail _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
                     9999,
@@ -55,11 +56,11 @@ macro_rules! tasm_test {
             }
         }
     };
-    // parser success
+    // file in the `example_programs` directory
     ($file:literal, example) => {
         paste! {
             #[test]
-            fn [<fileparse_example _ $file>]() {
+            fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
                     9999,
@@ -73,11 +74,11 @@ macro_rules! tasm_test {
         }
     };
 
-    // parser success
-    ($file:literal, exmaple_no_entry_point) => {
+    // file in the `example_programs` directory without an entry point
+    ($file:literal, example_no_entry_point) => {
         paste! {
             #[test]
-            fn [<fileparse_example _ $file>]() {
+            fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
                     9999,
@@ -90,9 +91,27 @@ macro_rules! tasm_test {
             }
         }
     };
+
+    // tests compiler-defined implementations located in `tests/compdef_{ident}.tasm`
+    ($file:literal, compdef) => {
+        paste! {
+            #[test]
+            fn [<compdef _ $file>]() {
+                let mut res = lexer::parse_file(
+                    fs::read_to_string(format!("../tests/compdef_{}.tasm", $file)).unwrap(),
+                    9999,
+                    0,
+                    true,
+                    true,
+                    true // no entry point, since the routine should be named the same as the ident
+                ).unwrap();
+                assert!(res.handle_routines(&String::new()).is_ok())
+            }
+        }
+    };
 }
 
-tasm_test!("fetch", exmaple_no_entry_point);
+tasm_test!("fetch", example_no_entry_point);
 tasm_test!("fib_in_memory", example);
 tasm_test!("incrementer", example);
 tasm_test!("is_c1_prime", example);
@@ -126,14 +145,16 @@ tasm_test!("timer_not_counter", false);
 tasm_test!("timerops", true);
 tasm_test!("trailing_comma", false);
 tasm_test!("values", true);
+// compdef: internal compiler-defined implementation
+tasm_test!("swap", compdef);
 
 #[test]
 fn int_detection() {
     assert!(fits_arg_signature(
         &vec![TasmValue::Number(1.0), TasmValue::Number(1.1)],
         &[
-            TasmValueType::Primitive(core::TasmPrimitive::Int),
-            TasmValueType::Primitive(core::TasmPrimitive::Number),
+            TasmValueType::Primitive(TasmPrimitive::Int),
+            TasmValueType::Primitive(TasmPrimitive::Number),
         ],
     ))
 }
@@ -143,8 +164,8 @@ fn no_int_detection() {
     assert!(!fits_arg_signature(
         &vec![TasmValue::Number(1.1), TasmValue::Number(1.1)],
         &[
-            TasmValueType::Primitive(core::TasmPrimitive::Int),
-            TasmValueType::Primitive(core::TasmPrimitive::Number),
+            TasmValueType::Primitive(TasmPrimitive::Int),
+            TasmValueType::Primitive(TasmPrimitive::Number),
         ],
     ))
 }
