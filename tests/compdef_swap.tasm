@@ -1,4 +1,6 @@
-; Compiler definition for `SWAP`
+; Compiler definition for `SWAP` (2-tick)
+
+; setup stuff to test it in-game
 _init:
     DISPLAY C1
     DISPLAY C2
@@ -6,8 +8,9 @@ _init:
     IOBLOCK swap, 0, _swap
     MOV C1, 1
     MOV C2, 2
+
 swap:
     ; swapping c1 and c2
     MOV C3, C2
     ~MOV C2, C1
-    ~MOV C1, C3
+    MOV C1, C3

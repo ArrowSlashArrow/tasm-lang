@@ -142,15 +142,16 @@ impl Tasm {
                 let handler = instr.handler_fn;
                 let args = HandlerArgs {
                     args: instr_args,
-                    cfg: match routine.ident == INIT_ROUTINE {
-                        // assuming that all init instructions are before x=0,
-                        // which only doesnt happen if the triggers were manually moved,
-                        // then they all execute immediately at the start of the level,
-                        // hence they are "initializers".
-                        // there is nothing to spawn them, since they are on group 0
-                        // therefore, the "spawn triggered" option is omitted
-                        true => cfg,
-                        false => cfg.spawnable(true),
+                    // assuming that all init instructions are before x=0,
+                    // which only doesnt happen if the triggers were manually moved,
+                    // then they all execute immediately at the start of the level,
+                    // hence they are "initializers".
+                    // there is nothing to spawn them, since they are on group 0
+                    // therefore, the "spawn triggered" option is omitted
+                    cfg: if routine.ident != INIT_ROUTINE {
+                        cfg.spawnable(true)
+                    } else {
+                        cfg
                     },
                     curr_group: self.curr_group, // used as auxiliary group
                     ptr_group: self.ptr_group,
