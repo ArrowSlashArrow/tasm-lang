@@ -461,6 +461,67 @@ One of the four arithmetic operators: `+`, `-`, `*`, or `/`.
 A dictionary delimited by braces, with key-value pairs separated by commas. Written like:
 - `{123:456}`
 - `{1:2, 3:4, ...}`
+
+### 3.1.5. Concurrent instructions
+Concurrent instructions are denoted with a `~` prefix to their identifier. They are placed to be executed on the same tick as the previous instruction.
+```
+sequential:
+	; executed one-by-one. takes 3 ticks.
+	MOV C1, 1
+	MOV C2, 2
+	MOV C3, 3
+
+concurrent:
+	; all executed on the same tick. takes 1 tick.
+	; not necessary to put a ~ on the first instruction
+	MOV C1, 1	;                          	<-----+
+	~MOV C2, 2	; executed on same tick as above -|
+	~MOV C3, 3	; executed on same tick as above -+
+```
+
+> While having great potential to speed up any program that does not need a strictly sequential flaw, the order in which instructions are executed is **NOT GUARANTEED TO BE THE SAME ORDER THAT THEY ARE WRITTEN**. This is due to the GD runtime executing triggers in different orders in the same tick in different cases, and not a fault of the compiler.  
+> Please keep this in mind when writing a program that is order-sensitive. 
+
+#### 3.1.5.1. Delays
+Instruction execution times are overwritten if there is another concurrent instruction after it:
+```
+example1:
+	SE g123, C1, 0	; 2-tick instruction
+	~MOV C1, 1      ; 1-tick instruction
+    ; in this case, the instruction cluster has a 1-tick delay, since the last concurernt instruction in it is 1-tick.
+
+example2:
+    MOV C1, 0
+    ~SE g123, C1, 0
+    ; in this case, the cluster has a 2-tick delay, since SE is a 2-tick instruction
+```
+This delay is always guaranteed and enforced by the compiler.
+
+#### 3.1.5.2. Destructive operations
+It is important to be mindful of the usage of destructive operations with concurrent instructions, as data may be overwritten non-deterministically. In the case of swapping two items, the following is a baseline implementation:
+```
+swap:
+    MOV C3, C2  ; move to temp counter
+    MOV C2, C1  ; previous value is overwritten
+    MOV C1, C3  ; stored value is written back
+```
+This implementation is standard in regular procedural languages, however it may be made faster in the context of TASM with concurrent instructions:
+```
+swap:
+    MOV C3, C2
+    ~MOV C2, C1
+    ~MOV C1, C3
+```
+This implementation theoretically performs the swap in a single tick. However, since the order of execution is not strictly guaranteed to be the same as is listed in the program, this operation is unsafe and may overwrite previously stored data.  
+Therefore, we must be careful to not use possibly stale data and overwrite data that may not have been transferred in the same tick. In this case, we should not attempt to store the value of C2 and overwrite it with the value of C1 in the same tick.  
+The following is the updated implementation, which runs in 2 ticks instead of 3:
+```
+swap:
+    MOV C3, C2  ; executed on one tick
+    MOV C2, C1  ; executed on the next
+    ~MOV C1, C3
+```
+
 ## 3.2. Routines 
 ### 3.2.1. Routine declaration 
 A routine is declared as such:

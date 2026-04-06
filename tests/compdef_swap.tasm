@@ -12,5 +12,5 @@ _init:
 swap:
     ; swapping c1 and c2
     MOV C3, C2
-    ~MOV C2, C1
-    MOV C1, C3
+    MOV C2, C1
+    ~MOV C1, C3

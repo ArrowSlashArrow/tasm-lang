@@ -58,7 +58,7 @@
 - 0.5.0
     - possibly add tty for console output
 
-### memory markers
+### memory markers (legacy memory)
 marker objects that are in the memory structure.  
 could help with moving a pointer to a previous location:
 ```
@@ -74,30 +74,6 @@ MFUNC ; read it
 MPTR M1 ; move pointer back to marker
 ```
 the block at mem pos 0 can also be considered a marker  
-
-### Concurrent instructions
-Concurrent instructions are isntructions that will be placed on the same x-position,
-so that they will be executed on the same tick with spawn ordered.
-Concurrent instructions should be denoted with `~`:
-
-```
-sequential:
-    MOV C1, 1
-    MOV C2, 2
-    MOV C3, 3
-    MOV C4, 4
-    MOV C5, 5
-    MOV C6, 6
-
-concurrent:
-    MOV C1, 1
-    ~MOV C2, 2  ; will happen on the same tick as instruction above
-    ~MOV C3, 3
-    ~MOV C4, 4
-    ~MOV C5, 5
-    ~MOV C6, 6
-
-```
 
 ### compiler optimizations
 - single object routine inline
