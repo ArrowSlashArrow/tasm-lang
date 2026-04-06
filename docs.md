@@ -522,6 +522,9 @@ swap:
     ~MOV C1, C3
 ```
 
+> [!NOTE]
+> While there likely is a deterministic and predictable way in which triggers are executed in one tick, the maintainer of this project was not aware of the mechanism. If it becomes known, please open a feature request PR on the repo.
+
 ## 3.2. Routines 
 ### 3.2.1. Routine declaration 
 A routine is declared as such:
