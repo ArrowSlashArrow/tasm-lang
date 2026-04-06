@@ -9,7 +9,7 @@ use crate::{
         error::TasmParseError,
         structs::{HandlerArgs, HandlerData, InstrType, Tasm, TasmValue},
     },
-    instr::{get_item_spec, ioblock},
+    instr::{fns::ioblock, get_item_spec},
 };
 
 pub mod consts {
