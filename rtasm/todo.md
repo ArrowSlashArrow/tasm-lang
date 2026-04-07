@@ -10,7 +10,7 @@
 
 ## roadmap
 - 0.2.x: utility releases
-    - implement boolean data operations
+    - implement boolean data operations (0.2.3)
         - boolean logic gates
             - all instructions here work under the pretense that the operand(s) are strictly booleans.
             - AND, NAND, NOR, OR, XOR, XNOR
@@ -29,9 +29,11 @@
 
     - more utils (0.2.2)
         - `MAX counter, counter, counter`: c1 = max(c2, c3), same for min
+            - max: ( a + b + |a - b| )/ 2
+            - min: ( a + b - |a - b| )/ 2
         - `CLAMP`, `STEP`
         - `MODZ counter, counter, counter`: c1 = c2 % c3 == 0 (bool)
-        - add spawn/fork variants to the above to immediately spawn groups based on compare if needed
+            - add spawn/fork variants to the above to immediately spawn groups (`SMODZ`, `FMODZ`)
         - `SWAP item, item`: swaps values
 
 - memory improvements: v0.3.0

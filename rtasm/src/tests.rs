@@ -148,6 +148,8 @@ tasm_test!("trailing_comma", false);
 tasm_test!("values", true);
 // compdef: internal compiler-defined implementation
 tasm_test!("swap", compdef);
+tasm_test!("min", compdef);
+tasm_test!("max", compdef);
 
 #[test]
 fn int_detection() {

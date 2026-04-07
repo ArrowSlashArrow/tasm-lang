@@ -1,0 +1,16 @@
+; Returns the maximum of two functions branchlessly
+; Inputs: c1, c2
+; Output: c3
+_init:
+    display C1
+    display C2
+    display C3
+    display C4
+    ioblock max, 0, _max
+    mov C1, 4
+    mov C2, 9
+max:
+    add C3, C1, C2
+    ~sub C4, C1, C2 | resmode:+
+    add C3, C4
+    ~div C3, 2
