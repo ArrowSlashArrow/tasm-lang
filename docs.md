@@ -76,7 +76,8 @@ Note that instruction argsets are typed to ensure that valid arguments are passe
 ### 3.1.2. Available instructions 
 All instructions in this section are expected to be fully functional. Any deprecated instructions will not be listed as of the next minor release.
 #### 3.1.2.1 Arithmetic
-All arithmetic instructions are 1-tick.
+All arithmetic instructions are 1-tick.  
+By convention, the counter that stores the result of an arithmetic operation is usually specified as the first argument.
 ##### Argument format
 
 | Argset                   | Result (in the example case of division) | Commands that use it           |

@@ -1,6 +1,5 @@
 ; Compiler definition for `SWAP` (2-tick)
-
-; setup stuff to test it in-game
+; Inputs: c1, c2
 _init:
     DISPLAY C1
     DISPLAY C2

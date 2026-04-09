@@ -9,32 +9,37 @@
 - `--objdump` don't compile, but dump all object info once parsed
 
 ## roadmap
-- 0.2.x: utility releases
-    - implement boolean data operations (0.2.3)
-        - boolean logic gates
-            - all instructions here work under the pretense that the operand(s) are strictly booleans.
-            - AND, NAND, NOR, OR, XOR, XNOR
-            - spawns group(s) based on condition
-                - in the case of AND, if `a & b`, then group 1 is spawned
-                - `group, counter, counter`: spawn
-                - `group, group, counter, counter`: fork
-                - `counter, counter [counter]`: assignment (value is computed and stored into result without any group spawning)
-        - branchless item compares that return booleans
-            - `==`: floor ( 0.5 / |a-b| + 0.5 )
-            - `!=`: ceil ( |a-b| / |a-b| + 0.5 )
-            - `>=`: floor ( a-b / (|a-b| + 0.5) + 1)
-            - `>` : floor ( a-b / (|a-b| + 0.5) + 0.5)
-            - `<=`: floor ( b-a / (|a-b| + 0.5) + 1)
-            - `<` : floor ( b-a / (|a-b| + 0.5) + 0.5)
+- upgrade parsing to an actual tokeniser (v0.2.2)
+- module system (v0.2.3)
+    - init instruction `IMPORT` that imports module
+        - compiler takes all of these and adds them and parses the files they specify recursively
+            - prevent circular imports
+        - parsing starts when all imports are resolved
+    - useful for stdlib (e.g. mathutils, boolean ops listed below)
+- boolean logic gates (v0.2.3)
+    - all instructions here work under the pretense that the operand(s) are strictly booleans.
+    - AND, NAND, NOR, OR, XOR, XNOR
+    - spawns group(s) based on condition
+        - in the case of AND, if `a & b`, then group 1 is spawned
+        - `group, counter, counter`: spawn
+        - `group, group, counter, counter`: fork
+        - `counter, counter [counter]`: assignment (value is computed and stored into result without any group spawning)
+- branchless item compares that return booleans
+    - `==`: floor ( 0.5 / |a-b| + 0.5 )
+    - `!=`: ceil ( |a-b| / |a-b| + 0.5 )
+    - `>=`: floor ( a-b / (|a-b| + 0.5) + 1)
+    - `>` : floor ( a-b / (|a-b| + 0.5) + 0.5)
+    - `<=`: floor ( b-a / (|a-b| + 0.5) + 1)
+    - `<` : floor ( b-a / (|a-b| + 0.5) + 0.5)
+- `MODZ counter, counter, counter`: c1 = c2 % c3 == 0 (bool)
+    - add spawn/fork variants to the above to immediately spawn groups (`SMODZ`, `FMODZ`)
+    - a mod b == 0: 1 - ceil ( a/b - flr (a/b) )
 
-    - more utils (0.2.2)
-        - `MAX counter, counter, counter`: c1 = max(c2, c3), same for min
-            - max: ( a + b + |a - b| )/ 2
-            - min: ( a + b - |a - b| )/ 2
-        - `CLAMP`, `STEP`
-        - `MODZ counter, counter, counter`: c1 = c2 % c3 == 0 (bool)
-            - add spawn/fork variants to the above to immediately spawn groups (`SMODZ`, `FMODZ`)
-        - `SWAP item, item`: swaps values
+- misc utils (0.2.3)
+    - `MAX counter, counter, counter`: c1 = max(c2, c3), same for min
+        - max: ( a + b + |a - b| )/ 2
+        - min: ( a + b - |a - b| )/ 2
+    - `SWAP item, item`: swaps values
 
 - memory improvements: v0.3.0
     - this is a possibly breaking change, so minor release number is increased
@@ -50,14 +55,14 @@
         - `LMA <addr>`: load mem addr, shorthand for `MOV PTRPOS, <addr>`.
         - `MPTR`/`MREAD`/`MWRITE`/`MFUNC`: deprecated
 
-- 0.3.x: optimizations update
-    - compiler optimizations (v0.3.1)
-        - SORI (single object routine inlining)
-        - optimizations within the compiler itself
-- 0.4.0
+- compiler optimizations (v0.3.1)
+    - SORI (single object routine inlining)
+    - optimizations within the compiler itself
+
+- 1.0.0
     - un-deprecate emulator
 
-- 0.5.0
+- 1.1.0
     - possibly add tty for console output
 
 ### memory markers (legacy memory)
