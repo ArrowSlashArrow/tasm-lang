@@ -47,10 +47,10 @@ Development of the project can be found on the [TASM repo](https://github.com/Ar
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
 ## 2.1. Constraints
 While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As such, TASM programmers must be aware of these constraints and their implications.
-- IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KiB of information, assuming the availability of each and every counter and timer. 
+- IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KB of information, assuming the availability of each and every counter and timer. 
 - Counter items (counters) are 32-bit integers. They may hold any value from \[-2<sup>32</sup> , 2<sup>32</sup>-1).
 - Timer items (timers) are 32-bit floats, as per the [IEEE-754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format) implementation.
-- The game runs on a 240Hz loop, which means that trigger programs are quite slow compared to real programs.
+- The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms). As a result, trigger programs are quite slow compared to real programs.
 
 ## 2.2. Useful mechanics
 When compiled, the spawn trigger for every routine ALWAYS uses the spawn-ordered option. This is to ensure control of execution and pauses between instructions. If not enabled, the spawn will incorrectly skip waits and make every instruction 1-tick, which is undesirable since some instructions need downtime to be fully and correctly processed.

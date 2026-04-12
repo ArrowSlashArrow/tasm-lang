@@ -33,6 +33,15 @@ macro_rules! verbose_log {
     };
 }
 
+#[macro_export]
+macro_rules! log {
+    ($on:expr, $t:tt) => {
+        if $on {
+            println!($t);
+        }
+    };
+}
+
 impl Tasm {
     pub fn handle_routines(&mut self, level_name: &String) -> Result<Level, Vec<TasmParseError>> {
         // clear errors
