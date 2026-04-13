@@ -1,79 +1,63 @@
 ## general
-- add style guidelines to docs
-- refactor error enum with proper formatting via struct fields
-    - add warning level
-        - warning: modifying ptrpos. this counter should never be modified unless by actually moving the pointer.
-- `--no-log` flag to disable everything printed to stdout
-- `--objdump` don't compile, but dump all object info once parsed
+- docs
+    - add style guidelines/best practices
+    - add ptrpos counter inc/dec docs to mptr/mreset instructions
 
 ## roadmap
-- 0.2.x: utility releases
-    - custom aliases (v0.2.1)
-    - memory improvements (v0.2.2)
-        - memory markers
-        - dynamic movement of pointer via binary splitting
-    - implement boolean data operations
-        - single-bit logic gates (AND, NOR, XOR, etc.)
-        - branchless item compares 
-- 0.3.x: optimizations update
-    - concurrent instructions (v0.3.0)
-    - compiler optimizations (v0.3.1)
-        - SORI (single object routine inlining)
-        - optimizations within the compiler itself
-- 0.4.0
-    - un-deprecate emulator
+- a way to include custom objects
+    - `OBJECT`
+- compiler optimizations (v1.0.0-rc1)
+    - SORI (single object routine inlining)
+    - optimizations within the compiler itself
 
-### memory markers
-marker objects that are in the memory structure.  
-could help with moving a pointer to a previous location:
-```
-MVMARK 1 ; move marker 1 to current location of pointer
-; essentially store the current location of the pointer in the marker
-
-MRESET
-MPTR 50 ; goto some memory address
-
-MREAD
-MFUNC ; read it
-
-MPTR M1 ; move pointer back to marker
-```
-the block at mem pos 0 can also be considered a marker  
-
-### `ALIAS` (init-only)
-- defines a constant that can be used as an alias
-- cannot overwrite existing aliases (any already defined and any of the default ones)
-- e.g. `ALIAS external_object, g123`
-    - `external_object` now refers to group 123
-- alias is resolved only when mentioned
-
-### Concurrent instructions
-Concurrent instructions are isntructions that will be placed on the same x-position,
-so that they will be executed on the same tick with spawn ordered.
-Concurrent instructions should be denoted with `~`:
-
-```
-sequential:
-    MOV C1, 1
-    MOV C2, 2
-    MOV C3, 3
-    MOV C4, 4
-    MOV C5, 5
-    MOV C6, 6
-
-concurrent:
-    MOV C1, 1
-    ~MOV C2, 2  ; will happen on the same tick as instruction above
-    ~MOV C3, 3
-    ~MOV C4, 4
-    ~MOV C5, 5
-    ~MOV C6, 6
-
-```
+## post-v1.0
+- un-deprecate emulator
+- possibly add tty for console output
+- memory improvements
+    - this is a possibly breaking change, so minor release number is increased
+    - refactor memory to be more group efficient
+    - refactor should also include being able to look up memory from any address
+    - possibly retain legacy memory as compiler option
+    - mem instructions overhaul
+        - `INITMEM <ints>`: keeping it
+        - `(F)MALLOC <start>, <end>`: specify range instead of allocsize. allocsize is stored as `MEMSIZE` alias anyway, so it doesn't matter. removes need for `--mem-end-counter` flag.
+        - `MGET`: gets value at PTRPOS and stores it in memreg.
+        - `MSET`: sets value in memreg to PTRPOS.
+        - `MRESET`: sets addr to 0.
+        - `LMA <addr>`: load mem addr, shorthand for `MOV PTRPOS, <addr>`.
+        - `MPTR`/`MREAD`/`MWRITE`/`MFUNC`: deprecated
 
 ### compiler optimizations
 - single object routine inline
     - any routine that conatins a single object will be inlined
+
+## planned for PLSE
+Note: instructions specified here are not planned to be included in the tasm ISA. they are placeholders for functionality in the planned stdlib for PLSE.
+
+- boolean logic gates: `std::bool`
+    - all instructions here work under the pretense that the operand(s) are strictly booleans.
+    - AND, NAND, NOR, OR, XOR, XNOR
+    - spawns group(s) based on condition
+        - in the case of AND, if `a & b`, then group 1 is spawned
+        - `group, counter, counter`: spawn
+        - `group, group, counter, counter`: fork
+        - `counter, counter [counter]`: assignment (value is computed and stored into result without any group spawning)
+- branchless item compares that return booleans: `std::bool`
+    - `==`: floor ( 0.5 / |a-b| + 0.5 )
+    - `!=`: ceil ( |a-b| / |a-b| + 0.5 )
+    - `>=`: floor ( a-b / (|a-b| + 0.5) + 1)
+    - `>` : floor ( a-b / (|a-b| + 0.5) + 0.5)
+    - `<=`: floor ( b-a / (|a-b| + 0.5) + 1)
+    - `<` : floor ( b-a / (|a-b| + 0.5) + 0.5)
+- `MODZ counter, counter, counter`: c1 = c2 % c3 == 0 (bool)
+    - add spawn/fork variants to the above to immediately spawn groups (`SMODZ`, `FMODZ`)
+    - a mod b == 0: 1 - ceil ( a/b - flr (a/b) )
+
+- misc utils (0.2.3): `std::core`
+    - `MAX counter, counter, counter`: c1 = max(c2, c3), same for min
+        - max: ( a + b + |a - b| )/ 2
+        - min: ( a + b - |a - b| )/ 2
+    - `SWAP item, item`: swaps values
 
 ## extas, for later
 - make landing page

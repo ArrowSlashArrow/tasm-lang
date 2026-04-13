@@ -52,37 +52,45 @@ struct Args {
     /// Useful for compiling utility programs that don't necessarily contain an entry point.
     #[arg(long)]
     no_entry_point: bool,
-    // /// Disables logging of any kind from the compiler
-    // // currently does nothing
-    // #[arg(long)]
-    // no_log: bool,
+    /// Disables logging to stdout from the compiler, including verbose logs.
+    #[arg(long)]
+    no_log: bool,
 }
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
-    println!("Parsing tasm...");
+    log!(!args.no_log, "Parsing tasm...");
     let file = fs::read_to_string(&args.infile)?;
 
     let id_limit = 9999;
     if args.mem_end_counter > id_limit {
-        println!("You may not set the end counter beyond the ID limit of {id_limit}");
+        log!(
+            !args.no_log,
+            "You may not set the end counter beyond the ID limit of {id_limit}"
+        );
         return Ok(());
     } else if args.mem_end_counter < 0 {
-        println!("You may not set the end counter to a negative ID.");
+        log!(
+            !args.no_log,
+            "You may not set the end counter to a negative ID."
+        );
         return Ok(());
     }
 
     let mut tasm = match lexer::parse_file(
         file,
+        args.infile.clone(),
         args.mem_end_counter,
         args.group_offset,
-        args.verbose_logs,
+        args.verbose_logs && !args.no_log,
         true,
         args.no_entry_point,
     ) {
         Ok(t) => t,
         Err(es) => {
-            show_errors(es, &format!("Unable to compile {}", &args.infile));
+            if !args.no_log {
+                show_errors(es, &format!("Unable to compile {}", &args.infile));
+            }
             return Ok(());
         }
     };
@@ -94,23 +102,25 @@ fn main() -> Result<(), Error> {
         None => args.infile,
     };
 
-    println!("Encoding level...");
+    log!(!args.no_log, "Encoding level...");
     match tasm.handle_routines(&level_name) {
         Ok(level) => {
             if !args.no_export {
                 match args.gmd {
-                    true => level.export_to_gmd(&format!("{}.gmd", level_name))?,
+                    true => level.export_to_gmd(format!("{}.gmd", level_name))?,
                     false => {
                         let mut savefile = Levels::from_local()?;
                         savefile.add_level(level);
                         savefile.export_to_savefile()?;
-                        println!("exported to savefile.")
+                        log!(!args.no_log, "exported to savefile.")
                     }
                 }
             }
         }
         Err(e) => {
-            show_errors(e, "Unable to compile to level");
+            if !args.no_log {
+                show_errors(e, "Unable to compile to level");
+            }
         }
     }
 

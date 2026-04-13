@@ -47,10 +47,10 @@ Development of the project can be found on the [TASM repo](https://github.com/Ar
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
 ## 2.1. Constraints
 While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As such, TASM programmers must be aware of these constraints and their implications.
-- IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KiB of information, assuming the availability of each and every counter and timer. 
+- IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KB of information, assuming the availability of each and every counter and timer. 
 - Counter items (counters) are 32-bit integers. They may hold any value from \[-2<sup>32</sup> , 2<sup>32</sup>-1).
 - Timer items (timers) are 32-bit floats, as per the [IEEE-754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format) implementation.
-- The game runs on a 240Hz loop, which means that trigger programs are quite slow compared to real programs.
+- The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms). As a result, trigger programs are quite slow compared to real programs.
 
 ## 2.2. Useful mechanics
 When compiled, the spawn trigger for every routine ALWAYS uses the spawn-ordered option. This is to ensure control of execution and pauses between instructions. If not enabled, the spawn will incorrectly skip waits and make every instruction 1-tick, which is undesirable since some instructions need downtime to be fully and correctly processed.
@@ -76,7 +76,8 @@ Note that instruction argsets are typed to ensure that valid arguments are passe
 ### 3.1.2. Available instructions 
 All instructions in this section are expected to be fully functional. Any deprecated instructions will not be listed as of the next minor release.
 #### 3.1.2.1 Arithmetic
-All arithmetic instructions are 1-tick.
+All arithmetic instructions are 1-tick.  
+By convention, the counter that stores the result of an arithmetic operation is usually specified as the first argument.
 ##### Argument format
 
 | Argset                   | Result (in the example case of division) | Commands that use it           |
@@ -411,27 +412,27 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
 		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
 
-> [!NOTE] Flag value types
+> [!NOTE]
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
 
-> [!NOTE] Item result
+> [!NOTE]
 > "Item result" refers to the intermediate result between the operands in an item edit trigger (used be arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
 > ![Item Result](./img/item_result.png)
 
-| Flag    | Usage                                                                                                 | Instructions | Type       |     |
-| ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- | --- |
-| resmode | Rounding and sign config for the item result                                                          | Arithmetic   | Round/Sign |     |
-| finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |     |
-| itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |     |
-| divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |     |
-| iter    | Compund assignment operator to target item. Akin to `+=`.                                             | Arithmetic   | Operator   |     |
-| op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |     |
-| delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |     |
-| remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |     |
-| tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |     |
-| tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |     |
-| tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |     |
-| nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |     |
+| Flag    | Usage                                                                                                 | Instructions | Type       |
+| ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- |
+| resmode | Rounding and sign config for the item result                                                          | Arithmetic   | Round/Sign |
+| finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |
+| itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |
+| divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |
+| iter    | Compund assignment operator to target item. Akin to `+=`.                                             | Arithmetic   | Operator   |
+| op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |
+| delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |
+| remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
+| tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
+| tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
+| tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |
+| nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |
 #### 3.1.4.2. Flag types
 ##### Round/Sign
 Rounding and sign (absolute/negative) configuration string.  
@@ -461,6 +462,70 @@ One of the four arithmetic operators: `+`, `-`, `*`, or `/`.
 A dictionary delimited by braces, with key-value pairs separated by commas. Written like:
 - `{123:456}`
 - `{1:2, 3:4, ...}`
+
+### 3.1.5. Concurrent instructions
+Concurrent instructions are denoted with a `~` prefix to their identifier. They are placed to be executed on the same tick as the previous instruction.
+```
+sequential:
+	; executed one-by-one. takes 3 ticks.
+	MOV C1, 1
+	MOV C2, 2
+	MOV C3, 3
+
+concurrent:
+	; all executed on the same tick. takes 1 tick.
+	; not necessary to put a ~ on the first instruction
+	MOV C1, 1	;                          	<-----+
+	~MOV C2, 2	; executed on same tick as above -|
+	~MOV C3, 3	; executed on same tick as above -+
+```
+
+> While having great potential to speed up any program that does not need a strictly sequential flaw, the order in which instructions are executed is **NOT GUARANTEED TO BE THE SAME ORDER THAT THEY ARE WRITTEN**. This is due to the GD runtime executing triggers in different orders in the same tick in different cases, and not a fault of the compiler.  
+> Please keep this in mind when writing a program that is order-sensitive. 
+
+#### 3.1.5.1. Delays
+Instruction execution times are overwritten if there is another concurrent instruction after it:
+```
+example1:
+	SE g123, C1, 0	; 2-tick instruction
+	~MOV C1, 1      ; 1-tick instruction
+    ; in this case, the instruction cluster has a 1-tick delay, since the last concurernt instruction in it is 1-tick.
+
+example2:
+    MOV C1, 0
+    ~SE g123, C1, 0
+    ; in this case, the cluster has a 2-tick delay, since SE is a 2-tick instruction
+```
+This delay is always guaranteed and enforced by the compiler.
+
+#### 3.1.5.2. Destructive operations
+It is important to be mindful of the usage of destructive operations with concurrent instructions, as data may be overwritten non-deterministically. In the case of swapping two items, the following is a baseline implementation:
+```
+swap:
+    MOV C3, C2  ; move to temp counter
+    MOV C2, C1  ; previous value is overwritten
+    MOV C1, C3  ; stored value is written back
+```
+This implementation is standard in regular procedural languages, however it may be made faster in the context of TASM with concurrent instructions:
+```
+swap:
+    MOV C3, C2
+    ~MOV C2, C1
+    ~MOV C1, C3
+```
+This implementation theoretically performs the swap in a single tick. However, since the order of execution is not strictly guaranteed to be the same as is listed in the program, this operation is unsafe and may overwrite previously stored data.  
+Therefore, we must be careful to not use possibly stale data and overwrite data that may not have been transferred in the same tick. In this case, we should not attempt to store the value of C2 and overwrite it with the value of C1 in the same tick.  
+The following is the updated implementation, which runs in 2 ticks instead of 3:
+```
+swap:
+    MOV C3, C2  ; executed on one tick
+    MOV C2, C1  ; executed on the next
+    ~MOV C1, C3
+```
+
+> [!NOTE]
+> While there likely is a deterministic and predictable way in which triggers are executed in one tick, the maintainer of this project was not aware of the mechanism. If it becomes known, please open a feature request PR on the repo.
+
 ## 3.2. Routines 
 ### 3.2.1. Routine declaration 
 A routine is declared as such:

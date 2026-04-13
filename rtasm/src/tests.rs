@@ -1,34 +1,37 @@
 use paste::paste;
 use std::time::Instant;
 
-use crate::core::{TasmValue, TasmValueType, fits_arg_signature};
+use crate::core::structs::{TasmPrimitive, TasmValue, TasmValueType, fits_arg_signature};
 
 use super::*;
 
 macro_rules! tasm_test {
-    // parser success
+    // successful compile
     ($file:literal, true) => {
         paste! {
             #[test]
-            fn [<fileparse_pass _ $file>]() {
-                assert!(lexer::parse_file(
+            fn [<compile_success _ $file>]() {
+                let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
                     true,
                     false
-                ).is_ok())
+                ).unwrap();
+                assert!(res.handle_routines(&String::new()).is_ok())
             }
         }
     };
-    // parser error handler
+    // fail in lexing stage
     ($file:literal, false) => {
         paste! {
             #[test]
             fn [<fileparse_fail _ $file>]() {
                 assert!(lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -38,13 +41,14 @@ macro_rules! tasm_test {
             }
         }
     };
-    // compiler error handler
+    // fail in translation stage
     ($file:literal, false, compile) => {
         paste! {
             #[test]
-            fn [<fileparse_fail _ $file>]() {
+            fn [<translate_fail _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -55,13 +59,14 @@ macro_rules! tasm_test {
             }
         }
     };
-    // parser success
+    // file in the `example_programs` directory
     ($file:literal, example) => {
         paste! {
             #[test]
-            fn [<fileparse_example _ $file>]() {
+            fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -73,13 +78,14 @@ macro_rules! tasm_test {
         }
     };
 
-    // parser success
-    ($file:literal, exmaple_no_entry_point) => {
+    // file in the `example_programs` directory without an entry point
+    ($file:literal, example_no_entry_point) => {
         paste! {
             #[test]
-            fn [<fileparse_example _ $file>]() {
+            fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -90,9 +96,28 @@ macro_rules! tasm_test {
             }
         }
     };
+
+    // tests compiler-defined implementations located in `tests/compdef_{ident}.tasm`
+    ($file:literal, compdef) => {
+        paste! {
+            #[test]
+            fn [<compdef _ $file>]() {
+                let mut res = lexer::parse_file(
+                    fs::read_to_string(format!("../tests/compdef_{}.tasm", $file)).unwrap(),
+                    format!("test"),
+                    9999,
+                    0,
+                    true,
+                    true,
+                    true // no entry point, since the routine should be named the same as the ident
+                ).unwrap();
+                assert!(res.handle_routines(&String::new()).is_ok())
+            }
+        }
+    };
 }
 
-tasm_test!("fetch", exmaple_no_entry_point);
+tasm_test!("fetch", example_no_entry_point);
 tasm_test!("fib_in_memory", example);
 tasm_test!("incrementer", example);
 tasm_test!("is_c1_prime", example);
@@ -109,6 +134,7 @@ tasm_test!("bad_args", false);
 tasm_test!("bad_assignment", false, compile);
 tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
+tasm_test!("concurrent", true);
 tasm_test!("correct", true);
 tasm_test!("empty", true);
 tasm_test!("flags", true);
@@ -126,14 +152,18 @@ tasm_test!("timer_not_counter", false);
 tasm_test!("timerops", true);
 tasm_test!("trailing_comma", false);
 tasm_test!("values", true);
+// compdef: internal compiler-defined implementation
+tasm_test!("swap", compdef);
+tasm_test!("min", compdef);
+tasm_test!("max", compdef);
 
 #[test]
 fn int_detection() {
     assert!(fits_arg_signature(
         &vec![TasmValue::Number(1.0), TasmValue::Number(1.1)],
         &[
-            TasmValueType::Primitive(core::TasmPrimitive::Int),
-            TasmValueType::Primitive(core::TasmPrimitive::Number),
+            TasmValueType::Primitive(TasmPrimitive::Int),
+            TasmValueType::Primitive(TasmPrimitive::Number),
         ],
     ))
 }
@@ -143,8 +173,8 @@ fn no_int_detection() {
     assert!(!fits_arg_signature(
         &vec![TasmValue::Number(1.1), TasmValue::Number(1.1)],
         &[
-            TasmValueType::Primitive(core::TasmPrimitive::Int),
-            TasmValueType::Primitive(core::TasmPrimitive::Number),
+            TasmValueType::Primitive(TasmPrimitive::Int),
+            TasmValueType::Primitive(TasmPrimitive::Number),
         ],
     ))
 }
@@ -153,7 +183,16 @@ fn no_int_detection() {
 fn parse_tasm() -> anyhow::Result<()> {
     let file = fs::read_to_string("../programs/nuclear_reactor.tasm")?;
     let mut parse_start = Instant::now();
-    let mut tasm = lexer::parse_file(file, 9999, 0, true, true, false).unwrap();
+    let mut tasm = lexer::parse_file(
+        file,
+        format!("../programs/nuclear_reactor.tasm"),
+        9999,
+        0,
+        true,
+        true,
+        false,
+    )
+    .unwrap();
 
     println!(
         "Parse time: {:.3}ms",

@@ -10,338 +10,21 @@ use gdlib::gdobj::{
         random_trigger, spawn_trigger, stop_trigger, time_control, time_trigger, toggle_trigger,
     },
 };
+
 use paste::paste;
 
-// const GROUP_SPAWN_DELAY: f64 = 0.0044;
-const GROUP_SPAWN_DELAY: f64 = 0.0044;
-
-use crate::core::{
-    FlagValue, HandlerArgs, HandlerData, HandlerFn, HandlerReturn, MemInfo, TasmParseError,
-    TasmPrimitive, TasmValue, TasmValueType,
+use crate::{
+    core::{
+        HandlerReturn,
+        error::{TasmError, TasmErrorType},
+        flags::FlagValue,
+        structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
+    },
+    instr::{
+        GROUP_SPAWN_DELAY, LowerCompOp, LowerOp, flag_override, get_flag_value, get_flag_value_opt,
+        get_item_spec,
+    },
 };
-
-// convert a list of type identifiers into a slice
-macro_rules! argset {
-    (($($arg:ident),*) => $fn:ident) => {
-        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn)
-    };
-
-    // use this for list args
-    ([$argtype:ident] => $fn:ident) => {
-        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn)
-    }
-}
-
-pub const INSTR_SPEC: &[(
-    &'static str,                     // ident
-    bool,                             // exclusive to _init
-    &[(&[TasmValueType], HandlerFn)], // handlers
-)] = &[
-    // inits
-    ("MALLOC", true, &[argset!((Int) => malloc)]),
-    ("FMALLOC", true, &[argset!((Int) => fmalloc)]),
-    ("INITMEM", true, &[argset!([Number] => init_mem)]),
-    ("PERS", true, &[argset!((Item) => pers)]),
-    ("DISPLAY", true, &[argset!((Item) => display)]),
-    ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
-    // memory
-    ("MFUNC", false, &[argset!(() => mfunc)]),
-    ("MREAD", false, &[argset!(() => mread)]),
-    ("MWRITE", false, &[argset!(() => mwrite)]),
-    ("MPTR", false, &[argset!((Int) => mptr)]),
-    ("MRESET", false, &[argset!(() => mreset)]),
-    (
-        "MOV",
-        false,
-        &[
-            argset!((Item, Number) => arithmetic_item_num_mov),
-            argset!((Item, Item) => arithmetic_2items_mov),
-        ],
-    ),
-    // debug
-    ("BREAKPOINT", false, &[argset!(() => skip)]),
-    // Process
-    ("SPAWN", false, &[argset!((Group) => spawn)]),
-    // Waits
-    ("NOP", false, &[argset!(() => nop)]),
-    ("WAIT", false, &[argset!((Int) => wait)]),
-    // Arithmetic
-    (
-        "ADD",
-        false,
-        &[
-            argset!((Item, Item) => arithmetic_2items_add),
-            argset!((Item, Number) => arithmetic_item_num_add),
-            argset!((Item, Item, Item) => arithmetic_3items_add),
-        ],
-    ),
-    (
-        "SUB",
-        false,
-        &[
-            argset!((Item, Item) => arithmetic_2items_sub),
-            argset!((Item, Number) => arithmetic_item_num_sub),
-            argset!((Item, Item, Item) => arithmetic_3items_sub),
-        ],
-    ),
-    (
-        "ADDM",
-        false,
-        &[
-            argset!((Item, Item, Number) => add_mod_2items_num),
-            argset!((Item, Item, Item, Number) => add_mod_3items_num),
-        ],
-    ),
-    (
-        "SUBM",
-        false,
-        &[
-            argset!((Item, Item, Number) => sub_mod_2items_num),
-            argset!((Item, Item, Item, Number) => sub_mod_3items_num),
-        ],
-    ),
-    (
-        "ADDD",
-        false,
-        &[
-            argset!((Item, Item, Number) => add_div_2items_num),
-            argset!((Item, Item, Item, Number) => add_div_3items_num),
-        ],
-    ),
-    (
-        "SUBD",
-        false,
-        &[
-            argset!((Item, Item, Number) => sub_div_2items_num),
-            argset!((Item, Item, Item, Number) => sub_div_3items_num),
-        ],
-    ),
-    (
-        "MUL",
-        false,
-        &[
-            argset!((Item, Item) => arithmetic_2items_mul),
-            argset!((Item, Number) => arithmetic_item_num_mul),
-            argset!((Item, Item, Item) => arithmetic_3items_mul),
-            argset!((Item, Item, Number) => arithmetic_2items_num_mul),
-        ],
-    ),
-    (
-        "DIV",
-        false,
-        &[
-            argset!((Item, Item) => arithmetic_2items_div),
-            argset!((Item, Number) => arithmetic_item_num_div),
-            argset!((Item, Item, Item) => arithmetic_3items_div),
-            argset!((Item, Item, Number) => arithmetic_2items_num_div),
-        ],
-    ),
-    (
-        "FLDIV",
-        false,
-        &[
-            argset!((Item, Item) => fldiv_2items),
-            argset!((Item, Number) => fldiv_item_num),
-            argset!((Item, Item, Item) => fldiv_3items),
-            argset!((Item, Item, Number) => fldiv_2items_num),
-        ],
-    ),
-    (
-        "SE",
-        false,
-        &[
-            argset!((Group, Item, Item) => spawn_item_item_eq),
-            argset!((Group, Item, Number) => spawn_item_num_eq),
-        ],
-    ),
-    (
-        "SNE",
-        false,
-        &[
-            argset!((Group, Item, Item) => spawn_item_item_ne),
-            argset!((Group, Item, Number) => spawn_item_num_ne),
-        ],
-    ),
-    (
-        "SL",
-        false,
-        &[
-            argset!((Group, Item, Item) => spawn_item_item_le),
-            argset!((Group, Item, Number) => spawn_item_num_le),
-        ],
-    ),
-    (
-        "SLE",
-        false,
-        &[
-            argset!((Group, Item, Item) => spawn_item_item_leq),
-            argset!((Group, Item, Number) => spawn_item_num_leq),
-        ],
-    ),
-    (
-        "SG",
-        false,
-        &[
-            argset!((Group, Item, Item) => spawn_item_item_ge),
-            argset!((Group, Item, Number) => spawn_item_num_ge),
-        ],
-    ),
-    (
-        "SGE",
-        false,
-        &[
-            argset!((Group, Item, Item) => spawn_item_item_geq),
-            argset!((Group, Item, Number) => spawn_item_num_geq),
-        ],
-    ),
-    (
-        "FE",
-        false,
-        &[
-            argset!((Group, Group, Item, Item) => fork_item_item_eq),
-            argset!((Group, Group, Item, Number) => fork_item_num_eq),
-        ],
-    ),
-    (
-        "FNE",
-        false,
-        &[
-            argset!((Group, Group, Item, Item) => fork_item_item_ne),
-            argset!((Group, Group, Item, Number) => fork_item_num_ne),
-        ],
-    ),
-    (
-        "FL",
-        false,
-        &[
-            argset!((Group, Group, Item, Item) => fork_item_item_le),
-            argset!((Group, Group, Item, Number) => fork_item_num_le),
-        ],
-    ),
-    (
-        "FLE",
-        false,
-        &[
-            argset!((Group, Group, Item, Item) => fork_item_item_leq),
-            argset!((Group, Group, Item, Number) => fork_item_num_leq),
-        ],
-    ),
-    (
-        "FG",
-        false,
-        &[
-            argset!((Group, Group, Item, Item) => fork_item_item_ge),
-            argset!((Group, Group, Item, Number) => fork_item_num_ge),
-        ],
-    ),
-    (
-        "FGE",
-        false,
-        &[
-            argset!((Group, Group, Item, Item) => fork_item_item_geq),
-            argset!((Group, Group, Item, Number) => fork_item_num_geq),
-        ],
-    ),
-    ("SRAND", false, &[argset!((Group, Number) => spawn_random)]),
-    (
-        "FRAND",
-        false,
-        &[argset!((Group, Group, Number) => fork_random)],
-    ),
-    (
-        "TSPAWN",
-        false,
-        &[argset!((Timer, Number, Number, Group) => tspawn)],
-    ),
-    ("TSTART", false, &[argset!((Timer) => tstart)]),
-    ("TSTOP", false, &[argset!((Timer) => tstop)]),
-    ("PAUSE", false, &[argset!((Group) => pause)]),
-    ("RESUME", false, &[argset!((Group) => resume)]),
-    ("STOP", false, &[argset!((Group) => stop)]),
-];
-
-macro_rules! wrap_objs {
-    ($objs:expr) => {
-        Ok(HandlerData::from_objects($objs))
-    };
-}
-
-// utils
-pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
-    match item {
-        TasmValue::Counter(c) => Some(Item::Counter(*c)),
-        TasmValue::Timer(t) => Some(Item::Timer(*t)),
-        TasmValue::GDItem(i) => Some(*i),
-        _ => None,
-    }
-}
-
-fn get_flag_value(args: &HandlerArgs, ident: &str, default: FlagValue) -> FlagValue {
-    match args.flags.iter().find(|f| f.ident == ident) {
-        Some(flag) => flag.value.clone(),
-        None => default,
-    }
-}
-
-fn get_flag_value_opt(args: &HandlerArgs, ident: &str) -> Option<FlagValue> {
-    args.flags
-        .iter()
-        .find(|f| f.ident == ident)
-        .and_then(|f| Some(f.clone().value))
-}
-
-fn flag_override<T>(item: &mut T, ident: &str, args: &HandlerArgs)
-where
-    FlagValue: Into<T>,
-{
-    if let Some(value) = args.flags.iter().find(|f| f.ident == ident) {
-        *item = value.value.clone().into()
-    }
-}
-
-// Below enums are created for integration with macro.
-
-#[allow(non_camel_case_types)]
-enum LowerOp {
-    add,
-    sub,
-    mul,
-    div,
-    mov,
-}
-impl LowerOp {
-    pub const fn to_op(&self) -> Op {
-        match self {
-            Self::add => Op::Add,
-            Self::sub => Op::Sub,
-            Self::mul => Op::Mul,
-            Self::div => Op::Div,
-            Self::mov => Op::Set,
-        }
-    }
-}
-
-#[allow(non_camel_case_types)]
-enum LowerCompOp {
-    eq,
-    ne,
-    le,
-    leq,
-    ge,
-    geq,
-}
-impl LowerCompOp {
-    pub const fn to_op(&self) -> CompareOp {
-        match self {
-            Self::eq => CompareOp::Equals,
-            Self::ne => CompareOp::NotEquals,
-            Self::le => CompareOp::Less,
-            Self::leq => CompareOp::LessOrEquals,
-            Self::ge => CompareOp::Greater,
-            Self::geq => CompareOp::GreaterOrEquals,
-        }
-    }
-}
 
 macro_rules! handlers {
     // handlers!((add, sub, mul, div) => _arith_2items)
@@ -351,7 +34,7 @@ macro_rules! handlers {
     ( ($($var:ident),* $(,)?) => $inner_fn:ident) => {
         $(
             paste! {
-                fn [<$inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
+                pub fn [<$inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
                     Ok(HandlerData::from_objects($inner_fn(args, (LowerOp::$var).to_op(), false)))
                 }
             }
@@ -361,7 +44,7 @@ macro_rules! handlers {
     ( [$($var:ident),* $(,)?] + $extra_groups:literal => $inner_fn:ident) => {
         $(
             paste! {
-                fn [<$inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
+                pub fn [<$inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
                     Ok(
                         HandlerData::from_objects($inner_fn(args, (LowerCompOp::$var).to_op()))
                             .extra_groups($extra_groups),
@@ -372,37 +55,50 @@ macro_rules! handlers {
     };
 }
 
-// fn todo(_args: HandlerArgs) -> HandlerReturn {
+macro_rules! wrap_objs {
+    ($objs:expr) => {
+        Ok(HandlerData::from_objects($objs))
+    };
+}
+
+// pub fn todo(_args: HandlerArgs) -> HandlerReturn {
 //     unimplemented!()
 // }
 
 // useful for instructions that don't correspond to any objects
 // namely debug instructions
 // namely breakpoint
-fn skip(_args: HandlerArgs) -> HandlerReturn {
+pub fn skip(_args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::default().skip_spaces(0))
 }
 
 /* WAIT */
 
-fn nop(_args: HandlerArgs) -> HandlerReturn {
+pub fn nop(_args: HandlerArgs) -> HandlerReturn {
     // skip no-op space
     Ok(HandlerData::default().skip_spaces(1))
 }
 
-fn wait(args: HandlerArgs) -> HandlerReturn {
+pub fn wait(args: HandlerArgs) -> HandlerReturn {
     // skip specified amount of spaces
     let wait = args.args[0].to_int().unwrap();
     if wait >= 0 {
         Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
     } else {
-        Err(TasmParseError::InvalidWaitAmount((args.line, wait)))
+        Err(TasmError {
+            _type: TasmErrorType::InvalidWaitAmount,
+            file: String::new(),
+            routine: String::new(),
+            error: true,
+            line: args.line,
+            details: format!("Cannot wait a negative number of ticks."),
+        })
     }
 }
 
 /* ARITHMETIC */
 // even though all functions return one object, they return Vecs for compatibility with the macro.
-fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
+pub fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let result = get_item_spec(&args.args[0]).unwrap();
     let operand = get_item_spec(&args.args[1]).unwrap();
 
@@ -438,7 +134,7 @@ fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject
         finmode.1,
     )]
 }
-fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
+pub fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let op2 = get_item_spec(&args.args[2]).unwrap();
@@ -474,7 +170,7 @@ fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject
         finmode.1,
     )]
 }
-fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
+pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     // second arg should always be a number
     let mut modifier = args.args[1].to_float().unwrap();
@@ -508,7 +204,7 @@ fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObje
         finmode.1,
     )]
 }
-fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
+pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let mut modifier = args.args[2].to_float().unwrap();
@@ -548,7 +244,7 @@ handlers!((add, sub, mul, div) => arithmetic_3items);
 handlers!((add, sub, mul, div, mov) => arithmetic_item_num);
 handlers!((mul, div) => arithmetic_2items_num);
 
-fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+pub fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
 
@@ -576,7 +272,7 @@ fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObj
         finmode.1,
     )
 }
-fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let op2 = get_item_spec(&args.args[2]).unwrap();
@@ -607,64 +303,64 @@ fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObj
     )
 }
 
-fn add_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn add_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_2items_num(args, Op::Add, true),
     ]))
 }
-fn add_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn add_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_3items_num(args, Op::Add, true),
     ]))
 }
-fn sub_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn sub_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_2items_num(args, Op::Sub, true),
     ]))
 }
-fn sub_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn sub_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_3items_num(args, Op::Sub, true),
     ]))
 }
-fn add_div_2items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn add_div_2items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_2items_num(args, Op::Add, false),
     ]))
 }
-fn add_div_3items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn add_div_3items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_3items_num(args, Op::Add, false),
     ]))
 }
-fn sub_div_2items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn sub_div_2items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_2items_num(args, Op::Sub, false),
     ]))
 }
-fn sub_div_3items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn sub_div_3items_num(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         arithmetic_with_mod_3items_num(args, Op::Sub, false),
     ]))
 }
 
 // fldiv instructions are not supported in the macro, so they are defined here.
-fn fldiv_2items(args: HandlerArgs) -> HandlerReturn {
+pub fn fldiv_2items(args: HandlerArgs) -> HandlerReturn {
     wrap_objs!(arithmetic_2items(args, Op::Div, true,))
 }
-fn fldiv_item_num(args: HandlerArgs) -> HandlerReturn {
+pub fn fldiv_item_num(args: HandlerArgs) -> HandlerReturn {
     wrap_objs!(arithmetic_item_num(args, Op::Div, true,))
 }
-fn fldiv_3items(args: HandlerArgs) -> HandlerReturn {
+pub fn fldiv_3items(args: HandlerArgs) -> HandlerReturn {
     wrap_objs!(arithmetic_3items(args, Op::Div, true,))
 }
-fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
+pub fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
     wrap_objs!(arithmetic_2items_num(args, Op::Div, true,))
 }
 
 /* COMPARES */
 
-fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
+pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
     spawn_trigger(
         &spawn_cfg,
         group,
@@ -677,7 +373,7 @@ fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
     )
 }
 
-fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+pub fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
@@ -707,7 +403,7 @@ fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         spawn_trg(&spawn_cfg, spawning_group),
     ]
 }
-fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+pub fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
@@ -737,7 +433,7 @@ fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         spawn_trg(&spawn_cfg, spawning_group),
     ]
 }
-fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+pub fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
@@ -778,7 +474,7 @@ fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         spawn_trg(&spawn_false_cfg, spawning_false),
     ]
 }
-fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+pub fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     // below
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
@@ -827,7 +523,7 @@ handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
 /* RANDOMS */
 
-fn spawn_random(args: HandlerArgs) -> HandlerReturn {
+pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
     let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
@@ -850,7 +546,7 @@ fn spawn_random(args: HandlerArgs) -> HandlerReturn {
     .extra_groups(1))
 }
 
-fn fork_random(args: HandlerArgs) -> HandlerReturn {
+pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
     let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
@@ -884,7 +580,7 @@ fn fork_random(args: HandlerArgs) -> HandlerReturn {
 
 /* PROCESS */
 
-fn spawn(args: HandlerArgs) -> HandlerReturn {
+pub fn spawn(args: HandlerArgs) -> HandlerReturn {
     let spawning_group = args.args[0].to_group_id().unwrap();
     let cfg = args.cfg.clone().set_control_id(spawning_group);
     wrap_objs!(vec![spawn_trigger(
@@ -899,7 +595,7 @@ fn spawn(args: HandlerArgs) -> HandlerReturn {
     )])
 }
 
-fn pause(args: HandlerArgs) -> HandlerReturn {
+pub fn pause(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![stop_trigger(
         &args.cfg,
         args.args[0].to_group_id().unwrap(),
@@ -908,7 +604,7 @@ fn pause(args: HandlerArgs) -> HandlerReturn {
     )]))
 }
 
-fn resume(args: HandlerArgs) -> HandlerReturn {
+pub fn resume(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![stop_trigger(
         &args.cfg,
         args.args[0].to_group_id().unwrap(),
@@ -917,7 +613,7 @@ fn resume(args: HandlerArgs) -> HandlerReturn {
     )]))
 }
 
-fn stop(args: HandlerArgs) -> HandlerReturn {
+pub fn stop(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![stop_trigger(
         &args.cfg,
         args.args[0].to_group_id().unwrap(),
@@ -928,7 +624,7 @@ fn stop(args: HandlerArgs) -> HandlerReturn {
 
 /* TIMERS */
 
-fn tstart(args: HandlerArgs) -> HandlerReturn {
+pub fn tstart(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![time_control(
         &args.cfg,
         get_item_spec(&args.args[0]).unwrap().id(),
@@ -936,7 +632,7 @@ fn tstart(args: HandlerArgs) -> HandlerReturn {
     )]))
 }
 
-fn tstop(args: HandlerArgs) -> HandlerReturn {
+pub fn tstop(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![time_control(
         &args.cfg,
         get_item_spec(&args.args[0]).unwrap().id(),
@@ -944,7 +640,7 @@ fn tstop(args: HandlerArgs) -> HandlerReturn {
     )]))
 }
 
-fn tspawn(args: HandlerArgs) -> HandlerReturn {
+pub fn tspawn(args: HandlerArgs) -> HandlerReturn {
     let timer = args.args[0].to_timer_id().unwrap();
     let start_time = args.args[1].to_float().unwrap();
     let stop_time = args.args[2].to_float().unwrap();
@@ -966,7 +662,7 @@ fn tspawn(args: HandlerArgs) -> HandlerReturn {
 
 /* MEMORY */
 
-fn mptr(args: HandlerArgs) -> HandlerReturn {
+pub fn mptr(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
     let move_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 + 7.5);
     let add_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 - 7.5);
@@ -1020,14 +716,18 @@ fn mptr(args: HandlerArgs) -> HandlerReturn {
             ),
         ]))
     } else {
-        Err(TasmParseError::InvalidPointerMove(
-            invalid_move_reason,
-            args.line,
-        ))
+        Err(TasmError {
+            _type: TasmErrorType::InvalidPointerMove,
+            file: String::new(),
+            routine: String::new(),
+            error: true,
+            line: args.line,
+            details: invalid_move_reason,
+        })
     }
 }
 
-fn mreset(args: HandlerArgs) -> HandlerReturn {
+pub fn mreset(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
     let move_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 + 7.5);
     let add_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 - 7.5);
@@ -1062,7 +762,7 @@ fn mreset(args: HandlerArgs) -> HandlerReturn {
     ]))
 }
 
-fn mfunc(args: HandlerArgs) -> HandlerReturn {
+pub fn mfunc(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![move_trigger(
         &args.cfg,
         MoveMode::Default(DefaultMove {
@@ -1080,7 +780,7 @@ fn mfunc(args: HandlerArgs) -> HandlerReturn {
     .skip_spaces(2))
 }
 
-fn mem_mode(args: HandlerArgs, toggle_read: bool) -> HandlerReturn {
+pub fn mem_mode(args: HandlerArgs, toggle_read: bool) -> HandlerReturn {
     let top_cfg = args.cfg.clone().scale(0.5, 0.5).y(args.cfg.pos.1 + 7.5);
     let bottom_cfg = args.cfg.clone().scale(0.5, 0.5).y(args.cfg.pos.1 - 7.5);
     let mem_info = args.mem_info.unwrap();
@@ -1091,16 +791,16 @@ fn mem_mode(args: HandlerArgs, toggle_read: bool) -> HandlerReturn {
     ]))
 }
 
-fn mwrite(args: HandlerArgs) -> HandlerReturn {
+pub fn mwrite(args: HandlerArgs) -> HandlerReturn {
     mem_mode(args, false)
 }
-fn mread(args: HandlerArgs) -> HandlerReturn {
+pub fn mread(args: HandlerArgs) -> HandlerReturn {
     mem_mode(args, true)
 }
 
 /* INITS */
 
-fn display(args: HandlerArgs) -> HandlerReturn {
+pub fn display(args: HandlerArgs) -> HandlerReturn {
     let item = get_item_spec(&args.args[0]).unwrap();
     let cfg = GDObjConfig::new()
         .pos(-75.0, 75.0 + 30.0 * args.displayed_items as f64)
@@ -1142,7 +842,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     .skip_spaces(0))
 }
 
-fn pers(args: HandlerArgs) -> HandlerReturn {
+pub fn pers(args: HandlerArgs) -> HandlerReturn {
     let item = get_item_spec(&args.args[0]).unwrap();
     Ok(HandlerData::from_objects(vec![persistent_item(
         &args.cfg,
@@ -1156,7 +856,7 @@ fn pers(args: HandlerArgs) -> HandlerReturn {
 
 /* MEM INITS */
 
-fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
+pub fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let (mem_x, mem_y) = (45.0, 165.0 + args.routine_count as f64 * 30.0);
     let mem_size = args.args[0].to_int().unwrap() as i16;
 
@@ -1331,8 +1031,8 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     data.ptr_group = ptr_group;
     data.new_mem = Some(MemInfo {
         _type: match float_mem {
-            true => crate::core::MemType::Float,
-            false => crate::core::MemType::Int,
+            true => MemType::Float,
+            false => MemType::Int,
         },
         memreg: match float_mem {
             true => TasmValue::Timer(memreg_id),
@@ -1343,20 +1043,21 @@ fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
         read_group,
         write_group,
         start_counter_id,
+        line: args.line,
     });
 
     data
 }
 
-fn malloc(args: HandlerArgs) -> HandlerReturn {
+pub fn malloc(args: HandlerArgs) -> HandlerReturn {
     Ok(malloc_inner(args, false))
 }
 
-fn fmalloc(args: HandlerArgs) -> HandlerReturn {
+pub fn fmalloc(args: HandlerArgs) -> HandlerReturn {
     Ok(malloc_inner(args, true))
 }
 
-fn init_mem(args: HandlerArgs) -> HandlerReturn {
+pub fn init_mem(args: HandlerArgs) -> HandlerReturn {
     let y_offset = args.routine_count as f64 * 30.0 + 150.0;
     let mut cfg = GDObjConfig::new().pos(-15.0, 0.0).scale(0.25, 0.25);
 
@@ -1373,8 +1074,8 @@ fn init_mem(args: HandlerArgs) -> HandlerReturn {
             None,
             None,
             match mem_info._type {
-                crate::core::MemType::Float => Item::Timer(start_counter + idx as i16),
-                crate::core::MemType::Int => Item::Counter(start_counter + idx as i16),
+                MemType::Float => Item::Timer(start_counter + idx as i16),
+                MemType::Int => Item::Counter(start_counter + idx as i16),
             },
             v.to_float().unwrap(),
             Op::Set,

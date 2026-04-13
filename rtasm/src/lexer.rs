@@ -36,11 +36,18 @@
 //! All lines are stripped for whitespace on the right-hand side before tokenisation.
 //! Following that, all routines are indexed and their group determined.
 //! Finally, all instructions are parsed in each group sequentially.
+use std::mem::take;
+
 use crate::{
     core::{
-        ENTRY_POINT, Flag, FlagValueType, INIT_ROUTINE, Instruction, ParseErrorType, Routine, Tasm,
-        TasmParseError, TasmValue, fits_arg_signature, get_flag_type, get_instr_type,
-        is_builtin_alias,
+        consts::{ENTRY_POINT, INIT_ROUTINE},
+        error::{ParseErrorType, TasmError, TasmErrorType},
+        flags::{Flag, FlagValueType, get_flag_type},
+        push_error, push_error_lineless,
+        structs::{
+            Instruction, Routine, Tasm, TasmValue, fits_arg_signature, get_instr_type,
+            is_builtin_alias,
+        },
     },
     instr::INSTR_SPEC,
     verbose_log,
@@ -58,7 +65,7 @@ impl Tasm {
 
         verbose_log!(self, "Finished indexing routines.");
 
-        if self.routine_data.len() == 0 {
+        if self.routine_data.is_empty() {
             // there is nothing to parse
             return;
         }
@@ -75,13 +82,18 @@ impl Tasm {
 
         // error if no entry point
         if !self.has_entry_point && !disable_entry_point_check {
-            self.errors.push(TasmParseError::NoEntryPoint);
+            push_error_lineless(
+                &mut self.errors,
+                &self.fname,
+                TasmErrorType::NoEntryPoint,
+                "No entry point found in file.".into(),
+            );
         }
 
         verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
 
-        if self.errors.len() > 0 {
+        if !self.errors.is_empty() {
             verbose_log!(self, "Parsed file with {} errors.", self.errors.len());
         } else {
             verbose_log!(self, "Parsed file successfully with 0 errors.")
@@ -90,11 +102,13 @@ impl Tasm {
 
     pub fn get_aliases_from_init(&mut self) {
         // _init is at idx 0
-        let init_instructions = &self.routine_data[0].3;
+        let init_instructions = &mut self.routine_data[0].3;
 
         let mut aliases: Vec<(String, String)> = vec![];
 
-        for (line, raw_instr) in init_instructions {
+        // need to take to iteration with mutable references to self in self.push_error
+        let instrs = take(init_instructions);
+        for (line, raw_instr) in instrs.iter() {
             if !raw_instr.starts_with("ALIAS ") {
                 continue;
             }
@@ -103,40 +117,59 @@ impl Tasm {
                 .strip_prefix("ALIAS ")
                 .unwrap()
                 .split(',')
-                .into_iter()
                 .map(|v| v.trim())
                 .collect::<Vec<_>>();
             if trimmed.len() != 2 {
                 // otherwise, error
-                self.errors.push(TasmParseError::InvalidInstruction((
-                    format!("Instruction ALIAS must only have two arguments: [String, Any]"),
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    TasmErrorType::InvalidInstruction,
                     *line,
-                )));
+                    INIT_ROUTINE.into(),
+                    "Instruction ALIAS must only have two arguments: [String, Any]".to_string(),
+                );
             }
 
             if let Ok(v) = TasmValue::to_value(trimmed[0])
                 && let Some(s) = v.to_string()
             {
-                let err = if let Some(_) = aliases.iter().find(|(a, _)| *a == s) {
-                    TasmParseError::BadAlias((
-                        format!("Cannot override existing alias {s}."),
+                if aliases.iter().any(|(a, _)| *a == s) {
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::BadAlias,
                         *line,
-                    ))
+                        INIT_ROUTINE.into(),
+                        format!("Cannot override existing alias {s}."),
+                    );
                 } else if is_builtin_alias(&s) {
-                    TasmParseError::BadAlias((format!("Cannot override default alias {s}."), *line))
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::BadAlias,
+                        *line,
+                        INIT_ROUTINE.into(),
+                        format!("Cannot override default alias {s}."),
+                    );
                 } else {
                     aliases.push((s, trimmed[1].into()));
                     continue;
                 };
-
-                self.errors.push(err);
             } else {
-                self.errors.push(TasmParseError::InvalidInstruction((
-                    format!("Bad alias identifier: {}", trimmed[0]),
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    TasmErrorType::InvalidInstruction,
                     *line,
-                )));
+                    INIT_ROUTINE.into(),
+                    format!("Bad alias identifier: {}", trimmed[0]),
+                );
             };
         }
+
+        // put these back after taking
+        self.routine_data[0].3 = instrs;
 
         self.defined_aliases = aliases;
     }
@@ -159,7 +192,7 @@ impl Tasm {
                             INIT_PLACEHOLDER_GROUP => 0,
                             g => g,
                         })
-                        .ident(&ident), // routine object
+                        .ident(ident), // routine object
                 )
             })
             .collect();
@@ -168,7 +201,7 @@ impl Tasm {
             let prev_err_count = self.errors.len();
             for (curr_line, line) in lines {
                 let trimmed_line = line.trim();
-                if trimmed_line == "" {
+                if trimmed_line.is_empty() {
                     continue; // skip blank line
                 }
 
@@ -186,19 +219,24 @@ impl Tasm {
         }
     }
 
-    fn parse_raw_value(&mut self, v: &str, curr_line: usize) -> Option<TasmValue> {
+    fn parse_raw_value(&mut self, v: &str, curr_line: usize, routine: String) -> Option<TasmValue> {
         match TasmValue::to_value(v.trim()) {
             // whitespace is stripped when parsing
-            Ok(t) => self.parse_tasm_value(t, curr_line),
+            Ok(t) => self.parse_tasm_value(t, curr_line, routine),
             Err((etype, msg)) => {
                 // error if unable to parse argument value
-                self.errors.push(match etype {
-                    ParseErrorType::BadID => TasmParseError::BadID((msg, curr_line)),
-                    ParseErrorType::TrailingComma => TasmParseError::TrailingComma(curr_line),
-                    ParseErrorType::InvalidNumber => {
-                        TasmParseError::InvalidNumber((msg, v.to_string(), curr_line))
-                    }
-                });
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    match etype {
+                        ParseErrorType::BadID => TasmErrorType::BadID,
+                        ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
+                        ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
+                    },
+                    curr_line,
+                    routine.clone(),
+                    msg,
+                );
 
                 None
             }
@@ -218,19 +256,27 @@ impl Tasm {
         let (args_string, flags) = match split_at_char_once(
             trimmed_line,
             '|',
-            TasmParseError::InvalidInstruction(("Bad flag arguments".into(), curr_line)),
+            TasmError {
+                _type: TasmErrorType::InvalidInstruction,
+                file: self.fname.clone(),
+                routine: curr_routine.ident.clone(),
+                error: true,
+                line: curr_line,
+                details: "Bad flag arguments".into(),
+            },
         ) {
             Ok((left, right)) => {
-                if right == "" {
+                if right.is_empty() {
                     (left, vec![])
                 } else {
-                    let flags_parsed = match parse_flags_str(right, curr_line) {
-                        Ok(flags) => flags,
-                        Err(e) => {
-                            self.errors.push(e);
-                            return;
-                        }
-                    };
+                    let flags_parsed =
+                        match parse_flags_str(right, curr_line, &self.fname, &curr_routine.ident) {
+                            Ok(flags) => flags,
+                            Err(e) => {
+                                self.errors.push(e);
+                                return;
+                            }
+                        };
 
                     (left, flags_parsed)
                 }
@@ -241,22 +287,44 @@ impl Tasm {
             }
         };
 
-        let instr;
+        let instr: String;
         let mut args: Vec<TasmValue> = vec![];
+
+        let is_concurrent: bool;
 
         if let Some(pos) = args_string.trim().find(" ") {
             if args_string.ends_with(',') {
-                self.errors.push(TasmParseError::TrailingComma(curr_line));
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    TasmErrorType::TrailingComma,
+                    curr_line,
+                    curr_routine.ident.clone(),
+                    format!("Trailing commas are not allowed."),
+                );
                 return;
             }
 
-            instr = args_string[..pos].to_uppercase();
+            let instr_raw = args_string[..pos].to_uppercase();
+            if let Some(stripped) = instr_raw.strip_prefix('~') {
+                is_concurrent = true;
+                instr = stripped.to_string();
+            } else {
+                is_concurrent = false;
+                instr = instr_raw;
+            }
 
             // exclude alias instructions (parsed first thing after lexing)
             if instr.as_str() == "ALIAS" {
                 if curr_routine.ident.as_str() != "_init" {
-                    self.errors
-                        .push(TasmParseError::NonInitAliasDefinition(curr_line));
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::NonInitAliasDefinition,
+                        curr_line,
+                        curr_routine.ident.clone(),
+                        format!("Cannot define an alias outside of the init routine."),
+                    );
                 }
                 return;
             }
@@ -276,21 +344,32 @@ impl Tasm {
             }
 
             for raw in raw_args {
-                match self.parse_raw_value(&raw, curr_line) {
+                match self.parse_raw_value(&raw, curr_line, curr_routine.ident.clone()) {
                     Some(v) => args.push(v),
                     None => erroneous_instr = true,
                 }
             }
             if erroneous_instr {
                 verbose_log!(self, "Got bad args.");
-                self.errors.push(TasmParseError::InvalidInstruction((
-                    "Failed to parse instruction: invalid argset".into(),
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    TasmErrorType::InvalidInstruction,
                     curr_line,
-                )));
+                    curr_routine.ident.clone(),
+                    "Failed to parse instruction: invalid argset".into(),
+                );
             }
         } else {
             // no args or extras (everything after | )
-            instr = args_string.to_uppercase();
+            let instr_raw = args_string.to_uppercase();
+            if let Some(stripped) = instr_raw.strip_prefix('~') {
+                is_concurrent = true;
+                instr = stripped.to_string();
+            } else {
+                is_concurrent = false;
+                instr = instr_raw;
+            }
         }
 
         // find the instruction spec which contains arg handlers
@@ -298,23 +377,31 @@ impl Tasm {
             match INSTR_SPEC.iter().find(|(ident, _, _)| ident == &instr) {
                 Some(spec) => spec,
                 None => {
-                    self.errors.push(TasmParseError::InvalidInstruction((
-                        format!("Unrecognized instruction {instr}: "),
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::InvalidInstruction,
                         curr_line,
-                    )));
+                        curr_routine.ident.clone(),
+                        format!("Unrecognized instruction {instr}: "),
+                    );
                     return;
                 }
             };
 
         // check if this isntruction is allowed in the routine
         if *init_exclusive && curr_routine.ident != INIT_ROUTINE {
-            self.errors.push(TasmParseError::InvalidInstruction((
-                    format!(
-                        "Instruction {instr} is not allowed in routine {} because it is exclusive to the initialiser routine, {INIT_ROUTINE}.",
-                        curr_routine.ident,
-                    ),
-                    curr_line,
-                )));
+            push_error(
+                &mut self.errors,
+                &self.fname,
+                TasmErrorType::InvalidInstruction,
+                curr_line,
+                curr_routine.ident.clone(),
+                format!(
+                    "Instruction {instr} is not allowed in routine {} because it is exclusive to the initialiser routine, {INIT_ROUTINE}.",
+                    curr_routine.ident
+                ),
+            );
             return;
         }
 
@@ -322,7 +409,7 @@ impl Tasm {
         match handlers
             .iter()
             .find(|&(sig, _)| fits_arg_signature(&args, sig))
-            .and_then(|v| Some(v.1))
+            .map(|v| v.1)
         {
             Some(handler) => {
                 // finally, add instruction to routine
@@ -333,23 +420,40 @@ impl Tasm {
                     args,
                     flags,
                     handler_fn: handler,
+                    is_concurrent,
                 });
             }
             None => {
                 let argtypes = &args.iter().map(|a| a.get_type()).collect::<Vec<_>>();
                 // otherwise, error
-                self.errors.push(TasmParseError::InvalidInstruction((
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    TasmErrorType::InvalidInstruction,
+                    curr_line,
+                    curr_routine.ident.clone(),
                     format!(
                         "Instruction {instr} has no argument handler for the argset {argtypes:?}"
                     ),
-                    curr_line,
-                )));
+                );
             }
         }
     }
 
-    fn parse_tasm_value(&mut self, t: TasmValue, curr_line: usize) -> Option<TasmValue> {
-        parse_tasm_value(t, &self.routine_group_map, &mut self.errors, curr_line)
+    fn parse_tasm_value(
+        &mut self,
+        t: TasmValue,
+        curr_line: usize,
+        routine: String,
+    ) -> Option<TasmValue> {
+        parse_tasm_value(
+            t,
+            &self.routine_group_map,
+            &mut self.errors,
+            self.fname.clone(),
+            routine,
+            curr_line,
+        )
     }
 
     pub fn index_routines(&mut self) {
@@ -393,14 +497,24 @@ impl Tasm {
                     }
 
                     // check that this routine was not already declared
+                    // take to iterate with mutable reference available for error pushing
+
                     for rtn in self.routine_data.iter() {
                         if routine_ident == rtn.1 {
                             verbose_log!(self, "Routine was already declared.");
-                            self.errors.push(TasmParseError::MultipleRoutineDefintions(
-                                routine_ident.clone(),
+                            push_error(
+                                &mut self.errors,
+                                &self.fname,
+                                TasmErrorType::MultipleRoutineDefintions,
                                 line_idx,
-                                rtn.0,
-                            ));
+                                routine_ident.clone(),
+                                format!(
+                                    "
+                                Routine {} was already declared on line {}",
+                                    rtn.1.clone(),
+                                    rtn.0
+                                ),
+                            );
                         }
                     }
 
@@ -410,8 +524,14 @@ impl Tasm {
                 } else {
                     // this is not a routine identifier, so it is a bad token
                     verbose_log!(self, "Found bad token on line {line_idx}");
-                    self.errors
-                        .push(TasmParseError::BadToken((line.to_string(), line_idx)));
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::BadToken,
+                        line_idx,
+                        format!("<No routine>"),
+                        format!("Bad token."),
+                    );
                 }
             } else if in_routine {
                 let trim = line.trim();
@@ -439,32 +559,29 @@ impl Tasm {
     }
 }
 
-fn split_at_char_once(
-    instr: &str,
-    ch: char,
-    err: TasmParseError,
-) -> Result<(&str, &str), TasmParseError> {
-    let mut line_split = instr.split(ch).into_iter();
+fn split_at_char_once(instr: &str, ch: char, err: TasmError) -> Result<(&str, &str), TasmError> {
+    let mut line_split = instr.split(ch);
 
     // the first part is always present, which is guaranteed to be
     // the string with the instruction and its arguments
     let left = line_split.next().unwrap();
 
-    let right = if let Some(contents) = line_split.next() {
-        contents
-    } else {
-        ""
-    };
+    let right = line_split.next().unwrap_or_default();
 
-    if let Some(_) = line_split.next() {
+    if line_split.next().is_some() {
         return Err(err);
     }
 
     Ok((left, right))
 }
 
-fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmParseError> {
-    let raw_flags = flags_str.trim().split(' ').into_iter();
+fn parse_flags_str(
+    flags_str: &str,
+    curr_line: usize,
+    file: &String,
+    routine: &String,
+) -> Result<Vec<Flag>, TasmError> {
+    let raw_flags = flags_str.trim().split(' ');
 
     let mut preprocessed = vec![];
     let mut in_dict = false;
@@ -491,7 +608,14 @@ fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmP
         match split_at_char_once(
             flag_segment,
             ':',
-            TasmParseError::BadFlag((flag_segment.to_owned(), curr_line)),
+            TasmError {
+                _type: TasmErrorType::BadFlag,
+                file: file.clone(),
+                routine: routine.clone(),
+                error: true,
+                line: curr_line,
+                details: format!("Bad flag: {flag_segment}"),
+            },
         ) {
             Ok((ident, value)) => {
                 match get_flag_type(ident) {
@@ -519,10 +643,14 @@ fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmP
                         t => preprocessed.push((ident.into(), value.into(), t)),
                     },
                     None => {
-                        return Err(TasmParseError::BadFlag((
-                            format!("Unrecognized flag {flag_segment}"),
-                            curr_line,
-                        )));
+                        return Err(TasmError {
+                            _type: TasmErrorType::BadFlag,
+                            file: file.clone(),
+                            routine: routine.clone(),
+                            error: true,
+                            line: curr_line,
+                            details: format!("Unrecognized flag {flag_segment}"),
+                        });
                     }
                 }
             }
@@ -536,10 +664,16 @@ fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmP
         match Flag::from(ident.clone(), &raw_value, t.clone()) {
             Some(flag) => parsed_flags.push(flag),
             None => {
-                return Err(TasmParseError::BadFlag((
-                    format!("Unable to parse {ident} with value of {raw_value} and type {t:?}"),
-                    curr_line,
-                )));
+                return Err(TasmError {
+                    _type: TasmErrorType::BadFlag,
+                    file: file.clone(),
+                    routine: routine.clone(),
+                    error: true,
+                    line: curr_line,
+                    details: format!(
+                        "Unable to parse {ident} with value of {raw_value} and type {t:?}"
+                    ),
+                });
             }
         }
     }
@@ -549,8 +683,10 @@ fn parse_flags_str(flags_str: &str, curr_line: usize) -> Result<Vec<Flag>, TasmP
 
 pub fn parse_tasm_value(
     t: TasmValue,
-    routine_group_map: &Vec<(String, i16)>,
-    errors: &mut Vec<TasmParseError>,
+    routine_group_map: &[(String, i16)],
+    errors: &mut Vec<TasmError>,
+    fname: String,
+    routine: String,
     curr_line: usize,
 ) -> Option<TasmValue> {
     // if this is a routine ident, add corresponding group
@@ -558,14 +694,21 @@ pub fn parse_tasm_value(
         match routine_group_map
             .iter()
             .find(|(ident, _)| *ident == s)
-            .and_then(|data| Some(data.1))
+            .map(|data| data.1)
         {
             Some(group) => {
                 if group != INIT_PLACEHOLDER_GROUP {
                     Some(TasmValue::Group(group))
                 } else {
                     // only throw err if the group is the _init group
-                    errors.push(TasmParseError::InitRoutineSpawnError(curr_line + 1));
+                    errors.push(TasmError {
+                        _type: TasmErrorType::InitRoutineSpawnError,
+                        file: fname,
+                        routine,
+                        error: true,
+                        line: curr_line,
+                        details: format!("Cannot spawn init routine."),
+                    });
                     None
                 }
             }
@@ -578,16 +721,17 @@ pub fn parse_tasm_value(
 
 pub fn parse_file<T: AsRef<str>>(
     in_str: T,
+    fname: String,
     mem_end_counter: i16,
     group_offset: i16,
     verbose_logs: bool,
     log_errs: bool,
     disable_entry_point_check: bool,
-) -> Result<Tasm, Vec<TasmParseError>> {
+) -> Result<Tasm, Vec<TasmError>> {
     let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
     let lines = in_str
         .as_ref()
-        .replace('\t', &" ") // tabs converted to spaces, works for parsing purposes.
+        .replace('\t', " ") // tabs converted to spaces, works for parsing purposes.
         .lines() // remove comments
         .map(|l| l.split(';').next().unwrap().trim_end().to_string())
         .collect::<Vec<String>>();
@@ -595,9 +739,10 @@ pub fn parse_file<T: AsRef<str>>(
     tasm.lines = lines;
     tasm.logs_enabled = verbose_logs;
     tasm.group_offset = group_offset;
+    tasm.fname = fname;
     tasm.parse(group_offset, disable_entry_point_check);
 
-    if tasm.errors.len() == 0 {
+    if tasm.errors.is_empty() {
         Ok(tasm)
     } else {
         if log_errs && verbose_logs {
