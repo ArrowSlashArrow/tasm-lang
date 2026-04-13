@@ -16,7 +16,7 @@ use paste::paste;
 use crate::{
     core::{
         HandlerReturn,
-        error::TasmParseError,
+        error::{TasmError, TasmErrorType},
         flags::FlagValue,
         structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
     },
@@ -85,7 +85,14 @@ pub fn wait(args: HandlerArgs) -> HandlerReturn {
     if wait >= 0 {
         Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
     } else {
-        Err(TasmParseError::InvalidWaitAmount((args.line, wait)))
+        Err(TasmError {
+            _type: TasmErrorType::InvalidWaitAmount,
+            file: String::new(),
+            routine: String::new(),
+            error: true,
+            line: args.line,
+            details: format!("Cannot wait a negative number of ticks."),
+        })
     }
 }
 
@@ -709,10 +716,14 @@ pub fn mptr(args: HandlerArgs) -> HandlerReturn {
             ),
         ]))
     } else {
-        Err(TasmParseError::InvalidPointerMove(
-            invalid_move_reason,
-            args.line,
-        ))
+        Err(TasmError {
+            _type: TasmErrorType::InvalidPointerMove,
+            file: String::new(),
+            routine: String::new(),
+            error: true,
+            line: args.line,
+            details: invalid_move_reason,
+        })
     }
 }
 
@@ -1032,6 +1043,7 @@ pub fn malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
         read_group,
         write_group,
         start_counter_id,
+        line: args.line,
     });
 
     data

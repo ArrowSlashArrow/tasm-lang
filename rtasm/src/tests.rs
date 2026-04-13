@@ -13,6 +13,7 @@ macro_rules! tasm_test {
             fn [<compile_success _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -30,6 +31,7 @@ macro_rules! tasm_test {
             fn [<fileparse_fail _ $file>]() {
                 assert!(lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -46,6 +48,7 @@ macro_rules! tasm_test {
             fn [<translate_fail _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -63,6 +66,7 @@ macro_rules! tasm_test {
             fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -81,6 +85,7 @@ macro_rules! tasm_test {
             fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -99,6 +104,7 @@ macro_rules! tasm_test {
             fn [<compdef _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/compdef_{}.tasm", $file)).unwrap(),
+                    format!("test"),
                     9999,
                     0,
                     true,
@@ -177,7 +183,16 @@ fn no_int_detection() {
 fn parse_tasm() -> anyhow::Result<()> {
     let file = fs::read_to_string("../programs/nuclear_reactor.tasm")?;
     let mut parse_start = Instant::now();
-    let mut tasm = lexer::parse_file(file, 9999, 0, true, true, false).unwrap();
+    let mut tasm = lexer::parse_file(
+        file,
+        format!("../programs/nuclear_reactor.tasm"),
+        9999,
+        0,
+        true,
+        true,
+        false,
+    )
+    .unwrap();
 
     println!(
         "Parse time: {:.3}ms",

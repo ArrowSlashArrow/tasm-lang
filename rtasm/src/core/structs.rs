@@ -3,7 +3,7 @@ use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 use crate::core::{
     HandlerFn,
     consts::GROUP_LIMIT,
-    error::{ParseErrorType, TasmParseError},
+    error::{ParseErrorType, TasmError},
     flags::Flag,
 };
 
@@ -362,12 +362,13 @@ pub struct MemInfo {
     pub read_group: i16,
     pub write_group: i16,
     pub start_counter_id: i16,
+    pub line: usize, // where is was created
 }
 
 #[derive(Debug, Default)]
 pub struct Tasm {
     pub routines: Vec<Routine>,
-    pub errors: Vec<TasmParseError>,
+    pub errors: Vec<TasmError>,
     pub routine_data: Vec<(usize, String, i16, Vec<(usize, String)>)>,
     pub routine_group_map: Vec<(String, i16)>,
     pub group_offset: i16,
@@ -385,6 +386,7 @@ pub struct Tasm {
     pub logs_enabled: bool,
     pub release_mode: bool,
     pub defined_aliases: Vec<(String, String)>,
+    pub fname: String,
 }
 
 /// Aliases lookup container

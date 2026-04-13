@@ -2,11 +2,6 @@
 - docs
     - add style guidelines/best practices
     - add ptrpos counter inc/dec docs to mptr/mreset instructions
-- refactor error enum with proper formatting via struct fields
-    - add warning level
-        - warning: modifying ptrpos. this counter should never be modified unless by actually moving the pointer.
-- `--no-log` flag to disable everything printed to stdout
-- `--objdump` don't compile, but dump all object info once parsed
 
 ## roadmap
 - a way to include custom objects

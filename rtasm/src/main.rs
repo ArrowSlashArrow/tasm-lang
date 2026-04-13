@@ -79,6 +79,7 @@ fn main() -> Result<(), Error> {
 
     let mut tasm = match lexer::parse_file(
         file,
+        args.infile.clone(),
         args.mem_end_counter,
         args.group_offset,
         args.verbose_logs && !args.no_log,
