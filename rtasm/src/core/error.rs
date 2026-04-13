@@ -1,11 +1,4 @@
-use std::{error::Error, fmt::Display, num::ParseIntError};
-
-use gdlib::gdobj::ItemType;
-
-use crate::core::{
-    consts::{ENTRY_POINT, GROUP_LIMIT},
-    structs::TasmValue,
-};
+use std::{error::Error, fmt::Display};
 
 #[derive(Debug, Clone)]
 pub struct TasmError {

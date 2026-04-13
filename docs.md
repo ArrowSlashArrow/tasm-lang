@@ -41,7 +41,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of March 23, 2026 is **v0.2.0**. 
+The current version, as of April 12, 2026 is **v0.2.2**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -606,7 +606,7 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.2.0, the aliases that exist are:
+As of TASM v0.2.2, the aliases that exist are:
 - `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
 - `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
@@ -636,7 +636,7 @@ Below is the specification for all instructions and how many extra groups are us
 | MALLOC/FMALLOC                 | memsize + 4 | one for the pointer, pointer reset, read and write groups, and one per allocated cell. |
 ## 3.5. Comments
 <!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.0. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.2. 
 ## 3.6. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
@@ -645,7 +645,7 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-**NOTE:** As of the 18th of February, 2026, there are no installers. The TASM compiler is entirely portable, and should be treated as such. 
+**NOTE:** As of April 12, 2026, there are no installers. The TASM compiler is entirely portable, and should be treated as such. 
 It is encouraged to use the pre-built executables from the [GitHub repository](https://github.com/ArrowSlashArrow/tasm-lang), however, if it is not possible to use them, refer to the below instructions for manually installing the compiler:
 ## 4.1. rtasm compiler
 Prerequisites: 
