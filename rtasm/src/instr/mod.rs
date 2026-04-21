@@ -35,18 +35,21 @@ pub const INSTR_SPEC: &[(
     &[(&[TasmValueType], HandlerFn)], // handlers
 )] = &[
     // inits
-    ("LMALLOC", true, &[argset!((Int) => legacy_malloc)]),
-    ("LFMALLOC", true, &[argset!((Int) => legacy_fmalloc)]),
+    ("MALLOC", true, &[argset!((Int, Int) => malloc)]),
+    ("FMALLOC", true, &[argset!((Int, Int) => fmalloc)]),
     ("INITMEM", true, &[argset!([Number] => init_mem)]),
     ("PERS", true, &[argset!((Item) => pers)]),
     ("DISPLAY", true, &[argset!((Item) => display)]),
     ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
-    // memory
+    // legacy memory
+    ("LMALLOC", true, &[argset!((Int) => legacy_malloc)]),
+    ("LFMALLOC", true, &[argset!((Int) => legacy_fmalloc)]),
     ("LMFUNC", false, &[argset!(() => legacy_mfunc)]),
     ("LMREAD", false, &[argset!(() => legacy_mread)]),
     ("LMWRITE", false, &[argset!(() => legacy_mwrite)]),
     ("LMPTR", false, &[argset!((Int) => legacy_mptr)]),
     ("LMRESET", false, &[argset!(() => legacy_mreset)]),
+    // memory
     (
         "MOV",
         false,

@@ -401,6 +401,8 @@ pub struct Aliases {
 pub enum MemType {
     Float,
     Int,
+    LegacyFloat,
+    LegacyInt,
 }
 
 #[derive(Debug, Default, Clone)]

@@ -4,15 +4,11 @@
 - compiler optimizations (v1.0.0-rc1)
     - SORI (single object routine inlining)
     - optimizations within the compiler itself
+- document the memory structure
 
 ## post-v1.0
 - un-deprecate emulator
 - possibly add tty for console output
-- memory improvements
-    - this is a possibly breaking change, so minor release number is increased
-    - refactor memory to be more group efficient
-    - refactor should also include being able to look up memory from any address
-    - possibly retain legacy memory as compiler option
 
 - old mem instructions:
     - INITMEM
@@ -27,7 +23,6 @@
     - malloc: uses argset of start and end now (inclusive)
     - mget: calls mem controller in read mode (toggle trigger + spawn concurrently)
     - mset: call mem controlled in write mode
-    - lma :mov num to ptrpos
 ### compiler optimizations
 - single object routine inline
     - any routine that conatins a single object will be inlined
