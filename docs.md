@@ -205,14 +205,14 @@ Execution time: 1 tick.  
 ##### MPTR
 Arguments: `MPTR <int>`
 
-Moves the pointer by a specified amount. A positive number pushes it forward into memory, while a negative number retracts it back towards address 0.  
+Moves the pointer by a specified amount. A positive number pushes it forward into memory, while a negative number retracts it back towards address 0. This movement amount is added to the PTRPOS counter to keep track of the pointer's position.  
 Note: If the pointer is moved outside of memory, namely outside the range \[0, memsize), it will not read any memory, and will not get moved back down if MFUNC is called. 
 Please be mindful of this when using the instruction. If it is desirable that the pointer returns to valid address space, please use the instruction MRESET.  
 Execution time: 1 tick.  
 ##### MRESET
 Arguments: `MRESET`
 
-Resets the pointer position to 0.  
+Resets the pointer position to 0 and the PTRPOS counter to 0.  
 Execution time: 1 tick.  
 ##### 3.1.2.3.1. Memory safety guarantees
 If the pointer is outside of the memory range \[0, memsize), no memory will be read. This means that nothing will be read from or written to the MEMREG, but the pointer will still move upwards.

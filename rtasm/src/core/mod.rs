@@ -94,7 +94,7 @@ impl Tasm {
             for instr in routine.instructions.iter() {
                 self.handle_instruction(
                     instr,
-                    &routine,
+                    routine,
                     &mut previous_spacing_amount,
                     &mut obj_pos,
                     rtn_ypos,
@@ -161,7 +161,7 @@ impl Tasm {
                     TasmErrorType::InitRoutineMemoryAccess,
                     instr.line_number,
                     INIT_ROUTINE.into(),
-                    format!("Cannot access memory in the init routine."),
+                    "Cannot access memory in the init routine.".to_string(),
                 );
                 return;
             }
@@ -172,7 +172,7 @@ impl Tasm {
                     TasmErrorType::NonexistentMemoryAccess,
                     instr.line_number,
                     routine.ident.clone(),
-                    format!("Cannot access memory when none exists."),
+                    "Cannot access memory when none exists.".to_string(),
                 );
                 return;
             }

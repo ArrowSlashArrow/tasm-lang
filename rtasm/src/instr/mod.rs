@@ -9,10 +9,11 @@ use crate::{
         flags::FlagValue,
         structs::{HandlerArgs, TasmPrimitive, TasmValue, TasmValueType},
     },
-    instr::fns::*,
+    instr::{fns::*, mem::*},
 };
 
 pub mod fns;
+pub mod mem;
 
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
@@ -29,23 +30,23 @@ macro_rules! argset {
 }
 
 pub const INSTR_SPEC: &[(
-    &'static str,                     // ident
+    &str,                             // ident
     bool,                             // exclusive to _init
     &[(&[TasmValueType], HandlerFn)], // handlers
 )] = &[
     // inits
-    ("MALLOC", true, &[argset!((Int) => malloc)]),
-    ("FMALLOC", true, &[argset!((Int) => fmalloc)]),
+    ("LMALLOC", true, &[argset!((Int) => legacy_malloc)]),
+    ("LFMALLOC", true, &[argset!((Int) => legacy_fmalloc)]),
     ("INITMEM", true, &[argset!([Number] => init_mem)]),
     ("PERS", true, &[argset!((Item) => pers)]),
     ("DISPLAY", true, &[argset!((Item) => display)]),
     ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
     // memory
-    ("MFUNC", false, &[argset!(() => mfunc)]),
-    ("MREAD", false, &[argset!(() => mread)]),
-    ("MWRITE", false, &[argset!(() => mwrite)]),
-    ("MPTR", false, &[argset!((Int) => mptr)]),
-    ("MRESET", false, &[argset!(() => mreset)]),
+    ("LMFUNC", false, &[argset!(() => legacy_mfunc)]),
+    ("LMREAD", false, &[argset!(() => legacy_mread)]),
+    ("LMWRITE", false, &[argset!(() => legacy_mwrite)]),
+    ("LMPTR", false, &[argset!((Int) => legacy_mptr)]),
+    ("LMRESET", false, &[argset!(() => legacy_mreset)]),
     (
         "MOV",
         false,
