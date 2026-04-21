@@ -29,7 +29,9 @@ pub fn get_instr_type(ident: &str) -> Option<InstrType> {
         "INITMEM" | "MALLOC" | "FMALLOC" | "PERS" | "DISPLAY" | "IOBLOCK" | "ALIAS" => {
             Some(InstrType::Init)
         }
-        "MFUNC" | "MREAD" | "MWRITE" | "MPTR" | "MRESET" => Some(InstrType::Memory),
+        "MFUNC" | "MREAD" | "MWRITE" | "MPTR" | "MRESET" | "MSET" | "MGET" => {
+            Some(InstrType::Memory)
+        }
         "NOP" | "WAIT" => Some(InstrType::Wait),
         "TSPAWN" | "TSTART" | "TSTOP" => Some(InstrType::Timer),
         "STOP" | "PAUSE" | "RESUME" => Some(InstrType::Process),

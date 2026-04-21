@@ -10,19 +10,6 @@
 - un-deprecate emulator
 - possibly add tty for console output
 
-- old mem instructions:
-    - INITMEM
-    - fmalloc
-    - mptr
-    - mreset
-    - mread
-    - mwrite
-    - mfunc
-- new mem instructions:
-    - initmem
-    - malloc: uses argset of start and end now (inclusive)
-    - mget: calls mem controller in read mode (toggle trigger + spawn concurrently)
-    - mset: call mem controlled in write mode
 ### compiler optimizations
 - single object routine inline
     - any routine that conatins a single object will be inlined

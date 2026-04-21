@@ -3,22 +3,22 @@
 
 _init:
     DISPLAY C1
-    MALLOC 50
+    LMALLOC 50
     INITMEM 0,1
 
 fib:
-    MREAD
-    MFUNC           ; read the first number
+    LMREAD
+    LMFUNC           ; read the first number
     MOV C1, MEMREG  ; save it to C1
-    MPTR 1          ; go to next number
-    MFUNC           ; read
+    LMPTR 1          ; go to next number
+    LMFUNC           ; read
     ADD MEMREG, C1  ; add previous number to it
 
-    MWRITE
-    MPTR 1          ; increment pointer position
-    MFUNC           ; save the new number
+    LMWRITE
+    LMPTR 1          ; increment pointer position
+    LMFUNC           ; save the new number
 
-    MPTR -1         ; align pointer to last number
+    LMPTR -1         ; align pointer to last number
 
     ; spawn is pointer position is less than memsize - 1, which is set in _start
     SL fib, PTRPOS, C2

@@ -15,14 +15,17 @@ use gdlib::gdobj::{
     triggers::{
         ColliderConfig, CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget,
         Op, RoundMode, SignMode, TargetMove, collision_block, collision_trigger, counter_object,
-        item_edit, move_trigger, toggle_trigger,
+        item_edit, move_trigger, spawn_trigger, toggle_trigger,
     },
 };
 
-use crate::core::{
-    HandlerReturn,
-    error::{TasmError, TasmErrorType},
-    structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
+use crate::{
+    core::{
+        HandlerReturn,
+        error::{TasmError, TasmErrorType},
+        structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
+    },
+    instr::GROUP_SPAWN_DELAY,
 };
 
 // TODO: get rid for this when the gdlib maintainer fixes his crate
@@ -642,9 +645,10 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let mut data = HandlerData::from_objects(level);
 
     data.used_extra_groups = next_group - args.curr_group;
-    // fields are used in legacy memory. they are not used in vmem.
+    // field used in legacy memory, not used in vmem.
     data.ptr_reset_group = 0;
-    data.ptr_group = 0;
+    // controller group set as ptr group for vmem instructions.
+    data.ptr_group = controller_group;
 
     data.new_mem = Some(MemInfo {
         _type: match float_mem {
@@ -671,4 +675,50 @@ pub fn malloc(args: HandlerArgs) -> HandlerReturn {
 }
 pub fn fmalloc(args: HandlerArgs) -> HandlerReturn {
     Ok(malloc_generator(args, true))
+}
+
+pub fn mset(args: HandlerArgs) -> HandlerReturn {
+    // writing, so toggle off read group
+    let minfo = args.mem_info.unwrap();
+    Ok(HandlerData::from_objects(vec![
+        spawn_trigger(
+            &args.cfg,
+            args.ptr_group,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+            vec![],
+        ),
+        toggle_trigger(
+            &args.cfg.clone().translate(1.0, 0.0),
+            minfo.read_group,
+            false,
+        ),
+    ])
+    .skip_spaces(4))
+}
+
+pub fn mget(args: HandlerArgs) -> HandlerReturn {
+    // writing, so toggle off read group
+    let minfo = args.mem_info.unwrap();
+    Ok(HandlerData::from_objects(vec![
+        spawn_trigger(
+            &args.cfg,
+            args.ptr_group,
+            GROUP_SPAWN_DELAY,
+            0.0,
+            false,
+            true,
+            false,
+            vec![],
+        ),
+        toggle_trigger(
+            &args.cfg.clone().translate(1.0, 0.0),
+            minfo.write_group,
+            false,
+        ),
+    ])
+    .skip_spaces(4))
 }

@@ -58,6 +58,8 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item) => arithmetic_2items_mov),
         ],
     ),
+    ("MSET", false, &[argset!(() => mset)]),
+    ("MGET", false, &[argset!(() => mget)]),
     // debug
     ("BREAKPOINT", false, &[argset!(() => skip)]),
     // Process

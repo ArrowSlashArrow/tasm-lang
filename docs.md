@@ -189,6 +189,22 @@ Creates a memory block that is able to write to and read from the first counter 
 Only one memory allocation is allowed per program.  
 Only allowed `_init` routine.
 
+##### MSET
+Arguments: `MSET`
+
+Sets the value of the item at the `PTRPOS` to the value of the `MEMREG`.  
+The address of the item must have already been set in the `PTRPOS` counter.
+
+Execution time: 4 ticks
+
+##### MGET
+Arguments: `MGET`
+
+Reads the value of the item at the `PTRPOS` into the `MEMREG`.  
+The address of the item must have already been set in the `PTRPOS` counter.
+
+Execution time: 4 ticks
+
 ##### INITMEM
 Arguments: `INITMEM <numbers>`
 
@@ -658,7 +674,6 @@ There are two types of memory in TASM. Below is a comparison table:
 | Usage                   | Until v0.2.2         | v0.2.3 and onwards       |
 
 While legacy memory is still usable, it is considered old and will not be actively maintained. Therefore, it is recommended to use the new memory instructions.
-### 3.4.1. Interals
 
 ## 3.5. Group usage 
 Group usage in TASM is meant to be optimized, but is not expected to be fully optimized while the language is still in development.   
