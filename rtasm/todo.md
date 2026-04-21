@@ -1,18 +1,21 @@
-## roadmap
+## todos for v1.0
 - a way to include custom objects
     - `OBJECT`
 - compiler optimizations (v1.0.0-rc1)
     - SORI (single object routine inlining)
     - optimizations within the compiler itself
 - document the memory structure
+- test new memory structure
+- make landing page
+- generate actual doc page from docs.md
+- make either an installer or intsall mgr program (like rustup) for tasmc
+- compiler optimizations
+    - single object routine inline
+        - any routine that conatins a single object will be inlined
 
 ## post-v1.0
 - un-deprecate emulator
 - possibly add tty for console output
-
-### compiler optimizations
-- single object routine inline
-    - any routine that conatins a single object will be inlined
 
 ## planned for PLSE
 Note: instructions specified here are not planned to be included in the tasm ISA. they are placeholders for functionality in the planned stdlib for PLSE.
@@ -42,7 +45,3 @@ Note: instructions specified here are not planned to be included in the tasm ISA
         - min: ( a + b - |a - b| )/ 2
     - `SWAP item, item`: swaps values
 
-## extas, for later
-- make landing page
-- generate actual doc page from docs.md
-- make either an installer or intsall mgr program (like rustup) for tasmc

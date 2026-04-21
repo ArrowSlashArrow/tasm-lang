@@ -13,7 +13,7 @@ macro_rules! tasm_test {
             fn [<compile_success _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
-                    format!("test"),
+                    format!("testfile {}", $file),
                     9999,
                     0,
                     true,
@@ -31,7 +31,7 @@ macro_rules! tasm_test {
             fn [<fileparse_fail _ $file>]() {
                 assert!(lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
-                    format!("test"),
+                    format!("testfile {}", $file),
                     9999,
                     0,
                     true,
@@ -48,7 +48,7 @@ macro_rules! tasm_test {
             fn [<translate_fail _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
-                    format!("test"),
+                    format!("testfile {}", $file),
                     9999,
                     0,
                     true,
@@ -66,7 +66,7 @@ macro_rules! tasm_test {
             fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
-                    format!("test"),
+                    format!("testfile {}", $file),
                     9999,
                     0,
                     true,
@@ -85,7 +85,7 @@ macro_rules! tasm_test {
             fn [<example _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
-                    format!("test"),
+                    format!("testfile {}", $file),
                     9999,
                     0,
                     true,
@@ -104,7 +104,7 @@ macro_rules! tasm_test {
             fn [<compdef _ $file>]() {
                 let mut res = lexer::parse_file(
                     fs::read_to_string(format!("../tests/compdef_{}.tasm", $file)).unwrap(),
-                    format!("test"),
+                    format!("testfile {}", $file),
                     9999,
                     0,
                     true,

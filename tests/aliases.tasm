@@ -1,6 +1,6 @@
 ; This program uses all available aliases and a user-defined alias.
 _init:
-    MALLOC 10
+    LMALLOC 10
     ALIAS custom_alias, g123
     ALIAS rtn, routine
 
