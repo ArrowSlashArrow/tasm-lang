@@ -1,4 +1,4 @@
-<!-- # 0. These docs are still Work-In-Progress! -->
+# TASM Documentation
 # 1. Overview 
 ## 1.1. Abstract 
 TASM is a powerful, domain-specific language that is designed to take advantage of the trigger system in Geometry Dash. The language is intended as an alternative to hand-placement of triggers in a level, and encourages developers to instead write clean code to achieve the same. 
@@ -51,7 +51,7 @@ This section contains documentation of the GD environment that is relevant to th
 While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As such, TASM programmers must be aware of these constraints and their implications.
 - IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KB of information, assuming the availability of each and every counter and timer. 
 - Counter items (counters) are 32-bit integers. They may hold any value from \[-2<sup>32</sup> , 2<sup>32</sup>-1).
-- Timer items (timers) are 32-bit floats, as per the [IEEE-754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format) implementation.
+- Timer items (timers) are 32-bit floats, as per the [IEEE-754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format) implementation. It is not possible to set the value of a timer higher than 9,999,999.0 with item edit triggers. However, time triggers are able to do this just fine.
 - The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms). As a result, trigger programs are quite slow compared to real programs.
 
 ## 2.2. Useful mechanics
@@ -74,7 +74,7 @@ For example, the `SE` instruction is used as a branch instruction. It allows bot
 SE example_routine1, C1, 0
 SE example_routine2, C1, C2
 ```
-Note that instruction argsets are typed to ensure that valid arguments are passed. Learn more in [this section](#335-argsets).
+Note that instruction argsets are typed to ensure that valid arguments are passed. Learn more in [this section](#336-argsets).
 ### 3.1.2. Available instructions 
 All instructions in this section are expected to be fully functional. Any deprecated instructions will not be listed as of the next minor release.
 #### 3.1.2.1 Arithmetic
@@ -456,7 +456,7 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 
 > [!NOTE]
 > "Item result" refers to the intermediate result between the operands in an item edit trigger (used be arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
-> ![Item Result](./img/item_result.png)
+> ![Item Result](item_result.png)
 
 | Flag    | Usage                                                                                                 | Instructions | Type       |
 | ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- |
@@ -654,7 +654,7 @@ As of TASM v0.2.2, the aliases that exist are:
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
-**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be midful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
+**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 
@@ -677,7 +677,7 @@ While legacy memory is still usable, it is considered old and will not be active
 
 ### 3.4.1. New memory system
 Refer to this figure for any terms used that are specific to this memory structure:
-![New memory](./img/new_memory.png)
+![New memory](new_memory.png)
 
 The new memory system works based off of items encoded in groups, where each item's getter and setter has specific unique groups to any other item's getter/setter. To isolate a specific item, all groups that the memory block consists of except for the target item's groups.
 
@@ -733,7 +733,7 @@ Below is the specification for all instructions and how many extra groups are us
 
 Below is a chart that depicts the group usage according to the equations listed. The red line represents the usage of the old memory system, whereas the blue line represents the group usage of the new memory system.
 
-![Memory group usage](./img/group_usage.png)
+![Memory group usage](group_usage.png)
 
 For a memsize of more than 20, using the new system is recommended for the sake of conserving groups.
 
