@@ -4,8 +4,7 @@
 - compiler optimizations (v1.0.0-rc1)
     - SORI (single object routine inlining)
     - optimizations within the compiler itself
-- document the memory structure
-- test new memory structure
+- remove FMALLOC and have MALLOC allocate mixed memory, which mget/mset has an option to use floats for (flag or something)
 - make landing page
 - generate actual doc page from docs.md
 - make either an installer or intsall mgr program (like rustup) for tasmc

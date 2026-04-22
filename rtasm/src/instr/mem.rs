@@ -19,13 +19,10 @@ use gdlib::gdobj::{
     },
 };
 
-use crate::{
-    core::{
-        HandlerReturn,
-        error::{TasmError, TasmErrorType},
-        structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
-    },
-    instr::GROUP_SPAWN_DELAY,
+use crate::core::{
+    HandlerReturn,
+    error::{TasmError, TasmErrorType},
+    structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
 };
 
 // TODO: get rid for this when the gdlib maintainer fixes his crate

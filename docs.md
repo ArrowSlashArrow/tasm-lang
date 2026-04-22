@@ -675,6 +675,45 @@ There are two types of memory in TASM. Below is a comparison table:
 
 While legacy memory is still usable, it is considered old and will not be actively maintained. Therefore, it is recommended to use the new memory instructions.
 
+### 3.4.1. New memory system
+Refer to this figure for any terms used that are specific to this memory structure:
+![New memory](./img/new_memory.png)
+
+The new memory system works based off of items encoded in groups, where each item's getter and setter has specific unique groups to any other item's getter/setter. To isolate a specific item, all groups that the memory block consists of except for the target item's groups.
+
+#### 3.4.1.1. Item ID binary group encoding
+The way that items' getters/setters are assigned groups is by encoding the bits of the item's ID into groups.  
+When the compiler allocates memory, it first determines the maximum number of bits needed to encode. With a memory size of 25, only 5 bits are needed since 2^5 = 32, and 32 >= 25. To find the maximum number of bits needed, use the equation `bits = ceil( log_2 ( memsize ) )`.  
+Since each bit has two possible states, those being either on or off, two groups are needed per group. Groups for bit encoding start at 4, with each pair, e.g. 4 and 5, representing one bit, where the first bit represents "off" while the second represents "on". The next bit will be represented by the groups 6 and 7 for off and on respectively, and so on until all bits are encoded. Bits are encoded in order for least significant to most significant.  
+> A counter with at position 5 out of 8 cells will have the bits 101, which means it will have the groups [5, 6, 9].  
+> No two counters will share an identical group sequence, since each counter's ID is different.
+
+Encoding using bits instead of an entire group per counter, which is O(n), allows the user to allocate all available counters in only 60 groups, since the new memory system grows at a rate of O(log n) for each new group added.
+
+The groups are allocated as such:
+| Group | Purpose |
+| ----- | ------- |
+| 1 | Read group |
+| 2 | Write group |
+| 3 | Shared group |
+| 4 to bits*2 + 4 | Groups used to encode bits |
+> [!NOTE]
+> Groups are offset by a static amount if a group offset is needed. The numbers in the table are for reference.
+#### 3.4.1.2. Calling getters/setters
+When an instruction such as `MGET` or `MSET` is used, the memory controller uses the value of the PTRPOS counter to determine the target address.  
+First, the memory controller toggles on all of its groups to reset its state from any previous operations.
+When getting/setting an item with some arbitrary ID, all groups in the memory block are toggled off except for all the groups that the target trigger has. This is done by extracting each bit from the target address with a bit switch.
+
+A bit switch is a simple mechanism which does the following in order:
+- Shifts the target value to the left by `n` bits, which requires a temporary counter.
+- Checks if this new value is divisible by two
+- If this value is divisible by two, it means that this bit is a 0, and the group that corresponds to a 1 for this bit is toggled off.
+- If this vlaue is not divisible by two, the group that corresponds to a 0 is toggled off.
+
+Using a bit switch on every bit of the address (whose bitsize is determined by the compiler to be the maximum number of bits in group encoding step) allows the memory controller to toggle off every trigger that is not concerned with the target address. Since all triggers are assigned a unique combination of groups, only one trigger remains unscathed.
+
+When using either `MGET` or `MSET`, the instruction automatically despawns the opposite operation's group. For instance, when using `MGET`, the user attempts to read the value of the target address, so the write group is toggled off, and vice versa.
+
 ## 3.5. Group usage 
 Group usage in TASM is meant to be optimized, but is not expected to be fully optimized while the language is still in development.   
 Each routine uses one group to hold all of its instructions. After that, any instructions that need extra groups may use them. 
@@ -690,7 +729,14 @@ Below is the specification for all instructions and how many extra groups are us
 | NOP                            | 0           | none                                                                                   |
 | Non-initializer memory command | 0           | none                                                                                   |
 | LMALLOC/LFMALLOC               | memsize + 4 | one for the pointer, pointer reset, read and write groups, and one per allocated cell. |
-| MALLOC/FMALLOC                 | 4*ceil(log2(memsize)) + 3 | 4 per bit of the memory size + 2 for the read and write group + 1 for the controller group |
+| MALLOC/FMALLOC                 | 4*ceil(log2(memsize)) + 4 | 4 per bit of the memory size + 2 for the read and write group + 1 for the controller group + 1 for spawning the target trigger |
+
+Below is a chart that depicts the group usage according to the equations listed. The red line represents the usage of the old memory system, whereas the blue line represents the group usage of the new memory system.
+
+![Memory group usage](./img/group_usage.png)
+
+For a memsize of more than 20, using the new system is recommended for the sake of conserving groups.
+
 ## 3.6. Comments
 <!-- Version Number -->
 A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.2. 
