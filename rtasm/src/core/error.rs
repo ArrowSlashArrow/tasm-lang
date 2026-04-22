@@ -16,6 +16,7 @@ pub enum TasmErrorType {
     InvalidArguments,
     InvalidAssignment,
     InvalidWaitAmount,
+    InvalidMemoryRange,
     BadID,
     BadToken,
     BadAlias,

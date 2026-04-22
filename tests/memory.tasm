@@ -1,0 +1,13 @@
+; quick test for memory
+_init:
+    MALLOC 10, 200   ; allocates c10-c200
+    DISPLAY MEMREG
+    DISPLAY PTRPOS
+    IOBLOCK inc, 2, +
+
+_start:
+    MOV MEMREG, 50
+    MSET
+
+inc:
+    ADD PTRPOS, 1

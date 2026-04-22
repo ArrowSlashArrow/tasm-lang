@@ -300,7 +300,7 @@ impl Tasm {
                     TasmErrorType::TrailingComma,
                     curr_line,
                     curr_routine.ident.clone(),
-                    format!("Trailing commas are not allowed."),
+                    "Trailing commas are not allowed.".to_string(),
                 );
                 return;
             }
@@ -323,7 +323,7 @@ impl Tasm {
                         TasmErrorType::NonInitAliasDefinition,
                         curr_line,
                         curr_routine.ident.clone(),
-                        format!("Cannot define an alias outside of the init routine."),
+                        "Cannot define an alias outside of the init routine.".to_string(),
                     );
                 }
                 return;
@@ -529,8 +529,8 @@ impl Tasm {
                         &self.fname,
                         TasmErrorType::BadToken,
                         line_idx,
-                        format!("<No routine>"),
-                        format!("Bad token."),
+                        "<No routine>".to_string(),
+                        "Bad token.".to_string(),
                     );
                 }
             } else if in_routine {
@@ -610,8 +610,8 @@ fn parse_flags_str(
             ':',
             TasmError {
                 _type: TasmErrorType::BadFlag,
-                file: file.clone(),
-                routine: routine.clone(),
+                file: file.to_owned(),
+                routine: routine.to_owned(),
                 error: true,
                 line: curr_line,
                 details: format!("Bad flag: {flag_segment}"),
@@ -645,8 +645,8 @@ fn parse_flags_str(
                     None => {
                         return Err(TasmError {
                             _type: TasmErrorType::BadFlag,
-                            file: file.clone(),
-                            routine: routine.clone(),
+                            file: file.to_owned(),
+                            routine: routine.to_owned(),
                             error: true,
                             line: curr_line,
                             details: format!("Unrecognized flag {flag_segment}"),
@@ -666,8 +666,8 @@ fn parse_flags_str(
             None => {
                 return Err(TasmError {
                     _type: TasmErrorType::BadFlag,
-                    file: file.clone(),
-                    routine: routine.clone(),
+                    file: file.to_owned(),
+                    routine: routine.to_owned(),
                     error: true,
                     line: curr_line,
                     details: format!(
@@ -707,7 +707,7 @@ pub fn parse_tasm_value(
                         routine,
                         error: true,
                         line: curr_line,
-                        details: format!("Cannot spawn init routine."),
+                        details: "Cannot spawn init routine.".to_string(),
                     });
                     None
                 }

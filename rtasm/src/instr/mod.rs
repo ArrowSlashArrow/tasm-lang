@@ -9,10 +9,11 @@ use crate::{
         flags::FlagValue,
         structs::{HandlerArgs, TasmPrimitive, TasmValue, TasmValueType},
     },
-    instr::fns::*,
+    instr::{fns::*, mem::*},
 };
 
 pub mod fns;
+pub mod mem;
 
 const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
@@ -29,23 +30,26 @@ macro_rules! argset {
 }
 
 pub const INSTR_SPEC: &[(
-    &'static str,                     // ident
+    &str,                             // ident
     bool,                             // exclusive to _init
     &[(&[TasmValueType], HandlerFn)], // handlers
 )] = &[
     // inits
-    ("MALLOC", true, &[argset!((Int) => malloc)]),
-    ("FMALLOC", true, &[argset!((Int) => fmalloc)]),
+    ("MALLOC", true, &[argset!((Int, Int) => malloc)]),
+    ("FMALLOC", true, &[argset!((Int, Int) => fmalloc)]),
     ("INITMEM", true, &[argset!([Number] => init_mem)]),
     ("PERS", true, &[argset!((Item) => pers)]),
     ("DISPLAY", true, &[argset!((Item) => display)]),
     ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
+    // legacy memory
+    ("LMALLOC", true, &[argset!((Int) => legacy_malloc)]),
+    ("LFMALLOC", true, &[argset!((Int) => legacy_fmalloc)]),
+    ("LMFUNC", false, &[argset!(() => legacy_mfunc)]),
+    ("LMREAD", false, &[argset!(() => legacy_mread)]),
+    ("LMWRITE", false, &[argset!(() => legacy_mwrite)]),
+    ("LMPTR", false, &[argset!((Int) => legacy_mptr)]),
+    ("LMRESET", false, &[argset!(() => legacy_mreset)]),
     // memory
-    ("MFUNC", false, &[argset!(() => mfunc)]),
-    ("MREAD", false, &[argset!(() => mread)]),
-    ("MWRITE", false, &[argset!(() => mwrite)]),
-    ("MPTR", false, &[argset!((Int) => mptr)]),
-    ("MRESET", false, &[argset!(() => mreset)]),
     (
         "MOV",
         false,
@@ -54,6 +58,8 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item) => arithmetic_2items_mov),
         ],
     ),
+    ("MSET", false, &[argset!(() => mset)]),
+    ("MGET", false, &[argset!(() => mget)]),
     // debug
     ("BREAKPOINT", false, &[argset!(() => skip)]),
     // Process

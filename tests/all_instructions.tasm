@@ -2,7 +2,7 @@
 _init:
     ; MALLOC is omitted, because multiple memory instances are not allowed.
     ; FMALLOC uses the same object constructors internally
-    FMALLOC 25
+    LFMALLOC 25
     INITMEM 1.5, 2.8, 3.14
     DISPLAY C1
     PERS C1
@@ -50,11 +50,11 @@ _start:
 
     TSTART T1
 
-    MREAD
-    MPTR 5
-    MFUNC
-    MRESET
-    MWRITE
+    LMREAD
+    LMPTR 5
+    LMFUNC
+    LMRESET
+    LMWRITE
 
     NOP
     SPAWN routine1

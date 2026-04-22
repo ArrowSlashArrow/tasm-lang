@@ -26,10 +26,11 @@ pub fn get_instr_type(ident: &str) -> Option<InstrType> {
         "ADD" | "SUB" | "ADDM" | "SUBM" | "ADDD" | "SUBD" | "MUL" | "DIV" | "FLDIV" | "MOV" => {
             Some(InstrType::Arithmetic)
         }
-        "INITMEM" | "MALLOC" | "FMALLOC" | "PERS" | "DISPLAY" | "IOBLOCK" | "ALIAS" => {
-            Some(InstrType::Init)
+        "INITMEM" | "MALLOC" | "FMALLOC" | "LMALLOC" | "LFMALLOC" | "PERS" | "DISPLAY"
+        | "IOBLOCK" | "ALIAS" => Some(InstrType::Init),
+        "LMFUNC" | "LMREAD" | "LMWRITE" | "LMPTR" | "LMRESET" | "MSET" | "MGET" => {
+            Some(InstrType::Memory)
         }
-        "MFUNC" | "MREAD" | "MWRITE" | "MPTR" | "MRESET" => Some(InstrType::Memory),
         "NOP" | "WAIT" => Some(InstrType::Wait),
         "TSPAWN" | "TSTART" | "TSTOP" => Some(InstrType::Timer),
         "STOP" | "PAUSE" | "RESUME" => Some(InstrType::Process),
@@ -401,6 +402,8 @@ pub struct Aliases {
 pub enum MemType {
     Float,
     Int,
+    LegacyFloat,
+    LegacyInt,
 }
 
 #[derive(Debug, Default, Clone)]

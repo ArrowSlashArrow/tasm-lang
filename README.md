@@ -7,7 +7,7 @@ Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/w
 TASM is currently in **version v0.2.2**.  
 The working compiler is in the `rtasm/` directory. Note that the compiler is not a standalone executable, and must be executed from source.
 
-Documentation can be found [here](docs.md).
+Documentation can be found [here](docs/docs.md).
 
 # Overview
 TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of complex programs. 

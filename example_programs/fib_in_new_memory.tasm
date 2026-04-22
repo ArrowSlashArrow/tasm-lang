@@ -3,22 +3,22 @@
 
 _init:
     DISPLAY C1
-    LMALLOC 50
-    INITMEM 0,1
+    MALLOC 100, 200
+    DISPLAY PTRPOS
+    DISPLAY MEMREG
+    INITMEM 0, 1
 
 fib:
-    LMREAD
-    LMFUNC           ; read the first number
+    MGET
     MOV C1, MEMREG  ; save it to C1
-    LMPTR 1          ; go to next number
-    LMFUNC           ; read
+    ADD PTRPOS, 1
+    MGET            ; read
     ADD MEMREG, C1  ; add previous number to it
 
-    LMWRITE
-    LMPTR 1          ; increment pointer position
-    LMFUNC           ; save the new number
+    ADD PTRPOS, 1   ; increment pointer position
+    MSET            ; save the new number
 
-    LMPTR -1         ; align pointer to last number
+    SUB PTRPOS, 1   ; align pointer to last number
 
     ; spawn is pointer position is less than memsize - 1, which is set in _start
     SL fib, PTRPOS, C2
@@ -26,6 +26,6 @@ fib:
 _start:
     ; set iteration limit so that the pointer does not escape the memory area
     MOV C2, MEMSIZE
-    SUB C2, 1
+    SUB C2, 10
     ; spawn the fibonacci loop
     SPAWN fib
