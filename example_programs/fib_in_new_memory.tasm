@@ -1,0 +1,31 @@
+; attempts to calculate the fibonacci sequence with only 1 counter outside of ram. 
+; could do it completely inside of ram but i only have 1 pointer.
+
+_init:
+    DISPLAY C1
+    MALLOC 100, 200
+    DISPLAY PTRPOS
+    DISPLAY MEMREG
+    INITMEM 0, 1
+
+fib:
+    MGET
+    MOV C1, MEMREG  ; save it to C1
+    ADD PTRPOS, 1
+    MGET            ; read
+    ADD MEMREG, C1  ; add previous number to it
+
+    ADD PTRPOS, 1   ; increment pointer position
+    MSET            ; save the new number
+
+    SUB PTRPOS, 1   ; align pointer to last number
+
+    ; spawn is pointer position is less than memsize - 1, which is set in _start
+    SL fib, PTRPOS, C2
+
+_start:
+    ; set iteration limit so that the pointer does not escape the memory area
+    MOV C2, MEMSIZE
+    SUB C2, 10
+    ; spawn the fibonacci loop
+    SPAWN fib

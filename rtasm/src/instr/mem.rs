@@ -442,14 +442,26 @@ pub fn legacy_mread(args: HandlerArgs) -> HandlerReturn {
     legacy_mem_mode(args, true)
 }
 
-pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
+pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerReturn {
     // generates the block of memory of vmem (value-based memory)
 
     // memreg is 2nd last
     // ptrpos is last
     let start_ctr = args.args[0].to_int().unwrap() as i16;
-    let end_ctr = args.args[0].to_int().unwrap() as i16;
-    let memsize = start_ctr - end_ctr;
+    let end_ctr = args.args[1].to_int().unwrap() as i16;
+    let memsize = (end_ctr - start_ctr) + 1;
+    if memsize < 0 {
+        return Err(TasmError {
+            _type: TasmErrorType::InvalidMemoryRange,
+            file: String::new(),
+            routine: String::new(),
+            error: true,
+            line: args.line,
+            details: format!("Cannot allocate memory from {start_ctr} to {end_ctr}."),
+        });
+    }
+
+    let y_offset = 45.0 + args.routine_count as f64 * 30.0;
 
     let ptrpos = end_ctr;
     let memreg = end_ctr - 1;
@@ -480,13 +492,15 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let group_offset = args.curr_group;
     let read_group = 1 + group_offset;
     let write_group = 2 + group_offset;
+    // group used to spawn the only trigger left after all of them were turned off
+    let shared_group = 3 + group_offset;
 
     let mut level = vec![];
     for i in 0..memsize {
         // groups are binary encoded
         let mut groups: Vec<i16> = vec![0; max_bits as usize];
 
-        let mut group: i16 = 3 + group_offset;
+        let mut group: i16 = 4 + group_offset;
         for g_idx in 0..max_bits {
             // the logic here:
             // add odd group (group + 0, since it is already odd) if bit == 0
@@ -497,20 +511,25 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
             groups[g_idx as usize] = group + bit;
             group += 2;
         }
+        groups.push(shared_group);
 
         let cfg = GDObjConfig::new()
             .pos(
                 ((i) % memblock_height + 2) as f64 * 15.0 + 15.0,
-                ((i) / memblock_height + 2) as f64 * 15.0 + 15.0,
+                ((i) / memblock_height + 2) as f64 * 15.0 + 15.0 + y_offset,
             )
             .scale(0.2, 0.2)
             .groups(groups)
             .spawnable(true)
             .multitrigger(true);
 
+        let item_id = i + start_ctr;
+
+        let mut ctr_cfg = cfg.clone().spawnable(false).multitrigger(false);
+        ctr_cfg.clear_groups();
         level.push(counter_object(
-            &cfg.clone().spawnable(false).multitrigger(false),
-            (item_constructor)(i + 1),
+            &ctr_cfg,
+            (item_constructor)(item_id),
             gdlib::gdobj::triggers::ItemAlign::Center,
             false,
         ));
@@ -520,7 +539,7 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
 
         level.push(item_edit(
             &read_cfg,
-            Some((item_constructor)(i + 1)),
+            Some((item_constructor)(item_id)),
             None,
             (item_constructor)(memreg),
             1.0,
@@ -539,7 +558,7 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
             &write_cfg,
             Some((item_constructor)(memreg)),
             None,
-            (item_constructor)(i + 1),
+            (item_constructor)(item_id),
             1.0,
             Op::Set,
             true,
@@ -564,8 +583,8 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
      */
 
     // starting height for the controller area
-    let starting_height = (memblock_height + 4) as f64 * 15.0 + 45.0;
-    let mut next_group = 3 + max_bits * 2 + group_offset;
+    let starting_height = (memblock_height + 4) as f64 * 15.0 + 45.0 + y_offset;
+    let mut next_group = 4 + max_bits * 2 + group_offset;
     let controller_group = next_group;
     next_group += 1;
 
@@ -581,7 +600,7 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
                 .groups([controller_group])
                 .spawnable(true)
                 .multitrigger(true),
-            group,
+            group + group_offset,
             true,
         ));
     }
@@ -634,9 +653,9 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
         ));
 
         cfg = cfg.translate(30.0, 0.0).groups([next_group]);
-        level.push(toggle_trigger(&cfg, bit * 2 + 4, false));
+        level.push(toggle_trigger(&cfg, bit * 2 + 9, false));
         cfg = cfg.translate(30.0, 0.0).groups([next_group + 1]);
-        level.push(toggle_trigger(&cfg, bit * 2 + 3, false));
+        level.push(toggle_trigger(&cfg, bit * 2 + 8, false));
         next_group += 2;
     }
 
@@ -645,10 +664,9 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let mut data = HandlerData::from_objects(level);
 
     data.used_extra_groups = next_group - args.curr_group;
-    // field used in legacy memory, not used in vmem.
-    data.ptr_reset_group = 0;
-    // controller group set as ptr group for vmem instructions.
-    data.ptr_group = controller_group;
+    // fields are repurposed in new memory
+    data.ptr_reset_group = controller_group;
+    data.ptr_group = shared_group;
 
     data.new_mem = Some(MemInfo {
         _type: match float_mem {
@@ -660,21 +678,21 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerData {
             false => TasmValue::Counter(memreg),
         },
         size: memsize,
-        ptrpos: TasmValue::Counter(args.ptrpos_id),
+        ptrpos: TasmValue::Counter(ptrpos),
         read_group,
         write_group,
         start_counter_id: start_ctr,
         line: args.line,
     });
 
-    data
+    Ok(data)
 }
 
 pub fn malloc(args: HandlerArgs) -> HandlerReturn {
-    Ok(malloc_generator(args, false))
+    malloc_generator(args, false)
 }
 pub fn fmalloc(args: HandlerArgs) -> HandlerReturn {
-    Ok(malloc_generator(args, true))
+    malloc_generator(args, true)
 }
 
 pub fn mset(args: HandlerArgs) -> HandlerReturn {
@@ -683,8 +701,8 @@ pub fn mset(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![
         spawn_trigger(
             &args.cfg,
-            args.ptr_group,
-            GROUP_SPAWN_DELAY,
+            args.ptr_reset_group,
+            0.0,
             0.0,
             false,
             true,
@@ -692,22 +710,33 @@ pub fn mset(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
         toggle_trigger(
-            &args.cfg.clone().translate(1.0, 0.0),
+            &args.cfg.clone().translate(3.0, 0.0),
             minfo.read_group,
             false,
+        ),
+        // then spawn the trigger
+        spawn_trigger(
+            &args.cfg.clone().translate(3.0, 0.0),
+            args.ptr_group,
+            0.0,
+            0.0,
+            false,
+            false,
+            false,
+            vec![],
         ),
     ])
     .skip_spaces(4))
 }
 
 pub fn mget(args: HandlerArgs) -> HandlerReturn {
-    // writing, so toggle off read group
+    // reading, so toggle off write group
     let minfo = args.mem_info.unwrap();
     Ok(HandlerData::from_objects(vec![
         spawn_trigger(
             &args.cfg,
-            args.ptr_group,
-            GROUP_SPAWN_DELAY,
+            args.ptr_reset_group,
+            0.0,
             0.0,
             false,
             true,
@@ -715,9 +744,20 @@ pub fn mget(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
         toggle_trigger(
-            &args.cfg.clone().translate(1.0, 0.0),
+            &args.cfg.clone().translate(3.0, 0.0),
             minfo.write_group,
             false,
+        ),
+        // then spawn the trigger
+        spawn_trigger(
+            &args.cfg.clone().translate(3.0, 0.0),
+            args.ptr_group,
+            0.0,
+            0.0,
+            false,
+            false,
+            false,
+            vec![],
         ),
     ])
     .skip_spaces(4))
