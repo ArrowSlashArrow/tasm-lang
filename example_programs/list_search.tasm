@@ -1,0 +1,33 @@
+_init:
+    malloc 10, 200
+    ; list start: 20
+    initmem 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 5, 9, 2, 5, 1, 56, 2, 6, 3, 4, 16, 23, 59, 20, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    display C4
+    display PTRPOS
+    display MEMREG
+
+_start:
+    ; setup params
+    mov C1, 20  ; list start
+    mov C2, 18  ; list length
+    mov C3, 5   ; target number
+    mov C4, -1  ; return variable
+
+    ; setup temp vars
+    add C5, C1, C2  ; end addr of list
+    mov C5, 50
+    spawn search_iter
+
+search_iter:
+    mget
+    se found, MEMREG, C3    ; end if number is found
+    add PTRPOS, 1
+
+    ; goto not_found if ptrpos > end list addr
+    fle search_iter, not_found, PTRPOS, C5
+
+found:
+    stop search_iter
+    mov C4, 1
+not_found:
+    mov C4, 0

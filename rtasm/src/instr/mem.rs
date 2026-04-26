@@ -590,7 +590,7 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerReturn {
     // toggle all groups on
     // having a master group to toggle everything on at once doesn't work
     // so we toggle everything back on individually
-    for group in 1..(3 + max_bits * 2) {
+    for group in 1..(4 + max_bits * 2) {
         level.push(toggle_trigger(
             &GDObjConfig::new()
                 .pos(75.0, starting_height - 30.0)
@@ -650,9 +650,9 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerReturn {
         ));
 
         cfg = cfg.translate(30.0, 0.0).groups([next_group]);
-        level.push(toggle_trigger(&cfg, bit * 2 + 9, false));
+        level.push(toggle_trigger(&cfg, bit * 2 + 5 + group_offset, false));
         cfg = cfg.translate(30.0, 0.0).groups([next_group + 1]);
-        level.push(toggle_trigger(&cfg, bit * 2 + 8, false));
+        level.push(toggle_trigger(&cfg, bit * 2 + 4 + group_offset, false));
         next_group += 2;
     }
 
@@ -713,7 +713,7 @@ pub fn mset(args: HandlerArgs) -> HandlerReturn {
         ),
         // then spawn the trigger
         spawn_trigger(
-            &args.cfg.clone().translate(3.0, 0.0),
+            &args.cfg.clone().translate(4.0, 0.0),
             args.ptr_group,
             0.0,
             0.0,
@@ -723,7 +723,7 @@ pub fn mset(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
     ])
-    .skip_spaces(4))
+    .skip_spaces(5))
 }
 
 pub fn mget(args: HandlerArgs) -> HandlerReturn {
@@ -747,7 +747,7 @@ pub fn mget(args: HandlerArgs) -> HandlerReturn {
         ),
         // then spawn the trigger
         spawn_trigger(
-            &args.cfg.clone().translate(3.0, 0.0),
+            &args.cfg.clone().translate(4.0, 0.0),
             args.ptr_group,
             0.0,
             0.0,
@@ -757,5 +757,5 @@ pub fn mget(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
     ])
-    .skip_spaces(4))
+    .skip_spaces(5))
 }

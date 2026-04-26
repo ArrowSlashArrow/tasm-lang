@@ -6,7 +6,7 @@ _init:
     MALLOC 100, 200
     DISPLAY PTRPOS
     DISPLAY MEMREG
-    INITMEM 0, 1
+    INITMEM 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
 
 fib:
     MGET
@@ -27,5 +27,6 @@ _start:
     ; set iteration limit so that the pointer does not escape the memory area
     MOV C2, MEMSIZE
     SUB C2, 10
+    mov PTRPOS, 20
     ; spawn the fibonacci loop
     SPAWN fib
