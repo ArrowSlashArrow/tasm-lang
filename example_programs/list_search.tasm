@@ -16,6 +16,7 @@ _start:
     ; setup temp vars
     add C5, C1, C2  ; end addr of list
     mov C5, 50
+    mov PTRPOS, C1
     spawn search_iter
 
 search_iter:
