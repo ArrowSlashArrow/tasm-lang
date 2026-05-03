@@ -112,7 +112,13 @@ fn main() -> Result<(), Error> {
                         let mut savefile = Levels::from_local()?;
                         savefile.add_level(level);
                         savefile.export_to_savefile()?;
-                        log!(!args.no_log, "exported to savefile.")
+                        log!(!args.no_log, "exported to savefile.");
+                        log!(
+                            !args.no_log,
+                            "Using groups {} - {}",
+                            args.group_offset + 1,
+                            tasm.curr_group
+                        )
                     }
                 }
             }
