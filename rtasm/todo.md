@@ -1,9 +1,12 @@
 ## todos for v1.0
-- a way to include custom objects
-    - `OBJECT`
+- instructions to add
+    - RAW \<objstr> : injects this object string (can me multiple objects) into level
+    - ADVRAND \[args]: advanced random trigger
+    - TOGGLEON/TOGGLEOFF \<group>
+    - WAITS <float> : util for waiting in seconds
+    - rename STOP to KILL to make it clear that it's irreversible
 - compiler optimizations (v1.0.0-rc1)
     - SORI (single object routine inlining)
-    - optimizations within the compiler itself
 - make landing page
 - generate actual doc page from docs.md
     - sorta done; it's setup for this but its not deployed yet

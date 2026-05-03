@@ -1,0 +1,11 @@
+input: .
+output: .retype
+
+url: 127.0.0.1 # Use your website address here
+
+branding:
+  title: TASM Documentation
+  label: Docs
+
+footer:
+  copyright: "&copy; Copyright {{ year }}. All rights reserved."

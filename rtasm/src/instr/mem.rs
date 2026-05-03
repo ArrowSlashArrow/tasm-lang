@@ -707,13 +707,13 @@ pub fn mset(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
         toggle_trigger(
-            &args.cfg.clone().translate(3.0, 0.0),
+            &args.cfg.clone().translate(2.0, 0.0),
             minfo.read_group,
             false,
         ),
         // then spawn the trigger
         spawn_trigger(
-            &args.cfg.clone().translate(4.0, 0.0),
+            &args.cfg.clone().translate(3.0, 0.0),
             args.ptr_group,
             0.0,
             0.0,
@@ -723,7 +723,7 @@ pub fn mset(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
     ])
-    .skip_spaces(5))
+    .skip_spaces(4))
 }
 
 pub fn mget(args: HandlerArgs) -> HandlerReturn {
@@ -741,13 +741,13 @@ pub fn mget(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
         toggle_trigger(
-            &args.cfg.clone().translate(3.0, 0.0),
+            &args.cfg.clone().translate(2.0, 0.0),
             minfo.write_group,
             false,
         ),
         // then spawn the trigger
         spawn_trigger(
-            &args.cfg.clone().translate(4.0, 0.0),
+            &args.cfg.clone().translate(3.0, 0.0),
             args.ptr_group,
             0.0,
             0.0,
@@ -757,5 +757,5 @@ pub fn mget(args: HandlerArgs) -> HandlerReturn {
             vec![],
         ),
     ])
-    .skip_spaces(5))
+    .skip_spaces(4))
 }

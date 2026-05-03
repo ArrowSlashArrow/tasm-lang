@@ -24,7 +24,7 @@ struct Args {
     #[arg(long)]
     release: bool,
 
-    /// Ending counter ID of memory block.
+    /// Ending counter ID of memory block. Does not apply to programs using new memory.
     #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
 

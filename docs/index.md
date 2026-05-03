@@ -1,3 +1,8 @@
+---
+label: Home
+icon: home
+---
+
 # TASM Documentation
 # 1. Overview 
 ## 1.1. Abstract 
@@ -173,7 +178,7 @@ The routine `do_stuff` has a 42.8% chance of being spawned.
 #### 3.1.2.3. Memory
 > [!NOTE]
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
-> This memory structure is still usable, however it is much less than the structure used by the new memory instructions.
+> This memory structure is still usable, however it is considered deprecated and much less group-efficient than the structure used by the new memory instructions.
 
 ##### MALLOC
 Arguments: `MALLOC <int>, <int>`
@@ -370,12 +375,19 @@ _start:
 	MOV C1, 42
 ```
 
-Aliases will not clone values from other aliases:
+Aliases will **not** clone values from other aliases:
 ```
 _init:
 	ALIAS value, 42		; alias `value` holds 42
 	ALIAS value2, value	; alias `value2` holds "value", NOT 42. 
 ```
+
+#### 3.1.2.9. Excluded instructions
+Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
+It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  
+Likewise, all bitwise instructions were left out of the TASM instruction set because there are no built-in operations to compute, for instance, a & b.
+
+In light of this, it is necessary to address the existence of instructions such as `MSET`/`MGET`, since they compile to multiple operations. These instructions are part of the memory instruction subset, and they exist as an interface to TASM's custom memory structure. Without them, the programmer would need to manually write out the same logic for accessing/setting a specific memory cell with the exact triggers and delays needed. The `MSET`/`MGET` instructions (among others) exist to simplify this process and to reduce bottlenecks in the development of programs.
 
 ### 3.1.3. In-level object representation 
 All arithmetic instructions use a single Item Edit trigger, including MOV.  
