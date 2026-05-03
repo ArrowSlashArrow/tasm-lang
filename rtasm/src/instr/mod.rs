@@ -29,7 +29,7 @@ macro_rules! argset {
     }
 }
 
-pub const INSTR_SPEC: &[(
+pub static INSTR_SPEC: &[(
     &str,                             // ident
     bool,                             // exclusive to _init
     &[(&[TasmValueType], HandlerFn)], // handlers
@@ -67,6 +67,7 @@ pub const INSTR_SPEC: &[(
     // Waits
     ("NOP", false, &[argset!(() => nop)]),
     ("WAIT", false, &[argset!((Int) => wait)]),
+    ("WAITS", false, &[argset!((Number) => waits)]),
     // Arithmetic
     (
         "ADD",
@@ -259,7 +260,10 @@ pub const INSTR_SPEC: &[(
     ("TSTOP", false, &[argset!((Timer) => tstop)]),
     ("PAUSE", false, &[argset!((Group) => pause)]),
     ("RESUME", false, &[argset!((Group) => resume)]),
-    ("STOP", false, &[argset!((Group) => stop)]),
+    ("KILL", false, &[argset!((Group) => stop)]),
+    ("TOGGLEON", false, &[argset!((Group) => ton)]),
+    ("TOGGLEOFF", false, &[argset!((Group) => toff)]),
+    ("RAW", false, &[argset!((String) => raw_objs)]),
 ];
 
 // utils

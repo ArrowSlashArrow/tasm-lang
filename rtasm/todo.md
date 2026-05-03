@@ -1,10 +1,4 @@
 ## todos for v1.0
-- instructions to add
-    - RAW \<objstr> : injects this object string (can me multiple objects) into level
-    - ADVRAND \[args]: advanced random trigger
-    - TOGGLEON/TOGGLEOFF \<group>
-    - WAITS <float> : util for waiting in seconds
-    - rename STOP to KILL to make it clear that it's irreversible
 - compiler optimizations (v1.0.0-rc1)
     - SORI (single object routine inlining)
 - make landing page

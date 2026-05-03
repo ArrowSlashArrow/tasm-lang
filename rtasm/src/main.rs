@@ -102,6 +102,13 @@ fn main() -> Result<(), Error> {
         None => args.infile,
     };
 
+    log!(
+        !args.no_log,
+        "Using groups {} - {}",
+        args.group_offset + 1,
+        tasm.curr_group
+    );
+
     log!(!args.no_log, "Encoding level...");
     match tasm.handle_routines(&level_name) {
         Ok(level) => {
@@ -113,12 +120,6 @@ fn main() -> Result<(), Error> {
                         savefile.add_level(level);
                         savefile.export_to_savefile()?;
                         log!(!args.no_log, "exported to savefile.");
-                        log!(
-                            !args.no_log,
-                            "Using groups {} - {}",
-                            args.group_offset + 1,
-                            tasm.curr_group
-                        )
                     }
                 }
             }
