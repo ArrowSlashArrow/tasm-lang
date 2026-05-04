@@ -200,7 +200,7 @@ fn parse_tasm() -> anyhow::Result<()> {
     );
 
     parse_start = Instant::now();
-    let _level = tasm.handle_routines(&"test level".into()).unwrap();
+    let _level = tasm.handle_routines(&"test level").unwrap();
     println!(
         "Serialise time: {:.3}ms",
         parse_start.elapsed().as_micros() as f64 / 1000.0
