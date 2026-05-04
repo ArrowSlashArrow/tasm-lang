@@ -4,7 +4,7 @@ use anyhow::Error;
 use clap::Parser;
 use gdlib::gdlevel::Levels;
 
-use crate::core::show_errors;
+use crate::core::print_errors;
 
 pub mod core;
 pub mod instr;
@@ -89,7 +89,7 @@ fn main() -> Result<(), Error> {
         Ok(t) => t,
         Err(es) => {
             if !args.no_log {
-                show_errors(es, &format!("Unable to compile {}", &args.infile));
+                print_errors(es, &format!("Unable to compile {}", &args.infile));
             }
             return Ok(());
         }
@@ -119,7 +119,7 @@ fn main() -> Result<(), Error> {
         }
         Err(e) => {
             if !args.no_log {
-                show_errors(e, "Unable to compile to level");
+                print_errors(e, "Unable to compile to level");
             }
         }
     }

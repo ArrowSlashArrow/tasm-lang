@@ -358,7 +358,7 @@ pub fn legacy_mptr(args: HandlerArgs) -> HandlerReturn {
         ]))
     } else {
         Err(TasmError {
-            _type: TasmErrorType::InvalidPointerMove,
+            r#type: TasmErrorType::InvalidPointerMove,
             file: String::new(),
             routine: String::new(),
             error: true,
@@ -449,7 +449,7 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerReturn {
     let memsize = (end_ctr - start_ctr) + 1;
     if memsize < 0 {
         return Err(TasmError {
-            _type: TasmErrorType::InvalidMemoryRange,
+            r#type: TasmErrorType::InvalidMemoryRange,
             file: String::new(),
             routine: String::new(),
             error: true,

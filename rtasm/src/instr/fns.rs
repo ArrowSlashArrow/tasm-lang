@@ -79,7 +79,7 @@ pub fn wait(args: HandlerArgs) -> HandlerReturn {
         Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
     } else {
         Err(TasmError {
-            _type: TasmErrorType::InvalidWaitAmount,
+            r#type: TasmErrorType::InvalidWaitAmount,
             file: String::new(),
             routine: String::new(),
             error: true,

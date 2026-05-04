@@ -147,7 +147,7 @@ impl Aliases {
 }
 
 impl TasmValue {
-    pub fn to_value(s: &str) -> Result<Self, (ParseErrorType, String)> {
+    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String)> {
         let mut iter = s.chars();
         let pref = match iter.next() {
             Some(c) => c,
@@ -339,7 +339,6 @@ pub struct HandlerArgs {
     pub line: usize,
 }
 
-#[derive(Default)]
 pub struct HandlerData {
     pub objects: Vec<GDObject>,
     // skip this amount of obj (default: 1)
@@ -449,13 +448,6 @@ impl Routine {
 }
 
 impl HandlerData {
-    #[inline(always)]
-    pub fn default() -> Self {
-        Self {
-            skip_spaces: 1, // advance one space by default
-            ..Default::default()
-        }
-    }
 
     #[inline(always)]
     pub fn set_objects(mut self, objects: Vec<GDObject>) -> Self {
@@ -463,10 +455,13 @@ impl HandlerData {
         self
     }
 
+    #[inline(always)]
     pub fn from_objects(objects: Vec<GDObject>) -> Self {
-        let mut new = Self::default();
-        new.objects = objects;
-        new
+        Self {
+            skip_spaces: 1,
+            objects,
+            ..Default::default()
+        }
     }
 
     #[inline(always)]
@@ -485,5 +480,19 @@ impl HandlerData {
     pub fn added_item_display(mut self) -> Self {
         self.added_item_display = true;
         self
+    }
+}
+impl Default for HandlerData {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            skip_spaces: 1, // advance one space by default
+            objects: vec![],
+            used_extra_groups: 0,
+            ptr_group: 0,
+            ptr_reset_group: 0,
+            added_item_display: false,
+            new_mem: None,
+        }
     }
 }

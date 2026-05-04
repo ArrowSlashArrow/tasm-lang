@@ -127,7 +127,9 @@ impl Tasm {
         }
 
         if !self.errors.is_empty() {
-            Err(self.errors.clone())
+            // Given that we won't be using this TASM-object again (since we faild to compile),
+            // taking the errors will be ultimately more efficient.
+            Err(std::mem::take(&mut self.errors))
         } else {
             Ok(level)
         }
@@ -256,11 +258,9 @@ impl Tasm {
 
         let data = match handler(args) {
             Ok(data) => data,
-            Err(e) => {
-                let mut err = e.clone();
-                // fill in missing fields
-                err.file = self.fname.clone();
-                err.routine = routine.ident.clone();
+            Err(mut e) => {
+                e.file = self.fname.clone();
+                e.routine = routine.ident.clone();
                 self.errors.push(e);
                 return;
             }
@@ -319,15 +319,15 @@ impl Tasm {
 
 pub fn push_error(
     errors: &mut Vec<TasmError>,
-    file: &String,
+    file: &str,
     etype: TasmErrorType,
     line: usize,
     rtn: String,
     details: String,
 ) {
     errors.push(TasmError {
-        _type: etype,
-        file: file.clone(),
+        r#type: etype,
+        file: file.to_string(),
         routine: rtn,
         error: true,
         line,
@@ -337,13 +337,13 @@ pub fn push_error(
 
 pub fn push_error_lineless(
     errors: &mut Vec<TasmError>,
-    file: &String,
+    file: &str,
     etype: TasmErrorType,
     details: String,
 ) {
     errors.push(TasmError {
-        _type: etype,
-        file: file.clone(),
+        r#type: etype,
+        file: file.to_string(),
         routine: String::new(),
         error: true,
         line: 0,
@@ -351,7 +351,7 @@ pub fn push_error_lineless(
     })
 }
 
-pub fn show_errors(es: Vec<TasmError>, err_msg: &str) {
+pub fn print_errors(es: Vec<TasmError>, err_msg: &str) {
     println!("{err_msg} with {} errors:", es.len());
     for e in es {
         println!("{e}");

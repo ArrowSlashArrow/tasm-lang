@@ -36,8 +36,7 @@
 //! All lines are stripped for whitespace on the right-hand side before tokenisation.
 //! Following that, all routines are indexed and their group determined.
 //! Finally, all instructions are parsed in each group sequentially.
-use std::mem::take;
-
+use std::collections::HashMap;
 use crate::{
     core::{
         consts::{ENTRY_POINT, INIT_ROUTINE},
@@ -107,7 +106,7 @@ impl Tasm {
         let mut aliases: Vec<(String, String)> = vec![];
 
         // need to take to iteration with mutable references to self in self.push_error
-        let instrs = take(init_instructions);
+        let instrs = std::mem::take(init_instructions);
         for (line, raw_instr) in instrs.iter() {
             if !raw_instr.starts_with("ALIAS ") {
                 continue;
@@ -257,7 +256,7 @@ impl Tasm {
             trimmed_line,
             '|',
             TasmError {
-                _type: TasmErrorType::InvalidInstruction,
+                r#type: TasmErrorType::InvalidInstruction,
                 file: self.fname.clone(),
                 routine: curr_routine.ident.clone(),
                 error: true,
@@ -457,10 +456,11 @@ impl Tasm {
     }
 
     pub fn index_routines(&mut self) {
+        let mut seen_routines: HashMap<String, ()> = HashMap::new();
         let mut curr_routine_data = (0usize, String::new(), 0i16, vec![]);
+        let mut in_routine = false;
 
         // index all routines
-        let mut in_routine = false;
         for (line_idx, line) in self.lines.iter().enumerate() {
             if line.trim().is_empty() {
                 continue;
@@ -496,26 +496,26 @@ impl Tasm {
                         self.has_entry_point = true;
                     }
 
-                    // check that this routine was not already declared
-                    // take to iterate with mutable reference available for error pushing
-
-                    for rtn in self.routine_data.iter() {
-                        if routine_ident == rtn.1 {
-                            verbose_log!(self, "Routine was already declared.");
-                            push_error(
-                                &mut self.errors,
-                                &self.fname,
-                                TasmErrorType::MultipleRoutineDefintions,
-                                line_idx,
-                                routine_ident.clone(),
-                                format!(
-                                    "
+                    // HashMap<K, V>.insert() returns None if the value was not already defined.
+                    // If we don't get a none, the routine was already declared.
+                    if seen_routines.insert(routine_ident.clone(), ()).is_some() {
+                        verbose_log!(self, "Routine was already declared.");
+                        push_error(
+                            &mut self.errors,
+                            &self.fname,
+                            TasmErrorType::MultipleRoutineDefintions,
+                            line_idx,
+                            routine_ident.clone(),
+                            format!(
+                                "
                                 Routine {} was already declared on line {}",
-                                    rtn.1.clone(),
-                                    rtn.0
-                                ),
-                            );
-                        }
+                                routine_ident.clone(),
+                                seen_routines
+                                    .keys()
+                                    .position(|k| k == &routine_ident)
+                                    .unwrap_or(0) + 1 // +1 to convert from 0-indexed to 1-indexed line numbers
+                            ),
+                        );
                     }
 
                     // clear out bad data
@@ -551,7 +551,7 @@ impl Tasm {
             self.routine_group_map
                 .push((routine_ident, self.curr_group));
         }
-        self.routine_data.push(curr_routine_data.clone());
+        self.routine_data.push(curr_routine_data);
 
         verbose_log!(self, "Removing garbage routine data.");
         // first routine was garbage data, so remove it
@@ -609,7 +609,7 @@ fn parse_flags_str(
             flag_segment,
             ':',
             TasmError {
-                _type: TasmErrorType::BadFlag,
+                r#type: TasmErrorType::BadFlag,
                 file: file.to_owned(),
                 routine: routine.to_owned(),
                 error: true,
@@ -644,7 +644,7 @@ fn parse_flags_str(
                     },
                     None => {
                         return Err(TasmError {
-                            _type: TasmErrorType::BadFlag,
+                            r#type: TasmErrorType::BadFlag,
                             file: file.to_owned(),
                             routine: routine.to_owned(),
                             error: true,
@@ -665,7 +665,7 @@ fn parse_flags_str(
             Some(flag) => parsed_flags.push(flag),
             None => {
                 return Err(TasmError {
-                    _type: TasmErrorType::BadFlag,
+                    r#type: TasmErrorType::BadFlag,
                     file: file.to_owned(),
                     routine: routine.to_owned(),
                     error: true,
@@ -702,7 +702,7 @@ pub fn parse_tasm_value(
                 } else {
                     // only throw err if the group is the _init group
                     errors.push(TasmError {
-                        _type: TasmErrorType::InitRoutineSpawnError,
+                        r#type: TasmErrorType::InitRoutineSpawnError,
                         file: fname,
                         routine,
                         error: true,

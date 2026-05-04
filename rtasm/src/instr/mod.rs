@@ -29,10 +29,12 @@ macro_rules! argset {
     }
 }
 
+pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
+pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: &[(
-    &str,                             // ident
-    bool,                             // exclusive to _init
-    &[(&[TasmValueType], HandlerFn)], // handlers
+    &str,           // ident
+    bool,           // exclusive to _init
+    Handlers,       // handlers
 )] = &[
     // inits
     ("MALLOC", true, &[argset!((Int, Int) => malloc)]),
@@ -262,7 +264,7 @@ pub const INSTR_SPEC: &[(
     ("STOP", false, &[argset!((Group) => stop)]),
 ];
 
-// utils
+// -- utils -- \\
 
 pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
     match item {

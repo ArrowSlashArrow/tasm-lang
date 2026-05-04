@@ -138,5 +138,5 @@ The resulting level should have the name of the program file, and is by default 
 # Project Information
 The working TASM compiler is located in the `rtasm` directory, and the deprecated python compiler is located in the `pytasm` directory. It is recommended to use the `rtasm` compiler, since it is faster and more robust.  
 Example programs are located in the `example_programs/` directory, and actual programs that I have written myself are located in the `programs/` folder. They serve as examples of programs written for real use cases.  
-The `plse` directory is effectively empty, however, a language will ~~soon~~ eventually be created that will compile to TASM, since assembly syntax is can be pesky to work with.  
+The `plse` directory is effectively empty, however, a language will ~~soon~~ eventually be created that will compile to TASM, since assembly syntax can be pesky to work with.  
 The emulator, located in the `interpreter` directory, is not confirmed to be fully accurate, and should not be considered a 1:1 replica of GD's environment. That said, it is still a good tool for debugging TASM.  
