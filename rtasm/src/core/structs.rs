@@ -1,3 +1,5 @@
+use std::{borrow::Cow, collections::HashMap};
+
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
 use crate::core::{
@@ -107,6 +109,11 @@ impl BuiltinAlias {
 impl Default for TasmValue {
     fn default() -> Self {
         Self::Number(0.0)
+    }
+}
+impl Default for &TasmValue {
+    fn default() -> Self {
+        &TasmValue::Number(0.0)
     }
 }
 
@@ -319,9 +326,9 @@ pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
 }
 
 #[derive(Clone, Default)]
-pub struct HandlerArgs {
+pub struct HandlerArgs<'a> {
     /// Arguments to this function. e.g. Counter(C1), Number(2.5)
-    pub args: Vec<TasmValue>,
+    pub args: Cow<'a, [TasmValue]>,
     /// Config (specifically position and group) of the resulting object(s)
     pub cfg: GDObjConfig,
     /// Next available group to use for the objects
@@ -329,13 +336,16 @@ pub struct HandlerArgs {
     /// Group of the pointer collision block
     pub ptr_group: i16,
     pub ptr_reset_group: i16,
-    pub memreg: TasmValue,
+    pub memreg: &'a TasmValue,
     pub ptrpos_id: i16,
     pub displayed_items: usize,
     pub mem_end_counter: i16,
     pub routine_count: usize,
-    pub mem_info: Option<MemInfo>,
-    pub flags: Vec<Flag>,
+    pub mem_info: Option<&'a MemInfo>,
+    
+    pub flags: &'a [Flag],
+    pub flag_by_ident: HashMap<String, &'a Flag>,
+    
     pub line: usize,
 }
 
@@ -365,12 +375,21 @@ pub struct MemInfo {
     pub line: usize, // where is was created
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct RoutineData {
+    pub line_idx: usize,                // legacy: 0
+    pub routine_ident: String,          // legacy: 1
+    pub group_id: i16,                  // legacy: 2
+    pub lines: Vec<(usize, String)>,    // legacy: 3
+}
+
 #[derive(Debug, Default)]
 pub struct Tasm {
     pub routines: Vec<Routine>,
     pub errors: Vec<TasmError>,
-    pub routine_data: Vec<(usize, String, i16, Vec<(usize, String)>)>,
-    pub routine_group_map: Vec<(String, i16)>,
+    /// (line_idx, routine_ident, group_id, lines as (line_idx, line_content))
+    pub routine_data: Vec<RoutineData>,
+    pub routine_group_map: HashMap<String, i16>, // routine ident => group id
     pub group_offset: i16,
     pub has_entry_point: bool,
     pub lines: Vec<String>,
@@ -385,7 +404,7 @@ pub struct Tasm {
     pub aliases: Aliases,
     pub logs_enabled: bool,
     pub release_mode: bool,
-    pub defined_aliases: Vec<(String, String)>,
+    pub defined_aliases: HashMap<String, String>, // alias => value
     pub fname: String,
 }
 

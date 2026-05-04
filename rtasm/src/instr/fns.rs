@@ -370,7 +370,7 @@ pub fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
-    let iargs = args.args;
+    let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[1]).unwrap();
 
     let spawning_group = iargs[0].to_group_id().unwrap();
@@ -400,7 +400,7 @@ pub fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
-    let iargs = args.args;
+    let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[1]).unwrap();
     let rhs = get_item_spec(&iargs[2]).unwrap();
     let spawning_group = iargs[0].to_group_id().unwrap();
@@ -431,7 +431,7 @@ pub fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
 
-    let iargs = args.args;
+    let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[2]).unwrap();
     let num = iargs[3].to_float().unwrap();
 
@@ -472,7 +472,7 @@ pub fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
     let cfg = args.cfg;
     let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
 
-    let iargs = args.args;
+    let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[2]).unwrap();
     let rhs = get_item_spec(&iargs[3]).unwrap();
 
@@ -520,7 +520,7 @@ pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
     let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
-    let iargs = args.args;
+    let iargs = args.args.as_ref();
     let spawning_group = iargs[0].to_group_id().unwrap();
     let chance = iargs[1].to_float().unwrap();
 
@@ -543,7 +543,7 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
     let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
-    let iargs = args.args;
+    let iargs = args.args.as_ref();
     let spawning_group1 = iargs[0].to_group_id().unwrap();
     let spawning_group2 = iargs[1].to_group_id().unwrap();
     let chance = iargs[2].to_float().unwrap();

@@ -3,6 +3,8 @@ use gdlib::gdobj::{
     triggers::{CompareOp, Op},
 };
 
+use phf::phf_map;
+
 use crate::{
     core::{
         HandlerFn,
@@ -15,7 +17,7 @@ use crate::{
 pub mod fns;
 pub mod mem;
 
-const GROUP_SPAWN_DELAY: f64 = 0.0044;
+pub const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 // convert a list of type identifiers into a slice
 macro_rules! argset {
@@ -31,47 +33,39 @@ macro_rules! argset {
 
 pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
-pub const INSTR_SPEC: &[(
-    &str,           // ident
-    bool,           // exclusive to _init
-    Handlers,       // handlers
-)] = &[
+pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers)> = phf_map! {
     // inits
-    ("MALLOC", true, &[argset!((Int, Int) => malloc)]),
-    ("FMALLOC", true, &[argset!((Int, Int) => fmalloc)]),
-    ("INITMEM", true, &[argset!([Number] => init_mem)]),
-    ("PERS", true, &[argset!((Item) => pers)]),
-    ("DISPLAY", true, &[argset!((Item) => display)]),
-    ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
+    "MALLOC" => (true, &[argset!((Int, Int) => malloc)]),
+    "FMALLOC" => (true, &[argset!((Int, Int) => fmalloc)]),
+    "INITMEM" => (true, &[argset!([Number] => init_mem)]),
+    "PERS" => (true, &[argset!((Item) => pers)]),
+    "DISPLAY" => (true, &[argset!((Item) => display)]),
+    "IOBLOCK" => (true, &[argset!((Group, Int, String) => ioblock)]),
     // legacy memory
-    ("LMALLOC", true, &[argset!((Int) => legacy_malloc)]),
-    ("LFMALLOC", true, &[argset!((Int) => legacy_fmalloc)]),
-    ("LMFUNC", false, &[argset!(() => legacy_mfunc)]),
-    ("LMREAD", false, &[argset!(() => legacy_mread)]),
-    ("LMWRITE", false, &[argset!(() => legacy_mwrite)]),
-    ("LMPTR", false, &[argset!((Int) => legacy_mptr)]),
-    ("LMRESET", false, &[argset!(() => legacy_mreset)]),
+    "LMALLOC" => (true, &[argset!((Int) => legacy_malloc)]),
+    "LFMALLOC" => (true, &[argset!((Int) => legacy_fmalloc)]),
+    "LMFUNC" => (false, &[argset!(() => legacy_mfunc)]),
+    "LMREAD" => (false, &[argset!(() => legacy_mread)]),
+    "LMWRITE" => (false, &[argset!(() => legacy_mwrite)]),
+    "LMPTR" => (false, &[argset!((Int) => legacy_mptr)]),
+    "LMRESET" => (false, &[argset!(() => legacy_mreset)]),
     // memory
-    (
-        "MOV",
-        false,
-        &[
-            argset!((Item, Number) => arithmetic_item_num_mov),
-            argset!((Item, Item) => arithmetic_2items_mov),
-        ],
+    "MOV" => (false, &[
+        argset!((Item, Number) => arithmetic_item_num_mov),
+        argset!((Item, Item) => arithmetic_2items_mov),
+    ],
     ),
-    ("MSET", false, &[argset!(() => mset)]),
-    ("MGET", false, &[argset!(() => mget)]),
+    "MSET" => (false, &[argset!(() => mset)]),
+    "MGET" => (false, &[argset!(() => mget)]),
     // debug
-    ("BREAKPOINT", false, &[argset!(() => skip)]),
+    "BREAKPOINT" => (false, &[argset!(() => skip)]),
     // Process
-    ("SPAWN", false, &[argset!((Group) => spawn)]),
+    "SPAWN" => (false, &[argset!((Group) => spawn)]),
     // Waits
-    ("NOP", false, &[argset!(() => nop)]),
-    ("WAIT", false, &[argset!((Int) => wait)]),
+    "NOP" => (false, &[argset!(() => nop)]),
+    "WAIT" => (false, &[argset!((Int) => wait)]),
     // Arithmetic
-    (
-        "ADD",
+    "ADD" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_add),
@@ -79,8 +73,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Item) => arithmetic_3items_add),
         ],
     ),
-    (
-        "SUB",
+    "SUB" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_sub),
@@ -88,40 +81,35 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Item) => arithmetic_3items_sub),
         ],
     ),
-    (
-        "ADDM",
+    "ADDM" => (
         false,
         &[
             argset!((Item, Item, Number) => add_mod_2items_num),
             argset!((Item, Item, Item, Number) => add_mod_3items_num),
         ],
     ),
-    (
-        "SUBM",
+    "SUBM" => (
         false,
         &[
             argset!((Item, Item, Number) => sub_mod_2items_num),
             argset!((Item, Item, Item, Number) => sub_mod_3items_num),
         ],
     ),
-    (
-        "ADDD",
+    "ADDD" => (
         false,
         &[
             argset!((Item, Item, Number) => add_div_2items_num),
             argset!((Item, Item, Item, Number) => add_div_3items_num),
         ],
     ),
-    (
-        "SUBD",
+    "SUBD" => (
         false,
         &[
             argset!((Item, Item, Number) => sub_div_2items_num),
             argset!((Item, Item, Item, Number) => sub_div_3items_num),
         ],
     ),
-    (
-        "MUL",
+    "MUL" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_mul),
@@ -130,8 +118,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => arithmetic_2items_num_mul),
         ],
     ),
-    (
-        "DIV",
+    "DIV" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_div),
@@ -140,8 +127,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => arithmetic_2items_num_div),
         ],
     ),
-    (
-        "FLDIV",
+    "FLDIV" => (
         false,
         &[
             argset!((Item, Item) => fldiv_2items),
@@ -150,119 +136,109 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => fldiv_2items_num),
         ],
     ),
-    (
-        "SE",
+    "SE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_eq),
             argset!((Group, Item, Number) => spawn_item_num_eq),
         ],
     ),
-    (
-        "SNE",
+    "SNE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_ne),
             argset!((Group, Item, Number) => spawn_item_num_ne),
         ],
     ),
-    (
-        "SL",
+    "SL" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_le),
             argset!((Group, Item, Number) => spawn_item_num_le),
         ],
     ),
-    (
-        "SLE",
+    "SLE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_leq),
             argset!((Group, Item, Number) => spawn_item_num_leq),
         ],
     ),
-    (
-        "SG",
+    "SG" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_ge),
             argset!((Group, Item, Number) => spawn_item_num_ge),
         ],
     ),
-    (
-        "SGE",
+    "SGE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_geq),
             argset!((Group, Item, Number) => spawn_item_num_geq),
         ],
     ),
-    (
-        "FE",
+    "FE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_eq),
             argset!((Group, Group, Item, Number) => fork_item_num_eq),
         ],
     ),
-    (
-        "FNE",
+    "FNE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_ne),
             argset!((Group, Group, Item, Number) => fork_item_num_ne),
         ],
     ),
-    (
-        "FL",
+    "FL" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_le),
             argset!((Group, Group, Item, Number) => fork_item_num_le),
         ],
     ),
-    (
-        "FLE",
+    "FLE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_leq),
             argset!((Group, Group, Item, Number) => fork_item_num_leq),
         ],
     ),
-    (
-        "FG",
+    "FG" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_ge),
             argset!((Group, Group, Item, Number) => fork_item_num_ge),
         ],
     ),
-    (
-        "FGE",
+    "FGE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_geq),
             argset!((Group, Group, Item, Number) => fork_item_num_geq),
         ],
     ),
-    ("SRAND", false, &[argset!((Group, Number) => spawn_random)]),
-    (
-        "FRAND",
+    "SRAND" => (
+        false,
+        &[argset!((Group, Number) => spawn_random)],
+    ),
+    "FRAND" => (
         false,
         &[argset!((Group, Group, Number) => fork_random)],
     ),
-    (
-        "TSPAWN",
+    "TSPAWN" => (
         false,
         &[argset!((Timer, Number, Number, Group) => tspawn)],
     ),
-    ("TSTART", false, &[argset!((Timer) => tstart)]),
-    ("TSTOP", false, &[argset!((Timer) => tstop)]),
-    ("PAUSE", false, &[argset!((Group) => pause)]),
-    ("RESUME", false, &[argset!((Group) => resume)]),
-    ("STOP", false, &[argset!((Group) => stop)]),
-];
+    "TSTART" => (false, &[argset!((Timer) => tstart)]),
+    "TSTOP" => (false, &[argset!((Timer) => tstop)]),
+    "PAUSE" => (false, &[argset!((Group) => pause)]),
+    "RESUME" => (false, &[argset!((Group) => resume)]),
+    "STOP" => (false, &[argset!((Group) => stop)]),
+};
+
 
 // -- utils -- \\
 
@@ -276,25 +252,22 @@ pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
 }
 
 fn get_flag_value(args: &HandlerArgs, ident: &str, default: FlagValue) -> FlagValue {
-    match args.flags.iter().find(|f| f.ident == ident) {
+    match args.flag_by_ident.get(ident) {
         Some(flag) => flag.value.clone(),
         None => default,
     }
 }
 
 fn get_flag_value_opt(args: &HandlerArgs, ident: &str) -> Option<FlagValue> {
-    args.flags
-        .iter()
-        .find(|f| f.ident == ident)
-        .map(|f| f.clone().value)
+    args.flag_by_ident.get(ident).map(|f| f.value.clone())
 }
 
 fn flag_override<T>(item: &mut T, ident: &str, args: &HandlerArgs)
 where
     FlagValue: Into<T>,
 {
-    if let Some(value) = args.flags.iter().find(|f| f.ident == ident) {
-        *item = value.value.clone().into()
+    if let Some(flag) = args.flag_by_ident.get(ident) {
+        *item = flag.value.clone().into()
     }
 }
 

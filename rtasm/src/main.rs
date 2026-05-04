@@ -1,3 +1,5 @@
+#![warn(clippy::std_instead_of_core)]
+
 use std::fs;
 
 use anyhow::Error;

@@ -36,7 +36,7 @@
 //! All lines are stripped for whitespace on the right-hand side before tokenisation.
 //! Following that, all routines are indexed and their group determined.
 //! Finally, all instructions are parsed in each group sequentially.
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map};
 use crate::{
     core::{
         consts::{ENTRY_POINT, INIT_ROUTINE},
@@ -44,8 +44,7 @@ use crate::{
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
         structs::{
-            Instruction, Routine, Tasm, TasmValue, fits_arg_signature, get_instr_type,
-            is_builtin_alias,
+            Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature, get_instr_type, is_builtin_alias
         },
     },
     instr::INSTR_SPEC,
@@ -72,7 +71,7 @@ impl Tasm {
         verbose_log!(self, "Pushing _init to front of routine data");
         // push _init routine to the start to process it before anyting else
         // important to do for alias resolution, since memtype is determined in init.
-        if let Some(init_pos) = self.routine_data.iter().position(|r| r.1 == INIT_ROUTINE) {
+        if let Some(init_pos) = self.routine_data.iter().position(|r| r.routine_ident == INIT_ROUTINE) {
             let rtn = self.routine_data[init_pos].clone();
             self.routine_data.remove(init_pos);
             self.routine_data.insert(0, rtn);
@@ -101,9 +100,9 @@ impl Tasm {
 
     pub fn get_aliases_from_init(&mut self) {
         // _init is at idx 0
-        let init_instructions = &mut self.routine_data[0].3;
+        let init_instructions = &mut self.routine_data[0].lines;
 
-        let mut aliases: Vec<(String, String)> = vec![];
+        let mut aliases: HashMap<String, String> = HashMap::new();
 
         // need to take to iteration with mutable references to self in self.push_error
         let instrs = std::mem::take(init_instructions);
@@ -133,27 +132,32 @@ impl Tasm {
             if let Ok(v) = TasmValue::to_value(trimmed[0])
                 && let Some(s) = v.to_string()
             {
-                if aliases.iter().any(|(a, _)| *a == s) {
-                    push_error(
-                        &mut self.errors,
-                        &self.fname,
-                        TasmErrorType::BadAlias,
-                        *line,
-                        INIT_ROUTINE.into(),
-                        format!("Cannot override existing alias {s}."),
-                    );
-                } else if is_builtin_alias(&s) {
-                    push_error(
-                        &mut self.errors,
-                        &self.fname,
-                        TasmErrorType::BadAlias,
-                        *line,
-                        INIT_ROUTINE.into(),
-                        format!("Cannot override default alias {s}."),
-                    );
-                } else {
-                    aliases.push((s, trimmed[1].into()));
-                    continue;
+                match aliases.entry(s) {
+                    hash_map::Entry::Occupied(entry) => {
+                        push_error(
+                            &mut self.errors,
+                            &self.fname,
+                            TasmErrorType::BadAlias,
+                            *line,
+                            INIT_ROUTINE.into(),
+                            format!("Cannot override existing alias {}.", entry.key()),
+                        );
+                    }
+                    hash_map::Entry::Vacant(entry) => {
+                        if is_builtin_alias(entry.key()) {
+                            push_error(
+                                &mut self.errors,
+                                &self.fname,
+                                TasmErrorType::BadAlias,
+                                *line,
+                                INIT_ROUTINE.into(),
+                                format!("Cannot override default alias {}.", entry.key()),
+                            );
+                        } else {
+                            entry.insert(trimmed[1].into());
+                            continue;
+                        }
+                    }
                 };
             } else {
                 push_error(
@@ -168,7 +172,7 @@ impl Tasm {
         }
 
         // put these back after taking
-        self.routine_data[0].3 = instrs;
+        self.routine_data[0].lines = instrs;
 
         self.defined_aliases = aliases;
     }
@@ -182,16 +186,16 @@ impl Tasm {
         let mut routines: Vec<(Vec<(usize, String)>, Routine)> = self
             .routine_data
             .iter()
-            .map(|(_, ident, group, lines)| {
+            .map(|r| {
                 (
-                    lines.to_owned(), // routine lines
+                    r.lines.to_owned(), // routine lines
                     Routine::default()
-                        .group(match *group {
+                        .group(match r.group_id {
                             // if this routine is the init routine, don't give it a group
                             INIT_PLACEHOLDER_GROUP => 0,
                             g => g,
                         })
-                        .ident(ident), // routine object
+                        .ident(&r.routine_ident), // routine object
                 )
             })
             .collect();
@@ -218,7 +222,7 @@ impl Tasm {
         }
     }
 
-    fn parse_raw_value(&mut self, v: &str, curr_line: usize, routine: String) -> Option<TasmValue> {
+    fn parse_raw_value(&mut self, v: &str, curr_line: usize, routine: &str) -> Option<TasmValue> {
         match TasmValue::to_value(v.trim()) {
             // whitespace is stripped when parsing
             Ok(t) => self.parse_tasm_value(t, curr_line, routine),
@@ -233,7 +237,7 @@ impl Tasm {
                         ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
                     },
                     curr_line,
-                    routine.clone(),
+                    routine.to_string(),
                     msg,
                 );
 
@@ -337,13 +341,13 @@ impl Tasm {
 
             for raw in raw_args.iter_mut() {
                 // replace if an alias is referenced
-                if let Some((_, raw_val)) = self.defined_aliases.iter().find(|a| a.0 == *raw) {
+                if let Some(raw_val) = self.defined_aliases.get(&raw.to_string()) {
                     *raw = raw_val.clone();
                 }
             }
 
             for raw in raw_args {
-                match self.parse_raw_value(&raw, curr_line, curr_routine.ident.clone()) {
+                match self.parse_raw_value(&raw, curr_line, &curr_routine.ident) {
                     Some(v) => args.push(v),
                     None => erroneous_instr = true,
                 }
@@ -372,8 +376,8 @@ impl Tasm {
         }
 
         // find the instruction spec which contains arg handlers
-        let (_, init_exclusive, handlers) =
-            match INSTR_SPEC.iter().find(|(ident, _, _)| ident == &instr) {
+        let (init_exclusive, handlers) =
+            match INSTR_SPEC.get(&instr) {
                 Some(spec) => spec,
                 None => {
                     push_error(
@@ -443,21 +447,21 @@ impl Tasm {
         &mut self,
         t: TasmValue,
         curr_line: usize,
-        routine: String,
+        routine: &str,
     ) -> Option<TasmValue> {
-        parse_tasm_value(
+        validate_tasm_value(
             t,
             &self.routine_group_map,
             &mut self.errors,
-            self.fname.clone(),
+            &self.fname,
             routine,
             curr_line,
         )
     }
 
     pub fn index_routines(&mut self) {
-        let mut seen_routines: HashMap<String, ()> = HashMap::new();
-        let mut curr_routine_data = (0usize, String::new(), 0i16, vec![]);
+        let mut seen_routines: HashMap<String, usize> = HashMap::new(); // routine => line number
+        let mut curr_routine_data = RoutineData::default();
         let mut in_routine = false;
 
         // index all routines
@@ -470,13 +474,13 @@ impl Tasm {
                 // commit old data
                 // due to this being the first piece of code being ran once parsing starts,
                 // the first routine data will therefore be garbage data.
-                let routine_ident = curr_routine_data.1.clone();
+                let routine_ident = curr_routine_data.routine_ident.clone();
                 if routine_ident == INIT_ROUTINE {
-                    curr_routine_data.2 = INIT_PLACEHOLDER_GROUP; // init has no group, -1 serves as a unique _init marker
+                    curr_routine_data.group_id = INIT_PLACEHOLDER_GROUP; // init has no group, -1 serves as a unique _init marker
                     self.curr_group -= 1;
                 } else {
                     self.routine_group_map
-                        .push((routine_ident.clone(), self.curr_group));
+                        .insert(routine_ident.clone(), self.curr_group);
                 }
 
                 // ignore the garbage data
@@ -498,7 +502,7 @@ impl Tasm {
 
                     // HashMap<K, V>.insert() returns None if the value was not already defined.
                     // If we don't get a none, the routine was already declared.
-                    if seen_routines.insert(routine_ident.clone(), ()).is_some() {
+                    if seen_routines.insert(routine_ident.clone(), line_idx).is_some() {
                         verbose_log!(self, "Routine was already declared.");
                         push_error(
                             &mut self.errors,
@@ -511,15 +515,19 @@ impl Tasm {
                                 Routine {} was already declared on line {}",
                                 routine_ident.clone(),
                                 seen_routines
-                                    .keys()
-                                    .position(|k| k == &routine_ident)
-                                    .unwrap_or(0) + 1 // +1 to convert from 0-indexed to 1-indexed line numbers
+                                    .get(&routine_ident)
+                                    .unwrap_or(&0) + 1 // +1 to convert from 0-indexed to 1-indexed line numbers
                             ),
                         );
                     }
 
                     // clear out bad data
-                    curr_routine_data = (line_idx, routine_ident, self.curr_group, vec![]);
+                    curr_routine_data = RoutineData {
+                        line_idx,
+                        routine_ident,
+                        group_id: self.curr_group,
+                        lines: vec![],
+                    };
                     in_routine = true;
                 } else {
                     // this is not a routine identifier, so it is a bad token
@@ -535,7 +543,7 @@ impl Tasm {
                 }
             } else if in_routine {
                 let trim = line.trim();
-                curr_routine_data.3.push((line_idx, trim.to_owned()));
+                curr_routine_data.lines.push((line_idx, trim.to_owned()));
                 if trim.is_empty() {
                     in_routine = false;
                 }
@@ -544,12 +552,12 @@ impl Tasm {
 
         verbose_log!(self, "Pushing routine data.");
         // commit last routine data
-        let routine_ident = curr_routine_data.1.clone();
+        let routine_ident = curr_routine_data.routine_ident.clone();
         if routine_ident == INIT_ROUTINE {
-            curr_routine_data.2 = 0i16; // init has no group
+            curr_routine_data.group_id = 0i16; // init has no group
         } else {
             self.routine_group_map
-                .push((routine_ident, self.curr_group));
+                .insert(routine_ident, self.curr_group);
         }
         self.routine_data.push(curr_routine_data);
 
@@ -581,7 +589,7 @@ fn parse_flags_str(
     file: &String,
     routine: &String,
 ) -> Result<Vec<Flag>, TasmError> {
-    let raw_flags = flags_str.trim().split(' ');
+    let raw_flags = flags_str.split_whitespace();
 
     let mut preprocessed = vec![];
     let mut in_dict = false;
@@ -681,30 +689,28 @@ fn parse_flags_str(
     Ok(parsed_flags)
 }
 
-pub fn parse_tasm_value(
+pub fn validate_tasm_value(
     t: TasmValue,
-    routine_group_map: &[(String, i16)],
+    routine_group_map: &HashMap<String, i16>,
     errors: &mut Vec<TasmError>,
-    fname: String,
-    routine: String,
+    fname: &str,
+    routine: &str,
     curr_line: usize,
 ) -> Option<TasmValue> {
     // if this is a routine ident, add corresponding group
-    if let TasmValue::String(s) = t.clone() {
+    if let TasmValue::String(s) = t {
         match routine_group_map
-            .iter()
-            .find(|(ident, _)| *ident == s)
-            .map(|data| data.1)
+            .get(&s)
         {
-            Some(group) => {
+            Some(&group) => {
                 if group != INIT_PLACEHOLDER_GROUP {
                     Some(TasmValue::Group(group))
                 } else {
                     // only throw err if the group is the _init group
                     errors.push(TasmError {
                         r#type: TasmErrorType::InitRoutineSpawnError,
-                        file: fname,
-                        routine,
+                        file: fname.to_string(),
+                        routine: routine.to_string(),
                         error: true,
                         line: curr_line,
                         details: "Cannot spawn init routine.".to_string(),

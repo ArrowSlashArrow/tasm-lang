@@ -472,6 +472,7 @@ dependencies = [
  "clap",
  "gdlib",
  "paste",
+ "phf",
 ]
 
 [[package]]
