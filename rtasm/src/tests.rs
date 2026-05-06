@@ -178,7 +178,7 @@ tasm_test!("max", compdef);
 #[test]
 fn int_detection() {
     assert!(fits_arg_signature(
-        &vec![TasmValue::Number(1.0), TasmValue::Number(1.1)],
+        &[TasmValue::Number(1.0), TasmValue::Number(1.1)],
         &[
             TasmValueType::Primitive(TasmPrimitive::Int),
             TasmValueType::Primitive(TasmPrimitive::Number),
@@ -189,7 +189,7 @@ fn int_detection() {
 #[test]
 fn no_int_detection() {
     assert!(!fits_arg_signature(
-        &vec![TasmValue::Number(1.1), TasmValue::Number(1.1)],
+        &[TasmValue::Number(1.1), TasmValue::Number(1.1)],
         &[
             TasmValueType::Primitive(TasmPrimitive::Int),
             TasmValueType::Primitive(TasmPrimitive::Number),
@@ -203,7 +203,7 @@ fn parse_tasm() -> anyhow::Result<()> {
     let mut parse_start = Instant::now();
     let mut tasm = lexer::parse_file(
         file,
-        format!("../programs/nuclear_reactor.tasm"),
+        "../programs/nuclear_reactor.tasm".into(),
         9999,
         0,
         true,
@@ -218,7 +218,7 @@ fn parse_tasm() -> anyhow::Result<()> {
     );
 
     parse_start = Instant::now();
-    let _level = tasm.handle_routines(&"test level".into()).unwrap();
+    let _level = tasm.handle_routines(&"test level").unwrap();
     println!(
         "Serialise time: {:.3}ms",
         parse_start.elapsed().as_micros() as f64 / 1000.0

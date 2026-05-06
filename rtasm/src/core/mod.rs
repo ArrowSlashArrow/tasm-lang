@@ -12,6 +12,8 @@ use crate::{
     instr::{fns::ioblock, get_item_spec},
 };
 
+use std::{borrow::Cow, collections::HashMap};
+
 pub mod consts {
     pub const ENTRY_POINT: &str = "_start";
     pub const INIT_ROUTINE: &str = "_init";
@@ -22,7 +24,7 @@ pub mod flags;
 pub mod structs;
 
 pub type HandlerReturn = Result<HandlerData, TasmError>;
-pub type HandlerFn = fn(HandlerArgs) -> HandlerReturn;
+pub type HandlerFn = for<'a> fn(HandlerArgs<'a>) -> HandlerReturn;
 
 #[macro_export]
 macro_rules! verbose_log {
@@ -43,9 +45,9 @@ macro_rules! log {
 }
 
 impl Tasm {
-    pub fn handle_routines(&mut self, level_name: &String) -> Result<Level, Vec<TasmError>> {
+    pub fn handle_routines(&mut self, level_name: &str) -> Result<Level, Vec<TasmError>> {
         // clear errors
-        self.errors = vec![];
+        self.errors.clear();
 
         let spacing = match self.release_mode {
             true => 1.0,
@@ -54,14 +56,14 @@ impl Tasm {
 
         // setup state
         self.aliases.ptrpos_id = self.mem_end_counter;
-        let mut level = Level::new(level_name, &"tasm".to_owned(), None, None);
+        let mut level = Level::new(level_name, "tasm", None, None);
 
         let routine_count = self.routines.len();
         self.curr_group = routine_count as i16 + self.group_offset + 1;
 
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
-        let routines = std::mem::take(&mut self.routines);
-        routines.iter().for_each(|routine| {
+        let routines = core::mem::take(&mut self.routines);
+        for routine in &routines {
             // setup position variables
             let mut obj_pos = 0.0;
             // subtracting from group offset ensures that high group IDs are still placed close to y=0
@@ -73,7 +75,7 @@ impl Tasm {
                     TasmErrorType::ExceedsGroupLimit,
                     format!("Program uses more than {GROUP_LIMIT} groups."),
                 );
-                return;
+                break;
             }
 
             // keep track of entry group
@@ -103,16 +105,16 @@ impl Tasm {
                     &mut level,
                 );
             }
-        });
+        }
         self.routines = routines;
 
         if self.start_rtn_group != 0 {
             let ioblock_result = ioblock(HandlerArgs {
-                args: vec![
+                args: Cow::Owned(vec![
                     TasmValue::Group(self.start_rtn_group),
                     TasmValue::Number(0.0),
                     TasmValue::String("start".into()),
-                ],
+                ]),
                 cfg: GDObjConfig::new(),
                 displayed_items: self.displayed_items,
                 curr_group: self.curr_group,
@@ -127,7 +129,9 @@ impl Tasm {
         }
 
         if !self.errors.is_empty() {
-            Err(self.errors.clone())
+            // Given that we won't be using this TASM-object again (since we faild to compile),
+            // taking the errors will be ultimately more efficient.
+            Err(core::mem::take(&mut self.errors))
         } else {
             Ok(level)
         }
@@ -144,13 +148,19 @@ impl Tasm {
         routine_count: usize,
         level: &mut Level,
     ) {
-        let mut instr_args = instr.args.clone();
-        instr_args.iter_mut().for_each(|v| {
-            if let TasmValue::Alias(alias) = v {
-                // builtin alias
-                *v = self.aliases.get_value(*alias)
+        let instr_args: Cow<'_, [TasmValue]> = if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
+            let mut resolved = instr.args.clone();
+            for v in &mut resolved {
+                if let TasmValue::Alias(alias) = v {
+                    // builtin alias
+                    *v = self.aliases.get_value(*alias)
+                }
             }
-        });
+            Cow::Owned(resolved)
+        } else {
+            Cow::Borrowed(instr.args.as_slice())
+        };
+        let resolved_args = instr_args.as_ref();
 
         // check that we are not accessing memory in init routine
         if instr._type == InstrType::Memory {
@@ -181,7 +191,7 @@ impl Tasm {
         // check that any bad assignments aren't happening
         if instr._type == InstrType::Arithmetic {
             // first argument is always the result
-            let counter_type = get_item_spec(&instr_args[0]).unwrap().get_type();
+            let counter_type = get_item_spec(&resolved_args[0]).unwrap().get_type();
             if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
                 push_error(
                     &mut self.errors,
@@ -223,6 +233,10 @@ impl Tasm {
         }
         .multitrigger(true);
 
+        let flag_assoc = instr.flags.iter()
+            .map(|f| (f.ident.clone(), f))
+            .collect::<HashMap<_, _>>();
+
         let handler = instr.handler_fn;
         let args = HandlerArgs {
             args: instr_args,
@@ -245,22 +259,23 @@ impl Tasm {
             // if there is no malloc, there is no memory access allowed
             // therefore it does not matter if there is junk data in there
             // since it will either be overwritten or never used
-            memreg: self.aliases.memreg.clone(),
+            memreg: &self.aliases.memreg,
             ptrpos_id: self.aliases.ptrpos_id,
             displayed_items: self.displayed_items,
             routine_count,
             mem_end_counter: self.mem_end_counter,
-            flags: instr.flags.clone(),
-            mem_info: self.mem_info.clone(),
+
+            flags: instr.flags.as_slice(),
+            flag_by_ident: flag_assoc,
+            
+            mem_info: self.mem_info.as_ref(),
         };
 
         let data = match handler(args) {
             Ok(data) => data,
-            Err(e) => {
-                let mut err = e.clone();
-                // fill in missing fields
-                err.file = self.fname.clone();
-                err.routine = routine.ident.clone();
+            Err(mut e) => {
+                e.file = self.fname.clone();
+                e.routine = routine.ident.clone();
                 self.errors.push(e);
                 return;
             }
@@ -299,11 +314,12 @@ impl Tasm {
 
             // assigning new mem info, also assign the aliases
 
-            self.mem_info = Some(m.clone());
+            self.mem_info = Some(m);
+            let mref = self.mem_info.as_ref().unwrap();
             // assign to alias map
-            self.aliases.memreg = m.memreg;
-            self.aliases.ptrpos_id = m.ptrpos.to_counter_id().unwrap();
-            self.aliases.memsize = m.size;
+            self.aliases.memreg = mref.memreg.clone();
+            self.aliases.ptrpos_id = mref.ptrpos.to_counter_id().unwrap();
+            self.aliases.memsize = mref.size;
             // assign aliases themselves
         }
 
@@ -319,15 +335,15 @@ impl Tasm {
 
 pub fn push_error(
     errors: &mut Vec<TasmError>,
-    file: &String,
+    file: &str,
     etype: TasmErrorType,
     line: usize,
     rtn: String,
     details: String,
 ) {
     errors.push(TasmError {
-        _type: etype,
-        file: file.clone(),
+        r#type: etype,
+        file: file.to_string(),
         routine: rtn,
         error: true,
         line,
@@ -337,13 +353,13 @@ pub fn push_error(
 
 pub fn push_error_lineless(
     errors: &mut Vec<TasmError>,
-    file: &String,
+    file: &str,
     etype: TasmErrorType,
     details: String,
 ) {
     errors.push(TasmError {
-        _type: etype,
-        file: file.clone(),
+        r#type: etype,
+        file: file.to_string(),
         routine: String::new(),
         error: true,
         line: 0,
@@ -351,7 +367,7 @@ pub fn push_error_lineless(
     })
 }
 
-pub fn show_errors(es: Vec<TasmError>, err_msg: &str) {
+pub fn print_errors(es: Vec<TasmError>, err_msg: &str) {
     println!("{err_msg} with {} errors:", es.len());
     for e in es {
         println!("{e}");

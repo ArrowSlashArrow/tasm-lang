@@ -3,6 +3,8 @@ use gdlib::gdobj::{
     triggers::{CompareOp, Op},
 };
 
+use phf::phf_map;
+
 use crate::{
     core::{
         HandlerFn,
@@ -15,7 +17,7 @@ use crate::{
 pub mod fns;
 pub mod mem;
 
-const GROUP_SPAWN_DELAY: f64 = 0.0044;
+pub const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 // convert a list of type identifiers into a slice
 macro_rules! argset {
@@ -29,90 +31,74 @@ macro_rules! argset {
     }
 }
 
-pub static INSTR_SPEC: &[(
-    &str,                             // ident
-    bool,                             // exclusive to _init
-    &[(&[TasmValueType], HandlerFn)], // handlers
-    InstrType,
-)] = &[
+pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn, InstrType);
+pub type Handlers = &'static [HandlerAssoc];
+pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers)> = phf_map! {
     // inits
-    (
-        "MALLOC",
+    "MALLOC" => (
         true,
         &[argset!((Int, Int) => malloc)],
         InstrType::Init,
     ),
-    (
-        "FMALLOC",
+    "FMALLOC" => (
         true,
         &[argset!((Int, Int) => fmalloc)],
         InstrType::Init,
     ),
-    (
-        "INITMEM",
+    "INITMEM" => (
         true,
         &[argset!([Number] => init_mem)],
         InstrType::Init,
     ),
-    ("PERS", true, &[argset!((Item) => pers)], InstrType::Init),
-    (
-        "DISPLAY",
+    "PERS" => (true, &[argset!((Item) => pers)], InstrType::Init),
+    "DISPLAY" => (
         true,
         &[argset!((Item) => display)],
         InstrType::Init,
     ),
-    (
-        "IOBLOCK",
+    "IOBLOCK" => (
         true,
         &[argset!((Group, Int, String) => ioblock)],
         InstrType::Init,
     ),
     // legacy memory
-    (
-        "LMALLOC",
+    "LMALLOC" => (
         true,
         &[argset!((Int) => legacy_malloc)],
         InstrType::Init,
     ),
-    (
-        "LFMALLOC",
+    "LFMALLOC" => (
         true,
         &[argset!((Int) => legacy_fmalloc)],
         InstrType::Init,
     ),
-    (
-        "LMFUNC",
+    "LMFUNC" => (
         false,
         &[argset!(() => legacy_mfunc)],
         InstrType::Memory,
     ),
-    (
-        "LMREAD",
+    "LMREAD" => (
         false,
         &[argset!(() => legacy_mread)],
         InstrType::Memory,
     ),
-    (
-        "LMWRITE",
+    "LMWRITE" => (
         false,
         &[argset!(() => legacy_mwrite)],
         InstrType::Memory,
     ),
-    (
-        "LMPTR",
+    "LMPTR" => (
         false,
         &[argset!((Int) => legacy_mptr)],
         InstrType::Memory,
     ),
-    (
-        "LMRESET",
+    "LMRESET" => (
         false,
         &[argset!(() => legacy_mreset)],
         InstrType::Memory,
     ),
     // memory
-    (
-        "MOV",
+    "MOV" => (
         false,
         &[
             argset!((Item, Number) => arithmetic_item_num_mov),
@@ -120,34 +106,30 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    ("MSET", false, &[argset!(() => mset)], InstrType::Memory),
-    ("MGET", false, &[argset!(() => mget)], InstrType::Memory),
+    "MSET" => (false, &[argset!(() => mset)], InstrType::Memory),
+    "MGET" => (false, &[argset!(() => mget)], InstrType::Memory),
     // debug
-    (
-        "BREAKPOINT",
+    "BREAKPOINT" => (
         false,
         &[argset!(() => skip)],
         InstrType::Debug,
     ),
     // Process
-    (
-        "SPAWN",
+    "SPAWN" => (
         false,
         &[argset!((Group) => spawn)],
         InstrType::Process,
     ),
     // Waits
-    ("NOP", false, &[argset!(() => nop)], InstrType::Wait),
-    ("WAIT", false, &[argset!((Int) => wait)], InstrType::Wait),
-    (
-        "WAITS",
+    "NOP" => (false, &[argset!(() => nop)], InstrType::Wait),
+    "WAIT" => (false, &[argset!((Int) => wait)], InstrType::Wait),
+    "WAITS" => (
         false,
         &[argset!((Number) => waits)],
         InstrType::Wait,
     ),
     // Arithmetic
-    (
-        "ADD",
+    "ADD" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_add),
@@ -156,8 +138,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "SUB",
+    "SUB" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_sub),
@@ -166,8 +147,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "ADDM",
+    "ADDM" => (
         false,
         &[
             argset!((Item, Item, Number) => add_mod_2items_num),
@@ -175,8 +155,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "SUBM",
+    "SUBM" => (
         false,
         &[
             argset!((Item, Item, Number) => sub_mod_2items_num),
@@ -184,8 +163,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "ADDD",
+    "ADDD" => (
         false,
         &[
             argset!((Item, Item, Number) => add_div_2items_num),
@@ -193,8 +171,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "SUBD",
+    "SUBD" => (
         false,
         &[
             argset!((Item, Item, Number) => sub_div_2items_num),
@@ -202,8 +179,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "MUL",
+    "MUL" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_mul),
@@ -213,8 +189,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "DIV",
+    "DIV" => (
         false,
         &[
             argset!((Item, Item) => arithmetic_2items_div),
@@ -224,8 +199,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "FLDIV",
+    "FLDIV" => (
         false,
         &[
             argset!((Item, Item) => fldiv_2items),
@@ -235,8 +209,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Arithmetic,
     ),
-    (
-        "SE",
+    "SE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_eq),
@@ -244,8 +217,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "SNE",
+    "SNE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_ne),
@@ -253,8 +225,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "SL",
+    "SL" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_le),
@@ -262,8 +233,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "SLE",
+    "SLE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_leq),
@@ -271,8 +241,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "SG",
+    "SG" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_ge),
@@ -280,8 +249,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "SGE",
+    "SGE" => (
         false,
         &[
             argset!((Group, Item, Item) => spawn_item_item_geq),
@@ -289,8 +257,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "FE",
+    "FE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_eq),
@@ -298,8 +265,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "FNE",
+    "FNE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_ne),
@@ -307,8 +273,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "FL",
+    "FL" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_le),
@@ -316,8 +281,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "FLE",
+    "FLE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_leq),
@@ -325,8 +289,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "FG",
+    "FG" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_ge),
@@ -334,8 +297,7 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "FGE",
+    "FGE" => (
         false,
         &[
             argset!((Group, Group, Item, Item) => fork_item_item_geq),
@@ -343,75 +305,64 @@ pub static INSTR_SPEC: &[(
         ],
         InstrType::Process,
     ),
-    (
-        "SRAND",
+    "SRAND" => (
         false,
         &[argset!((Group, Number) => spawn_random)],
         InstrType::Process,
     ),
-    (
-        "FRAND",
+    "FRAND" => (
         false,
         &[argset!((Group, Group, Number) => fork_random)],
         InstrType::Process,
     ),
-    (
-        "TSPAWN",
+    "TSPAWN" => (
         false,
         &[argset!((Timer, Number, Number, Group) => tspawn)],
         InstrType::Timer,
     ),
-    (
-        "TSTART",
+    "TSTART" => (
         false,
         &[argset!((Timer) => tstart)],
         InstrType::Timer,
     ),
-    (
-        "TSTOP",
+    "TSTOP" => (
         false,
         &[argset!((Timer) => tstop)],
         InstrType::Timer,
     ),
-    (
-        "PAUSE",
+    "PAUSE" => (
         false,
         &[argset!((Group) => pause)],
         InstrType::Process,
     ),
-    (
-        "RESUME",
+    "RESUME" => (
         false,
         &[argset!((Group) => resume)],
         InstrType::Process,
     ),
-    (
-        "KILL",
+    "KILL" => (
         false,
         &[argset!((Group) => stop)],
         InstrType::Process,
     ),
-    (
-        "TOGGLEON",
+    "TOGGLEON" => (
         false,
         &[argset!((Group) => ton)],
         InstrType::Process,
     ),
-    (
-        "TOGGLEOFF",
+    "TOGGLEOFF" => (
         false,
         &[argset!((Group) => toff)],
         InstrType::Process,
     ),
-    (
-        "RAW",
+    "RAW" => (
         false,
         &[argset!((String) => raw_objs)],
         InstrType::Special,
     ),
-];
+};
 
-// utils
+// -- utils -- \\
 
 pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
     match item {
@@ -423,25 +374,22 @@ pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
 }
 
 fn get_flag_value(args: &HandlerArgs, ident: &str, default: FlagValue) -> FlagValue {
-    match args.flags.iter().find(|f| f.ident == ident) {
+    match args.flag_by_ident.get(ident) {
         Some(flag) => flag.value.clone(),
         None => default,
     }
 }
 
 fn get_flag_value_opt(args: &HandlerArgs, ident: &str) -> Option<FlagValue> {
-    args.flags
-        .iter()
-        .find(|f| f.ident == ident)
-        .map(|f| f.clone().value)
+    args.flag_by_ident.get(ident).map(|f| f.value.clone())
 }
 
 fn flag_override<T>(item: &mut T, ident: &str, args: &HandlerArgs)
 where
     FlagValue: Into<T>,
 {
-    if let Some(value) = args.flags.iter().find(|f| f.ident == ident) {
-        *item = value.value.clone().into()
+    if let Some(flag) = args.flag_by_ident.get(ident) {
+        *item = flag.value.clone().into()
     }
 }
 

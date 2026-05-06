@@ -127,7 +127,7 @@ fn new_active(active_groups: &mut HashMap<i32, ActiveGroup>, namespace: &Namespa
     active_groups.insert(
         group, 
         ActiveGroup { 
-            group: group, 
+            group, 
             name: name.to_string(),
             idx: -1, 
             wait: 0 
@@ -149,16 +149,16 @@ fn get_routine(namespace: &Namespace, group: i32) -> Option<Routine> {
 fn clamp(value: f64, isfloat: bool) -> f64 {
     if isfloat {
         if value > 9999999.0 {
-            return 9999999.0
+            9999999.0
         } else {
-            return value
+            value
         }
     } else {
         let mut newvalue = value.clamp(-2147483648.0, 2147483648.0);
-        if newvalue > std::i32::MAX as f64 {
-            newvalue = std::i32::MIN as f64
+        if newvalue > i32::MAX as f64 {
+            newvalue = i32::MIN as f64;
         } // simulate GD underflow
-        return newvalue
+        newvalue
     }
 }
 
@@ -170,121 +170,56 @@ fn get(counter: &Counter, counters: &[i32], timers: &[f32]) -> f64 {
     }
 }
 
+const fn match_op(lhs: f64, rhs: f64, op: i32) -> f64 {
+    match op {
+        0 => rhs,               // assignment
+        1 => lhs + rhs,         // addition
+        2 => lhs - rhs,         // subtraction
+        3 => lhs * rhs,         // multiplication
+        4 if rhs != 0.0 => {    // division
+            lhs / rhs
+        }
+        5 if rhs != 0.0 => {    // floor division
+            (lhs / rhs).floor()
+        },
+        _ => 0.0                // unknown
+    }
+}
+
 // counter = counter <op> value; op table: (0: =, 1: +, 2: -, 3: *, 4: /)
 fn gsetv(counter: &Counter, rhsvalue: f64, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
-    let lhs = get(&counter, &counters, &timers);
-    let result = match op {
-        0 => rhsvalue,
-        1 => lhs + rhsvalue,
-        2 => lhs - rhsvalue,
-        3 => lhs * rhsvalue,
-        4 => {
-            if rhsvalue != 0.0 {
-                lhs / rhsvalue
-            } else {
-                0.0
-            }
-        },
-        5 => {
-            if rhsvalue != 0.0 {
-                (lhs / rhsvalue).floor()
-            } else {
-                0.0
-            }
-        },
-        _ => 0.0
-    };
+    let lhs = get(counter, counters, timers);
+    let result = match_op(lhs, rhsvalue, op);
 
     clamp(result, counter.timer)
 }
 
 // counter = counter <op> rhs (0: =, 1: +, 2: -, 3: *, 4: /)
-fn gsetc(counter: &Counter, rhs: &Counter, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
-    
-    let lhs = get(&counter, &counters, &timers);
-    let rhsvalue = get(&rhs, &counters, &timers);
-    let value = match op {
-        0 => rhsvalue,
-        1 => lhs + rhsvalue,
-        2 => lhs - rhsvalue,
-        3 => lhs * rhsvalue,
-        4 => {
-            if rhsvalue != 0.0 {
-                lhs / rhsvalue
-            } else {
-                0.0
-            }
-        },
-        5 => {
-            if rhsvalue != 0.0 {
-                (lhs / rhsvalue).floor()
-            } else {
-                0.0
-            }
-        },
-        _ => 0.0
-    };
+fn gsetc(counter: &Counter, rhs: &Counter, op: i32, counters: &[i32], timers: &[f32]) -> f64 {    
+    let lhs = get(counter, counters, timers);
+    let rhsvalue = get(rhs, counters, timers);
+    let result = match_op(lhs, rhsvalue, op);
 
-    clamp(value, counter.timer)
+    clamp(result, counter.timer)
 }
 
 // counter = lhs <op> rhs (0: =, 1: +, 2: -, 3: *, 4: /)
-fn gset2(result: &Counter, lhs_counter: Counter, rhs: Counter, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
-    let lhs = get(&lhs_counter, &counters, &timers);
-    let rhsvalue = get(&rhs, &counters, &timers);
-    let value = match op {
-        0 => rhsvalue,
-        1 => lhs + rhsvalue,
-        2 => lhs - rhsvalue,
-        3 => lhs * rhsvalue,
-        4 => {
-            if rhsvalue != 0.0 {
-                lhs / rhsvalue
-            } else {
-                0.0
-            }
-        },
-        5 => {
-            if rhsvalue != 0.0 {
-                (lhs / rhsvalue).floor()
-            } else {
-                0.0
-            }
-        },
-        _ => 0.0
-    };
+fn gset2(storeto: &Counter, lhs_counter: &Counter, rhs: &Counter, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
+    let lhs = get(lhs_counter, counters, timers);
+    let rhsvalue = get(rhs, counters, timers);
+    let result = match_op(lhs, rhsvalue, op);
 
     // clamp value
-    clamp(value, result.timer)
+    clamp(result, storeto.timer)
 }
 
 // counter = lhs <op> mod (0: =, 1: +, 2: -, 3: *, 4: /)
-fn gset2c(result: &Counter, lhs_counter: Counter, value: f64, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
-    let lhs = get(&lhs_counter, &counters, &timers);
-    let newvalue = match op {
-        0 => value,
-        1 => lhs + value,
-        2 => lhs - value,
-        3 => lhs * value,
-        4 => {
-            if value != 0.0 {
-                lhs / value
-            } else {
-                0.0
-            }
-        },
-        5 => {
-            if value != 0.0 {
-                (lhs / value).floor()
-            } else {
-                0.0
-            }
-        },
-        _ => 0.0
-    };
+fn gset2c(storeto: &Counter, lhs_counter: &Counter, value: f64, op: i32, counters: &[i32], timers: &[f32]) -> f64 {
+    let lhs: f64 = get(lhs_counter, counters, timers);
+    let result = match_op(lhs, value, op);
 
     // clamp value
-    clamp(newvalue, result.timer)
+    clamp(result, storeto.timer)
 }
 
 // display the state in a nice way
@@ -380,14 +315,13 @@ fn show_state(
         // top border of memory display
         out_str += &format!("{first_column}{}\n", next_column.repeat(columns as usize - 1usize));
         
-        let mut i = 0;
-        for line in lines.iter() {
+        for (i, line) in lines.iter().enumerate() {
             // add the memory cell strings for each line
             let mut column = "".to_string();
             for memcell in line.iter() {
                 column += &build_memcell_str(*memcell as i32)
             }
-            if i == memory_size % rows && memory_size % rows != 0 {
+            if i == (memory_size % rows) as usize && memory_size % rows != 0 {
                 let mut beginning = format!("{VERTICAL}{column}");
                 beginning.pop();
                 // add the bottom of the last row if it cuts off early
@@ -395,8 +329,6 @@ fn show_state(
             } else {
                 out_str += &format!("{VERTICAL}{column}{CLEAR_LINE_AFTER_CURSOR}\n")
             }
-            
-            i += 1;
         }
         
         // add the bottom of the memory cell display
@@ -436,7 +368,7 @@ fn show_state(
         out_str += &format!("+-----------------------+{CLEAR_LINE_AFTER_CURSOR}\n{CLEAR_LINE_AFTER_CURSOR}\n");
     }
     
-    if displayed_counters.len() > 0 {
+    if !displayed_counters.is_empty() {
         let left_len = 5;
         let mut right_len_int = 0;
         let mut float_lengths: Vec<usize> = vec![];
@@ -452,7 +384,7 @@ fn show_state(
                 }
             }
         }
-        let right_len_float = if float_lengths.len() > 0 {*float_lengths.iter().max().unwrap() as i32} else{-1};
+        let right_len_float = if !float_lengths.is_empty() {*float_lengths.iter().max().unwrap() as i32} else {-1};
         let length = (6 + left_len as i32 + right_len_int as i32 + right_len_float) as usize;
 
         // top border
@@ -467,7 +399,7 @@ fn show_state(
         
         // then display
         for counter in displayed_counters.iter() {
-            let value = get(counter, &counters, &timers);
+            let value = get(counter, counters, timers);
             let counter_str = format!("{}{}", if counter.timer {"T"} else {"C"}, counter.id);
             out_str += &format!("{VERTICAL} {counter_str:<left_len$} {VERTICAL} {0:>right_len_int$}", (value as i32).to_string());
             if right_len_float > -1 && counter.timer {
@@ -570,7 +502,7 @@ fn main() {
 
     let argv = env::args().collect::<Vec<String>>();
     let infile = argv.get(1).expect("No input filepath found (argument 1).");
-    let file = fs::read_to_string(&infile).expect("Unable to read file.");    
+    let file = fs::read_to_string(infile).expect("Unable to read file.");    
 
     let fast = argv.contains(&"--fast".to_string());
 
@@ -619,10 +551,9 @@ fn main() {
         None => &Routine {group: -1, instructions: vec![]}
     };
     let mut malloced = false;
-    let mut idx = 0;
 
     // process init routine
-    for instruction in init_routine.instructions.clone().into_iter() {
+    for (idx, instruction) in init_routine.instructions.clone().into_iter().enumerate() {
         let command = instruction.instr.as_str();
         let args: Vec<String> = instruction.args;
         match command {
@@ -674,7 +605,6 @@ fn main() {
             },
             _ => {}
         }
-        idx += 1;
     }
 
     let mut routines: HashMap<String, Routine> = HashMap::new();
@@ -706,13 +636,13 @@ fn main() {
             name.clone(),
             Routine {
                 group: *group,
-                instructions: instructions
+                instructions
             }
         );
     }
 
     let namespace = Namespace { 
-        routines: routines
+        routines
     };
 
     let mut tick: u64 = 0;
@@ -745,32 +675,31 @@ fn main() {
         _extra_steps = 0;
 
         // get input 
-        if event::poll(Duration::from_millis(0)).unwrap() {
-            if let Event::Key(keystroke) = event::read().unwrap() {
-                if !previous_inputs.contains(&keystroke.code) {
-                    match keystroke.code {
-                        KeyCode::Char('q') => {
-                            process::exit(0);
-                        },
-                        KeyCode::Char(' ') => {
-                            paused = !paused;
-                        },
-                        KeyCode::Char('-') => {
-                            delay *= 1.148698355;
-                        },
-                        KeyCode::Char('=') => delay /= speed_multiplier,
-                        KeyCode::Char('.') => _extra_steps += 1,
-                        KeyCode::Char(';') => _extra_steps += 10,
-                        _ => {}
-                    };
-                    // min value is default delay / 64
-                    // max value is default delay * 64
-                    delay = delay.clamp(default_delay / 64.0, default_delay * 64.0);
-                    previous_inputs.insert(keystroke.code);
-                } else {
-                    previous_inputs.remove(&keystroke.code);
-                }
-            } 
+        if event::poll(Duration::from_millis(0)).unwrap() 
+            && let Event::Key(keystroke) = event::read().unwrap() {
+            if !previous_inputs.contains(&keystroke.code) {
+                match keystroke.code {
+                    KeyCode::Char('q') => {
+                        process::exit(0);
+                    },
+                    KeyCode::Char(' ') => {
+                        paused = !paused;
+                    },
+                    KeyCode::Char('-') => {
+                        delay *= 1.148698355;
+                    },
+                    KeyCode::Char('=') => delay /= speed_multiplier,
+                    KeyCode::Char('.') => _extra_steps += 1,
+                    KeyCode::Char(';') => _extra_steps += 10,
+                    _ => {}
+                };
+                // min value is default delay / 64
+                // max value is default delay * 64
+                delay = delay.clamp(default_delay / 64.0, default_delay * 64.0);
+                previous_inputs.insert(keystroke.code);
+            } else {
+                previous_inputs.remove(&keystroke.code);
+            }
         }
         // determine
         let steps = match paused {
@@ -800,7 +729,14 @@ fn main() {
 
             current_instructions_names = current_instructions
                 .iter()
-                .map(|(idx, instr)| (active_groups.get(idx).expect(format!("{tick}: no {idx} in {active_groups:?} {current_instructions:?}").as_str()).name.clone(), instr.clone())).collect::<HashMap<String, Instruction>>();
+                .map(|(idx, instr)| 
+                    (
+                        active_groups.get(idx)
+                            .unwrap_or_else(|| panic!("{}", format!("{tick}: no {idx} in {active_groups:?} {current_instructions:?}"))).name.clone(),
+                        instr.clone()
+                    )
+                )
+                .collect::<HashMap<String, Instruction>>();
                 
             
             // process all instructions
@@ -816,21 +752,21 @@ fn main() {
                     let result = Counter::new(&args[0], using_float_mem);
                     let resulting_value = match mode {
                         1 => { // item = num
-                            gsetv(&result, args[1].parse::<f64>().unwrap(), op, &mut counters, &mut timers)
+                            gsetv(&result, args[1].parse::<f64>().unwrap(), op, &counters, &timers)
                         },
                         2 => { // item = item
                             let rhs = Counter::new(&args[1], using_float_mem);
-                            gsetc(&result, &rhs, op, &mut counters, &mut timers)
+                            gsetc(&result, &rhs, op, &counters, &timers)
                         },
                         3 => {
                             let lhs = Counter::new(&args[1], using_float_mem);
                             let rhs = Counter::new(&args[2], using_float_mem);
-                            gset2(&result, lhs, rhs, op, &mut counters, &mut timers)
+                            gset2(&result, &lhs, &rhs, op, &counters, &timers)
                         },
                         4 => {
                             let lhs = Counter::new(&args[1], using_float_mem);
                             let rhs = args[2].parse::<f64>().unwrap();
-                            gset2c(&result, lhs, rhs, op, &mut counters, &mut timers)
+                            gset2c(&result, &lhs, rhs, op, &counters, &timers)
                         }
                         _ => 0.0
                     };
@@ -847,10 +783,10 @@ fn main() {
                 let mut spawns = |compare: i32, counters: &mut [i32], timers: &mut [f32]| {
                     let value = match mode {
                         1 => args[2].parse::<f64>().unwrap(),
-                        2 => get(&Counter::new(&args[2], using_float_mem), &counters, &timers),
+                        2 => get(&Counter::new(&args[2], using_float_mem), counters, timers),
                         _ => 0.0
                     };
-                    let lhs = get(&Counter::new(&args[1], using_float_mem), &counters, &timers);
+                    let lhs = get(&Counter::new(&args[1], using_float_mem), counters, timers);
                     if match compare {
                         0 => lhs == value,
                         1 => lhs > value,
@@ -867,10 +803,10 @@ fn main() {
                 let forks = |compare: i32, counters: &mut [i32], timers: &mut [f32], active_groups: &mut HashMap<i32, ActiveGroup>| {
                     let value = match mode {
                         1 => args[3].parse::<f64>().unwrap(),
-                        2 => get(&Counter::new(&args[3], using_float_mem), &counters, &timers),
+                        2 => get(&Counter::new(&args[3], using_float_mem), counters, timers),
                         _ => 0.0
                     };
-                    let lhs = get(&Counter::new(&args[2], using_float_mem), &counters, &timers);
+                    let lhs = get(&Counter::new(&args[2], using_float_mem), counters, timers);
                     if match compare {
                         0 => lhs == value,
                         1 => lhs > value,

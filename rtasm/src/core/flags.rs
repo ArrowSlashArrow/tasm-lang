@@ -4,7 +4,7 @@ use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
 pub struct Flag {
     pub ident: String,
     pub value: FlagValue,
-    pub _type: FlagValueType,
+    pub r#type: FlagValueType,
 }
 
 impl Flag {
@@ -14,7 +14,7 @@ impl Flag {
         Some(Self {
             value,
             ident,
-            _type: t,
+            r#type: t,
         })
     }
 }
@@ -99,7 +99,7 @@ impl From<FlagValue> for Op {
 }
 impl From<FlagValue> for Vec<(i16, i16)> {
     fn from(val: FlagValue) -> Self {
-        val.to_dict().unwrap()
+        val.to_cloned_dict().unwrap()
     }
 }
 impl From<FlagValue> for (RoundMode, SignMode) {
@@ -131,7 +131,7 @@ impl FlagValue {
             },
             FlagValueType::Dict => {
                 let mut invalid_dict = false;
-                let kv_pairs = &value[1..value.len() - 1]
+                let kv_pairs: Vec<(i16, i16)> = value[1..value.len() - 1]
                     .split(',')
                     .map(|kv| {
                         let mut split = kv.trim().split(':');
@@ -162,7 +162,7 @@ impl FlagValue {
                 if invalid_dict {
                     None
                 } else {
-                    Some(Self::Dict(kv_pairs.to_owned()))
+                    Some(Self::Dict(kv_pairs))
                 }
             }
             FlagValueType::Bool => match value {
@@ -189,9 +189,21 @@ impl FlagValue {
             _ => None,
         }
     }
-    pub fn to_dict(&self) -> Option<Vec<(i16, i16)>> {
+    pub fn to_dict(&self) -> Option<&Vec<(i16, i16)>> {
+        match self {
+            Self::Dict(d) => Some(d),
+            _ => None,
+        }
+    }
+    pub fn to_cloned_dict(&self) -> Option<Vec<(i16, i16)>> {
         match self {
             Self::Dict(d) => Some(d.clone()),
+            _ => None,
+        }
+    }
+    pub fn to_owned_dict(self) -> Option<Vec<(i16, i16)>> {
+        match self {
+            Self::Dict(d) => Some(d),
             _ => None,
         }
     }
