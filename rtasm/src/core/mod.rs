@@ -148,18 +148,19 @@ impl Tasm {
         routine_count: usize,
         level: &mut Level,
     ) {
-        let instr_args: Cow<'_, [TasmValue]> = if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
-            let mut resolved = instr.args.clone();
-            for v in &mut resolved {
-                if let TasmValue::Alias(alias) = v {
-                    // builtin alias
-                    *v = self.aliases.get_value(*alias)
+        let instr_args: Cow<'_, [TasmValue]> =
+            if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
+                let mut resolved = instr.args.clone();
+                for v in &mut resolved {
+                    if let TasmValue::Alias(alias) = v {
+                        // builtin alias
+                        *v = self.aliases.get_value(*alias)
+                    }
                 }
-            }
-            Cow::Owned(resolved)
-        } else {
-            Cow::Borrowed(instr.args.as_slice())
-        };
+                Cow::Owned(resolved)
+            } else {
+                Cow::Borrowed(instr.args.as_slice())
+            };
         let resolved_args = instr_args.as_ref();
 
         // check that we are not accessing memory in init routine
@@ -233,7 +234,9 @@ impl Tasm {
         }
         .multitrigger(true);
 
-        let flag_assoc = instr.flags.iter()
+        let flag_assoc = instr
+            .flags
+            .iter()
             .map(|f| (f.ident.clone(), f))
             .collect::<HashMap<_, _>>();
 
@@ -267,7 +270,7 @@ impl Tasm {
 
             flags: instr.flags.as_slice(),
             flag_by_ident: flag_assoc,
-            
+
             mem_info: self.mem_info.as_ref(),
         };
 
@@ -342,7 +345,7 @@ pub fn push_error(
     details: String,
 ) {
     errors.push(TasmError {
-        r#type: etype,
+        etype,
         file: file.to_string(),
         routine: rtn,
         error: true,
@@ -358,7 +361,7 @@ pub fn push_error_lineless(
     details: String,
 ) {
     errors.push(TasmError {
-        r#type: etype,
+        etype,
         file: file.to_string(),
         routine: String::new(),
         error: true,

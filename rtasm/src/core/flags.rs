@@ -4,7 +4,7 @@ use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
 pub struct Flag {
     pub ident: String,
     pub value: FlagValue,
-    pub r#type: FlagValueType,
+    pub ftype: FlagValueType,
 }
 
 impl Flag {
@@ -14,7 +14,7 @@ impl Flag {
         Some(Self {
             value,
             ident,
-            r#type: t,
+            ftype: t,
         })
     }
 }

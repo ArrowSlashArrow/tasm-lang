@@ -43,7 +43,7 @@ use crate::{
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
         structs::{
-            Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature, get_instr_type,
+            Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature,
             is_builtin_alias,
         },
     },
@@ -265,7 +265,7 @@ impl Tasm {
             trimmed_line,
             '|',
             TasmError {
-                r#type: TasmErrorType::InvalidInstruction,
+                etype: TasmErrorType::InvalidInstruction,
                 file: self.fname.clone(),
                 routine: curr_routine.ident.clone(),
                 error: true,
@@ -381,7 +381,7 @@ impl Tasm {
         }
 
         // find the instruction spec which contains arg handlers
-        let (init_exclusive, handlers) = match INSTR_SPEC.get(&instr) {
+        let (init_exclusive, handlers, itype) = match INSTR_SPEC.get(&instr) {
             Some(spec) => spec,
             None => {
                 push_error(
@@ -622,7 +622,7 @@ fn parse_flags_str(
             flag_segment,
             ':',
             TasmError {
-                r#type: TasmErrorType::BadFlag,
+                etype: TasmErrorType::BadFlag,
                 file: file.to_owned(),
                 routine: routine.to_owned(),
                 error: true,
@@ -657,7 +657,7 @@ fn parse_flags_str(
                     },
                     None => {
                         return Err(TasmError {
-                            r#type: TasmErrorType::BadFlag,
+                            etype: TasmErrorType::BadFlag,
                             file: file.to_owned(),
                             routine: routine.to_owned(),
                             error: true,
@@ -678,7 +678,7 @@ fn parse_flags_str(
             Some(flag) => parsed_flags.push(flag),
             None => {
                 return Err(TasmError {
-                    r#type: TasmErrorType::BadFlag,
+                    etype: TasmErrorType::BadFlag,
                     file: file.to_owned(),
                     routine: routine.to_owned(),
                     error: true,
@@ -711,7 +711,7 @@ pub fn validate_tasm_value(
                 } else {
                     // only throw err if the group is the _init group
                     errors.push(TasmError {
-                        r#type: TasmErrorType::InitRoutineSpawnError,
+                        etype: TasmErrorType::InitRoutineSpawnError,
                         file: fname.to_string(),
                         routine: routine.to_string(),
                         error: true,

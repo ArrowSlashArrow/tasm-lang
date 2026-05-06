@@ -31,9 +31,9 @@ macro_rules! argset {
     }
 }
 
-pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn, InstrType);
+pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
-pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers)> = phf_map! {
+pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
     "MALLOC" => (
         true,

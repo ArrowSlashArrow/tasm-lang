@@ -78,7 +78,7 @@ fn wait_internal(ticks: i32, line: usize) -> HandlerReturn {
         Ok(HandlerData::default().skip_spaces(ticks))
     } else {
         Err(TasmError {
-            r#type: TasmErrorType::InvalidWaitAmount,
+            etype: TasmErrorType::InvalidWaitAmount,
             file: String::new(),
             routine: String::new(),
             error: true,

@@ -23,7 +23,7 @@ macro_rules! tasm_test {
                 match res.handle_routines(&String::new()) {
                     Ok(_) => return,
                     Err(e) => {
-                        show_errors(e, "errors");
+                        print_errors(e, "errors");
                         panic!()
                     }
                 }
@@ -82,7 +82,7 @@ macro_rules! tasm_test {
                 match res.handle_routines(&String::new()) {
                     Ok(_) => return,
                     Err(e) => {
-                        show_errors(e, "errors");
+                        print_errors(e, "errors");
                         panic!()
                     }
                 }
@@ -107,7 +107,7 @@ macro_rules! tasm_test {
                 match res.handle_routines(&String::new()) {
                     Ok(_) => return,
                     Err(e) => {
-                        show_errors(e, "errors");
+                        print_errors(e, "errors");
                         panic!()
                     }
                 }

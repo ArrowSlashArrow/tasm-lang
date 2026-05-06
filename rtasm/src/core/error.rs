@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 /// Representative of TASM high-level lexer, parser, and logic errors.
-/// 
+///
 /// - `type`: the type of error. Refer to `TasmErrorType` for more info.
 /// - `file`: the file in which the error occurred. This is typically the source file being compiled.
 ///     - In the future, this could also include modules and imported files.
@@ -10,7 +10,7 @@ use std::{error::Error, fmt::Display};
 /// - `details`: a detailed message about the error. This is typically a human-readable message that provides more information about the error.
 #[derive(Debug, Clone)]
 pub struct TasmError {
-    pub r#type: TasmErrorType,
+    pub etype: TasmErrorType,
     pub file: String,
     pub routine: String, // routine (helps with navigation)
     pub error: bool,     // warning: false
@@ -60,11 +60,11 @@ impl Display for TasmError {
                 self.routine,
                 // line + 1 to match the visual index, e.g. line 0 appears as line 1 in most editors
                 self.line + 1,
-                self.r#type,
+                self.etype,
                 self.details
             )
         } else {
-            write!(f, "{} [{:?}] {}", self.file, self.r#type, self.details)
+            write!(f, "{} [{:?}] {}", self.file, self.etype, self.details)
         }
     }
 }

@@ -329,7 +329,7 @@ pub struct HandlerArgs<'a> {
     pub line: usize,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct HandlerData {
     pub objects: Vec<GDObject>,
     // skip this amount of obj (default: 1)
