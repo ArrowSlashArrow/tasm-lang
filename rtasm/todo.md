@@ -1,17 +1,12 @@
 ## todos for v1.0
-- a way to include custom objects
-    - `OBJECT`
 - compiler optimizations (v1.0.0-rc1)
     - SORI (single object routine inlining)
-    - optimizations within the compiler itself
-- remove FMALLOC and have MALLOC allocate mixed memory, which mget/mset has an option to use floats for (flag or something)
 - make landing page
 - generate actual doc page from docs.md
-- make either an installer or intsall mgr program (like rustup) for tasmc
-- compiler optimizations
-    - single object routine inline
-        - any routine that conatins a single object will be inlined
-
+    - sorta done; it's setup for this but its not deployed yet
+- ~~make either an installer or intsall mgr program (like rustup) for tasmc~~
+    - windows one is done, but we still need one for linux
+- make tutorial for installing tasm
 ## post-v1.0
 - un-deprecate emulator
 - possibly add tty for console output

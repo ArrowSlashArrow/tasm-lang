@@ -4,7 +4,7 @@ use gdlib::gdobj::{
     triggers::{
         CompareOp, CompareOperand, ItemAlign, Op, RoundMode, SignMode, StopMode, TimeTriggerConfig,
         counter_object, item_compare, item_edit, persistent_item, random_trigger, spawn_trigger,
-        stop_trigger, time_control, time_trigger,
+        stop_trigger, time_control, time_trigger, toggle_trigger,
     },
 };
 
@@ -72,21 +72,28 @@ pub fn nop(_args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::default().skip_spaces(1))
 }
 
-pub fn wait(args: HandlerArgs) -> HandlerReturn {
+fn wait_internal(ticks: i32, line: usize) -> HandlerReturn {
     // skip specified amount of spaces
-    let wait = args.args[0].to_int().unwrap();
-    if wait >= 0 {
-        Ok(HandlerData::default().skip_spaces(args.args[0].to_int().unwrap()))
+    if ticks >= 0 {
+        Ok(HandlerData::default().skip_spaces(ticks))
     } else {
         Err(TasmError {
             _type: TasmErrorType::InvalidWaitAmount,
             file: String::new(),
             routine: String::new(),
             error: true,
-            line: args.line,
+            line,
             details: "Cannot wait a negative number of ticks.".to_string(),
         })
     }
+}
+
+pub fn wait(args: HandlerArgs) -> HandlerReturn {
+    wait_internal(args.args[0].to_int().unwrap(), args.line)
+}
+
+pub fn waits(args: HandlerArgs) -> HandlerReturn {
+    wait_internal((args.args[0].to_float().unwrap() * 240.0) as i32, args.line)
 }
 
 /* ARITHMETIC */
@@ -707,4 +714,32 @@ pub fn pers(args: HandlerArgs) -> HandlerReturn {
         false,
         false,
     )]))
+}
+
+pub fn ton(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![toggle_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        true,
+    )]))
+}
+
+pub fn toff(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![toggle_trigger(
+        &args.cfg,
+        args.args[0].to_group_id().unwrap(),
+        false,
+    )]))
+}
+
+pub fn raw_objs(args: HandlerArgs) -> HandlerReturn {
+    // everything is irrelevant but the object string
+    let objs = args.args[0]
+        .to_string()
+        .unwrap()
+        .trim_matches(';')
+        .split(';')
+        .map(|segment| GDObject::parse_str(segment))
+        .collect::<Vec<GDObject>>();
+    Ok(HandlerData::from_objects(objs).skip_spaces(0))
 }

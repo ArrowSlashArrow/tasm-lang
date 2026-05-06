@@ -44,7 +44,7 @@ _start:
     FG routine1, routine2, C1, C2
     FGE routine1, routine2, C1, C2
     RESUME routine1
-    STOP routine2
+    KILL routine2
     SRAND routine1, 50
     FRAND routine1, routine2, 50
 

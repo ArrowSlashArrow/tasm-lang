@@ -35,9 +35,9 @@ macro_rules! verbose_log {
 
 #[macro_export]
 macro_rules! log {
-    ($on:expr, $t:tt) => {
+    ($on:expr, $($t:tt)*) => {
         if $on {
-            println!($t);
+            println!($($t)*);
         }
     };
 }

@@ -13,30 +13,10 @@ pub enum InstrType {
     Init,       // any instruction that can only go into the _init routine.
     Memory,     // any instruction that requires/interfaces with memory
     Timer,      // any instruction that interacts with timers non-arithmetically.
-    Spawner, // any instruction that spawns a group. comparison instructions fall into this category.
-    Process, // any instruction that modifies the process flow (PAUSE, RESUME, STOP)
-    Wait,    // any instruction that waits (NOP, WAIT)
+    Special,    // instructions that are miscellaneous (dont fit into any of these categories)
+    Process,    // any instruction that modifies the process flow (PAUSE, RESUME, STOP)
+    Wait,       // any instruction that waits (NOP, WAIT)
     Debug, // any instruction that is only used by the emulator, and ignored when parsing to GD objects.
-}
-
-pub fn get_instr_type(ident: &str) -> Option<InstrType> {
-    match ident {
-        "SPAWN" | "SRAND" | "FRAND" | "SE" | "SNE" | "SL" | "SLE" | "SG" | "SGE" | "FE" | "FNE"
-        | "FL" | "FLE" | "FG" | "FGE" => Some(InstrType::Spawner),
-        "ADD" | "SUB" | "ADDM" | "SUBM" | "ADDD" | "SUBD" | "MUL" | "DIV" | "FLDIV" | "MOV" => {
-            Some(InstrType::Arithmetic)
-        }
-        "INITMEM" | "MALLOC" | "FMALLOC" | "LMALLOC" | "LFMALLOC" | "PERS" | "DISPLAY"
-        | "IOBLOCK" | "ALIAS" => Some(InstrType::Init),
-        "LMFUNC" | "LMREAD" | "LMWRITE" | "LMPTR" | "LMRESET" | "MSET" | "MGET" => {
-            Some(InstrType::Memory)
-        }
-        "NOP" | "WAIT" => Some(InstrType::Wait),
-        "TSPAWN" | "TSTART" | "TSTOP" => Some(InstrType::Timer),
-        "STOP" | "PAUSE" | "RESUME" => Some(InstrType::Process),
-        "BREAKPOINT" => Some(InstrType::Debug),
-        _ => None,
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -318,7 +298,7 @@ pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct HandlerArgs {
     /// Arguments to this function. e.g. Counter(C1), Number(2.5)
     pub args: Vec<TasmValue>,
@@ -339,7 +319,7 @@ pub struct HandlerArgs {
     pub line: usize,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct HandlerData {
     pub objects: Vec<GDObject>,
     // skip this amount of obj (default: 1)

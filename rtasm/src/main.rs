@@ -24,7 +24,7 @@ struct Args {
     #[arg(long)]
     release: bool,
 
-    /// Ending counter ID of memory block.
+    /// Ending counter ID of memory block. Does not apply to programs using new memory.
     #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
 
@@ -102,6 +102,13 @@ fn main() -> Result<(), Error> {
         None => args.infile,
     };
 
+    log!(
+        !args.no_log,
+        "Using groups {} - {}",
+        args.group_offset + 1,
+        tasm.curr_group
+    );
+
     log!(!args.no_log, "Encoding level...");
     match tasm.handle_routines(&level_name) {
         Ok(level) => {
@@ -112,7 +119,7 @@ fn main() -> Result<(), Error> {
                         let mut savefile = Levels::from_local()?;
                         savefile.add_level(level);
                         savefile.export_to_savefile()?;
-                        log!(!args.no_log, "exported to savefile.")
+                        log!(!args.no_log, "exported to savefile.");
                     }
                 }
             }

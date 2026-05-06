@@ -20,7 +20,13 @@ macro_rules! tasm_test {
                     true,
                     false
                 ).unwrap();
-                assert!(res.handle_routines(&String::new()).is_ok())
+                match res.handle_routines(&String::new()) {
+                    Ok(_) => return,
+                    Err(e) => {
+                        show_errors(e, "errors");
+                        panic!()
+                    }
+                }
             }
         }
     };
@@ -73,7 +79,13 @@ macro_rules! tasm_test {
                     true,
                     false
                 ).unwrap();
-                assert!(res.handle_routines(&String::new()).is_ok())
+                match res.handle_routines(&String::new()) {
+                    Ok(_) => return,
+                    Err(e) => {
+                        show_errors(e, "errors");
+                        panic!()
+                    }
+                }
             }
         }
     };
@@ -92,7 +104,13 @@ macro_rules! tasm_test {
                     true,
                     true
                 ).unwrap();
-                assert!(res.handle_routines(&String::new()).is_ok())
+                match res.handle_routines(&String::new()) {
+                    Ok(_) => return,
+                    Err(e) => {
+                        show_errors(e, "errors");
+                        panic!()
+                    }
+                }
             }
         }
     };

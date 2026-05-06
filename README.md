@@ -4,7 +4,7 @@
 A computational language that compiles to Geometry Dash trigger objects. Allows you to write complex trigger programs without actually placing triggers.
 Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/wiki/Turbo_Assembler).  
   
-TASM is currently in **version v0.2.4**.  
+TASM is currently in **version v0.2.5**.  
 The working compiler is in the `rtasm/` directory. Note that the compiler is not a standalone executable, and must be executed from source.
 
 Documentation can be found [here](docs/docs.md).
@@ -25,6 +25,8 @@ Features:
 * Fast and versatile compiler
 
 # Quick Start and Tutorial
+## Quick Install
+The TASM compiler (tasmc) now has an installer script for windows [here](https://tasm.mntpoint.org/install.ps1). This is a powershell script that must be ran from the command line.
 ## SDK Usage Instructions
 To use the current up-to-date SDK, you may do the following:
 1. Refer to the releases in this repo for pre-built executables

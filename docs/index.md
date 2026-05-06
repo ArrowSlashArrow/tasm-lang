@@ -1,3 +1,8 @@
+---
+label: Home
+icon: home
+---
+
 # TASM Documentation
 # 1. Overview 
 ## 1.1. Abstract 
@@ -43,7 +48,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of April 25, 2026 is **v0.2.4**. 
+The current version, as of May 5, 2026 is **v0.2.5**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -173,7 +178,7 @@ The routine `do_stuff` has a 42.8% chance of being spawned.
 #### 3.1.2.3. Memory
 > [!NOTE]
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
-> This memory structure is still usable, however it is much less than the structure used by the new memory instructions.
+> This memory structure is still usable, however it is considered deprecated and much less group-efficient than the structure used by the new memory instructions.
 
 ##### MALLOC
 Arguments: `MALLOC <int>, <int>`
@@ -257,6 +262,7 @@ When using the new memory block, reading an address outside of the allocated ran
 Memory I/O operations are NOT thread-safe. If two simultaneous or overlapping memory reads or writes are attempted, undefined behaviour may occur, which could be corrupted data writes or reads, or a flat-out failed operation.
 
 #### 3.1.2.4. Process
+> Note that the terms "routine" and "group" refer to essentialy the same thing in this section. The distinction between the two terms stems from the knowledge of the contents on the group; where a routine has known triggers (as is specified in a program), and a group may have some arbitrary external objects. All routines are treated as groups in GD.
 ##### SPAWN
 Arguments: `SPAWN <routine>`
 
@@ -276,10 +282,22 @@ Arguments: `RESUME <routine>`
 Resumes execution of a paused routine via a stop trigger.  
 Execution time: 1 tick.
 
-##### STOP
-Arguments: `STOP <routine>`
+##### KILL
+Arguments: `KILL <routine>`
 
-Stops the specified routine via a stop trigger. Unlike `PAUSE`, once a routine is stopped with this instruction, it cannot be resumed.
+Kills the specified routine via a stop trigger. Unlike `PAUSE`, once a routine is stopped with this instruction, it is **irreverisble** cannot be resumed.
+Execution time: 1 tick.
+
+##### TOGGLEON
+Arguments: `TOGGLEON <group>`
+
+Toggles the argument group on via toggle trigger.  
+Execution time: 1 tick.
+
+##### TOGGLEOFF
+Arguments: `TOGGLEOFF <group>`
+
+Toggles the argument group off via toggle trigger.  
 Execution time: 1 tick.
 
 #### 3.1.2.5. Wait
@@ -294,6 +312,11 @@ Arguments: `WAIT <int>`
 Does nothing for in following n ticks. Effectively a series of `NOP`s.  
 Wait time cannot be negative. The compiler throws an error if it is specified as such. 
 
+Execution time: variable.
+##### WAITS
+Arguments: `WAITS <float>`
+
+Waits the specified number of seconds, where the amount of time is converted to ticks using `floor(seconds * 240)`. Effectively the same as `WAIT`.  
 Execution time: variable.
 #### 3.1.2.6. Time
 ##### TSPAWN
@@ -370,12 +393,33 @@ _start:
 	MOV C1, 42
 ```
 
-Aliases will not clone values from other aliases:
+Aliases will **not** clone values from other aliases:
 ```
 _init:
 	ALIAS value, 42		; alias `value` holds 42
 	ALIAS value2, value	; alias `value2` holds "value", NOT 42. 
 ```
+
+#### 3.1.2.9. The `RAW` instruction
+> [!NOTE]
+> This instruction is a feature intended for advanced users. 
+
+The `RAW` instruction inserts the given object string directly into the resulting level. Since TASM does not have dedicated instructions for each individual trigger, it is necessary for this instruction to exist to allow for the insertion of arbitrary objects.  
+This instruction expects only one argument: `RAW <objects>`. The object string may contain multiple objects, and must strictly be a **raw** object string, which is *NOT* the same thing as a .gmd file.  
+The instructions inserts the object string according to the GDLib's GDObject constructor, which prevents the creation of degenerate object with missing properties that may cause the level not to load. This may lead to strange formations in the level in the case of a malformed input.  
+One may obtain an object string by using the BetterEdit mod for Geode, and simply pressing ctrl+c to copy the object(s).
+
+> [!WARNING]
+> The objects that it controls are not expected to be related to the routine in which this instruction was written. Since a raw object string is included, the objects may be of any abitrary group(s), at any arbitrary positions, and be otherwise totally unrelated to the routine.  
+> Please double-check and comment usages of this instruction thoroughly. Object strings are notoriously opaque and difficult to read, which makes them very prone to accidental misformatting.
+
+Execution time: 0 ticks.
+#### 3.1.2.10. Excluded instructions
+Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
+It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  
+Likewise, all bitwise instructions were left out of the TASM instruction set because there are no built-in operations to compute, for instance, a & b.
+
+In light of this, it is necessary to address the existence of instructions such as `MSET`/`MGET`, since they compile to multiple operations. These instructions are part of the memory instruction subset, and they exist as an interface to TASM's custom memory structure. Without them, the programmer would need to manually write out the same logic for accessing/setting a specific memory cell with the exact triggers and delays needed. The `MSET`/`MGET` instructions (among others) exist to simplify this process and to reduce bottlenecks in the development of programs.
 
 ### 3.1.3. In-level object representation 
 All arithmetic instructions use a single Item Edit trigger, including MOV.  
@@ -455,7 +499,7 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
 
 > [!NOTE]
-> "Item result" refers to the intermediate result between the operands in an item edit trigger (used be arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
+> "Item result" refers to the intermediate result between the operands in an item edit trigger (used in arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
 > ![Item Result](item_result.png)
 
 | Flag    | Usage                                                                                                 | Instructions | Type       |
@@ -645,7 +689,7 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.2.4, the aliases that exist are:
+As of TASM v0.2.5, the aliases that exist are:
 - `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
 - `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
@@ -739,7 +783,7 @@ For a memsize of more than 20, using the new system is recommended for the sake 
 
 ## 3.6. Comments
 <!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.4. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.5. 
 ## 3.7. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.

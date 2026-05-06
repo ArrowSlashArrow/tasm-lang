@@ -7,7 +7,7 @@ use crate::{
     core::{
         HandlerFn,
         flags::FlagValue,
-        structs::{HandlerArgs, TasmPrimitive, TasmValue, TasmValueType},
+        structs::{HandlerArgs, InstrType, TasmPrimitive, TasmValue, TasmValueType},
     },
     instr::{fns::*, mem::*},
 };
@@ -29,26 +29,87 @@ macro_rules! argset {
     }
 }
 
-pub const INSTR_SPEC: &[(
+pub static INSTR_SPEC: &[(
     &str,                             // ident
     bool,                             // exclusive to _init
     &[(&[TasmValueType], HandlerFn)], // handlers
+    InstrType,
 )] = &[
     // inits
-    ("MALLOC", true, &[argset!((Int, Int) => malloc)]),
-    ("FMALLOC", true, &[argset!((Int, Int) => fmalloc)]),
-    ("INITMEM", true, &[argset!([Number] => init_mem)]),
-    ("PERS", true, &[argset!((Item) => pers)]),
-    ("DISPLAY", true, &[argset!((Item) => display)]),
-    ("IOBLOCK", true, &[argset!((Group, Int, String) => ioblock)]),
+    (
+        "MALLOC",
+        true,
+        &[argset!((Int, Int) => malloc)],
+        InstrType::Init,
+    ),
+    (
+        "FMALLOC",
+        true,
+        &[argset!((Int, Int) => fmalloc)],
+        InstrType::Init,
+    ),
+    (
+        "INITMEM",
+        true,
+        &[argset!([Number] => init_mem)],
+        InstrType::Init,
+    ),
+    ("PERS", true, &[argset!((Item) => pers)], InstrType::Init),
+    (
+        "DISPLAY",
+        true,
+        &[argset!((Item) => display)],
+        InstrType::Init,
+    ),
+    (
+        "IOBLOCK",
+        true,
+        &[argset!((Group, Int, String) => ioblock)],
+        InstrType::Init,
+    ),
     // legacy memory
-    ("LMALLOC", true, &[argset!((Int) => legacy_malloc)]),
-    ("LFMALLOC", true, &[argset!((Int) => legacy_fmalloc)]),
-    ("LMFUNC", false, &[argset!(() => legacy_mfunc)]),
-    ("LMREAD", false, &[argset!(() => legacy_mread)]),
-    ("LMWRITE", false, &[argset!(() => legacy_mwrite)]),
-    ("LMPTR", false, &[argset!((Int) => legacy_mptr)]),
-    ("LMRESET", false, &[argset!(() => legacy_mreset)]),
+    (
+        "LMALLOC",
+        true,
+        &[argset!((Int) => legacy_malloc)],
+        InstrType::Init,
+    ),
+    (
+        "LFMALLOC",
+        true,
+        &[argset!((Int) => legacy_fmalloc)],
+        InstrType::Init,
+    ),
+    (
+        "LMFUNC",
+        false,
+        &[argset!(() => legacy_mfunc)],
+        InstrType::Memory,
+    ),
+    (
+        "LMREAD",
+        false,
+        &[argset!(() => legacy_mread)],
+        InstrType::Memory,
+    ),
+    (
+        "LMWRITE",
+        false,
+        &[argset!(() => legacy_mwrite)],
+        InstrType::Memory,
+    ),
+    (
+        "LMPTR",
+        false,
+        &[argset!((Int) => legacy_mptr)],
+        InstrType::Memory,
+    ),
+    (
+        "LMRESET",
+        false,
+        &[argset!(() => legacy_mreset)],
+        InstrType::Memory,
+    ),
     // memory
     (
         "MOV",
@@ -57,16 +118,33 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Number) => arithmetic_item_num_mov),
             argset!((Item, Item) => arithmetic_2items_mov),
         ],
+        InstrType::Arithmetic,
     ),
-    ("MSET", false, &[argset!(() => mset)]),
-    ("MGET", false, &[argset!(() => mget)]),
+    ("MSET", false, &[argset!(() => mset)], InstrType::Memory),
+    ("MGET", false, &[argset!(() => mget)], InstrType::Memory),
     // debug
-    ("BREAKPOINT", false, &[argset!(() => skip)]),
+    (
+        "BREAKPOINT",
+        false,
+        &[argset!(() => skip)],
+        InstrType::Debug,
+    ),
     // Process
-    ("SPAWN", false, &[argset!((Group) => spawn)]),
+    (
+        "SPAWN",
+        false,
+        &[argset!((Group) => spawn)],
+        InstrType::Process,
+    ),
     // Waits
-    ("NOP", false, &[argset!(() => nop)]),
-    ("WAIT", false, &[argset!((Int) => wait)]),
+    ("NOP", false, &[argset!(() => nop)], InstrType::Wait),
+    ("WAIT", false, &[argset!((Int) => wait)], InstrType::Wait),
+    (
+        "WAITS",
+        false,
+        &[argset!((Number) => waits)],
+        InstrType::Wait,
+    ),
     // Arithmetic
     (
         "ADD",
@@ -76,6 +154,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Number) => arithmetic_item_num_add),
             argset!((Item, Item, Item) => arithmetic_3items_add),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "SUB",
@@ -85,6 +164,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Number) => arithmetic_item_num_sub),
             argset!((Item, Item, Item) => arithmetic_3items_sub),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "ADDM",
@@ -93,6 +173,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => add_mod_2items_num),
             argset!((Item, Item, Item, Number) => add_mod_3items_num),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "SUBM",
@@ -101,6 +182,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => sub_mod_2items_num),
             argset!((Item, Item, Item, Number) => sub_mod_3items_num),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "ADDD",
@@ -109,6 +191,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => add_div_2items_num),
             argset!((Item, Item, Item, Number) => add_div_3items_num),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "SUBD",
@@ -117,6 +200,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Number) => sub_div_2items_num),
             argset!((Item, Item, Item, Number) => sub_div_3items_num),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "MUL",
@@ -127,6 +211,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Item) => arithmetic_3items_mul),
             argset!((Item, Item, Number) => arithmetic_2items_num_mul),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "DIV",
@@ -137,6 +222,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Item) => arithmetic_3items_div),
             argset!((Item, Item, Number) => arithmetic_2items_num_div),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "FLDIV",
@@ -147,6 +233,7 @@ pub const INSTR_SPEC: &[(
             argset!((Item, Item, Item) => fldiv_3items),
             argset!((Item, Item, Number) => fldiv_2items_num),
         ],
+        InstrType::Arithmetic,
     ),
     (
         "SE",
@@ -155,6 +242,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Item) => spawn_item_item_eq),
             argset!((Group, Item, Number) => spawn_item_num_eq),
         ],
+        InstrType::Process,
     ),
     (
         "SNE",
@@ -163,6 +251,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Item) => spawn_item_item_ne),
             argset!((Group, Item, Number) => spawn_item_num_ne),
         ],
+        InstrType::Process,
     ),
     (
         "SL",
@@ -171,6 +260,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Item) => spawn_item_item_le),
             argset!((Group, Item, Number) => spawn_item_num_le),
         ],
+        InstrType::Process,
     ),
     (
         "SLE",
@@ -179,6 +269,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Item) => spawn_item_item_leq),
             argset!((Group, Item, Number) => spawn_item_num_leq),
         ],
+        InstrType::Process,
     ),
     (
         "SG",
@@ -187,6 +278,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Item) => spawn_item_item_ge),
             argset!((Group, Item, Number) => spawn_item_num_ge),
         ],
+        InstrType::Process,
     ),
     (
         "SGE",
@@ -195,6 +287,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Item, Item) => spawn_item_item_geq),
             argset!((Group, Item, Number) => spawn_item_num_geq),
         ],
+        InstrType::Process,
     ),
     (
         "FE",
@@ -203,6 +296,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Item) => fork_item_item_eq),
             argset!((Group, Group, Item, Number) => fork_item_num_eq),
         ],
+        InstrType::Process,
     ),
     (
         "FNE",
@@ -211,6 +305,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Item) => fork_item_item_ne),
             argset!((Group, Group, Item, Number) => fork_item_num_ne),
         ],
+        InstrType::Process,
     ),
     (
         "FL",
@@ -219,6 +314,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Item) => fork_item_item_le),
             argset!((Group, Group, Item, Number) => fork_item_num_le),
         ],
+        InstrType::Process,
     ),
     (
         "FLE",
@@ -227,6 +323,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Item) => fork_item_item_leq),
             argset!((Group, Group, Item, Number) => fork_item_num_leq),
         ],
+        InstrType::Process,
     ),
     (
         "FG",
@@ -235,6 +332,7 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Item) => fork_item_item_ge),
             argset!((Group, Group, Item, Number) => fork_item_num_ge),
         ],
+        InstrType::Process,
     ),
     (
         "FGE",
@@ -243,23 +341,74 @@ pub const INSTR_SPEC: &[(
             argset!((Group, Group, Item, Item) => fork_item_item_geq),
             argset!((Group, Group, Item, Number) => fork_item_num_geq),
         ],
+        InstrType::Process,
     ),
-    ("SRAND", false, &[argset!((Group, Number) => spawn_random)]),
+    (
+        "SRAND",
+        false,
+        &[argset!((Group, Number) => spawn_random)],
+        InstrType::Process,
+    ),
     (
         "FRAND",
         false,
         &[argset!((Group, Group, Number) => fork_random)],
+        InstrType::Process,
     ),
     (
         "TSPAWN",
         false,
         &[argset!((Timer, Number, Number, Group) => tspawn)],
+        InstrType::Timer,
     ),
-    ("TSTART", false, &[argset!((Timer) => tstart)]),
-    ("TSTOP", false, &[argset!((Timer) => tstop)]),
-    ("PAUSE", false, &[argset!((Group) => pause)]),
-    ("RESUME", false, &[argset!((Group) => resume)]),
-    ("STOP", false, &[argset!((Group) => stop)]),
+    (
+        "TSTART",
+        false,
+        &[argset!((Timer) => tstart)],
+        InstrType::Timer,
+    ),
+    (
+        "TSTOP",
+        false,
+        &[argset!((Timer) => tstop)],
+        InstrType::Timer,
+    ),
+    (
+        "PAUSE",
+        false,
+        &[argset!((Group) => pause)],
+        InstrType::Process,
+    ),
+    (
+        "RESUME",
+        false,
+        &[argset!((Group) => resume)],
+        InstrType::Process,
+    ),
+    (
+        "KILL",
+        false,
+        &[argset!((Group) => stop)],
+        InstrType::Process,
+    ),
+    (
+        "TOGGLEON",
+        false,
+        &[argset!((Group) => ton)],
+        InstrType::Process,
+    ),
+    (
+        "TOGGLEOFF",
+        false,
+        &[argset!((Group) => toff)],
+        InstrType::Process,
+    ),
+    (
+        "RAW",
+        false,
+        &[argset!((String) => raw_objs)],
+        InstrType::Special,
+    ),
 ];
 
 // utils
