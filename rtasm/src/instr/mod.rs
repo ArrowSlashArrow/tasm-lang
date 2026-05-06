@@ -72,13 +72,13 @@ pub static INSTR_SPEC: &[(
         "LMALLOC",
         true,
         &[argset!((Int) => legacy_malloc)],
-        InstrType::Memory,
+        InstrType::Init,
     ),
     (
         "LFMALLOC",
         true,
         &[argset!((Int) => legacy_fmalloc)],
-        InstrType::Memory,
+        InstrType::Init,
     ),
     (
         "LMFUNC",

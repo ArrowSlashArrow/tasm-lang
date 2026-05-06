@@ -266,6 +266,7 @@ pub fn legacy_malloc(args: HandlerArgs) -> HandlerReturn {
     Ok(legacy_malloc_inner(args, false))
 }
 pub fn legacy_fmalloc(args: HandlerArgs) -> HandlerReturn {
+    println!("nigga we called fmalloc {args:#?}");
     Ok(legacy_malloc_inner(args, true))
 }
 
@@ -273,7 +274,19 @@ pub fn init_mem(args: HandlerArgs) -> HandlerReturn {
     let y_offset = args.routine_count as f64 * 30.0 + 150.0;
     let mut cfg = GDObjConfig::new().pos(-15.0, 0.0).scale(0.25, 0.25);
 
-    let mem_info = args.mem_info.unwrap();
+    let mem_info = match args.mem_info {
+        Some(m) => m,
+        None => {
+            return Err(TasmError {
+                _type: TasmErrorType::NonexistentMemoryAccess,
+                file: String::new(),
+                routine: String::new(),
+                error: true,
+                line: args.line,
+                details: "Cannot initialise memory when none exists.".into(),
+            });
+        }
+    };
     let start_counter = mem_info.start_counter_id;
 
     let mut objs = vec![];

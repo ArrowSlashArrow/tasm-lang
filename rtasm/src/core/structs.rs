@@ -298,7 +298,7 @@ pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct HandlerArgs {
     /// Arguments to this function. e.g. Counter(C1), Number(2.5)
     pub args: Vec<TasmValue>,
@@ -319,7 +319,7 @@ pub struct HandlerArgs {
     pub line: usize,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct HandlerData {
     pub objects: Vec<GDObject>,
     // skip this amount of obj (default: 1)
