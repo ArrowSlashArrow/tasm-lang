@@ -25,6 +25,8 @@ Features:
 * Fast and versatile compiler
 
 # Quick Start and Tutorial
+## Quick Install
+The TASM compiler (tasmc) now has an installer script for windows [here](https://tasm.mntpoint.org/install.ps1). This is a powershell script that must be ran from the command line.
 ## SDK Usage Instructions
 To use the current up-to-date SDK, you may do the following:
 1. Refer to the releases in this repo for pre-built executables

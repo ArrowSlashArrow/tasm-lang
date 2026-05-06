@@ -44,10 +44,7 @@ use crate::{
         error::{ParseErrorType, TasmError, TasmErrorType},
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
-        structs::{
-            Instruction, Routine, Tasm, TasmValue, fits_arg_signature, get_instr_type,
-            is_builtin_alias,
-        },
+        structs::{Instruction, Routine, Tasm, TasmValue, fits_arg_signature, is_builtin_alias},
     },
     instr::INSTR_SPEC,
     verbose_log,
@@ -373,8 +370,8 @@ impl Tasm {
         }
 
         // find the instruction spec which contains arg handlers
-        let (_, init_exclusive, handlers) =
-            match INSTR_SPEC.iter().find(|(ident, _, _)| ident == &instr) {
+        let (_, init_exclusive, handlers, itype) =
+            match INSTR_SPEC.iter().find(|(ident, _, _, _)| ident == &instr) {
                 Some(spec) => spec,
                 None => {
                     push_error(
@@ -415,7 +412,7 @@ impl Tasm {
                 // finally, add instruction to routine
                 curr_routine.add_instruction(Instruction {
                     ident: instr.clone(),
-                    _type: get_instr_type(&instr).unwrap(),
+                    _type: *itype,
                     line_number: curr_line,
                     args,
                     flags,

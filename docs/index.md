@@ -499,7 +499,7 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
 
 > [!NOTE]
-> "Item result" refers to the intermediate result between the operands in an item edit trigger (used be arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
+> "Item result" refers to the intermediate result between the operands in an item edit trigger (used in arithmetic instructions) that is processed before any additional operations, such as usage of the multiplier or assignment to the target item.
 > ![Item Result](item_result.png)
 
 | Flag    | Usage                                                                                                 | Instructions | Type       |

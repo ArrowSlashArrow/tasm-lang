@@ -6,6 +6,7 @@
     - sorta done; it's setup for this but its not deployed yet
 - ~~make either an installer or intsall mgr program (like rustup) for tasmc~~
     - windows one is done, but we still need one for linux
+- make tutorial for installing tasm
 ## post-v1.0
 - un-deprecate emulator
 - possibly add tty for console output
