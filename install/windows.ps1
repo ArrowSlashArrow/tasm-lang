@@ -88,7 +88,7 @@ function install ($version) {
         mkdir $tasmdir | Out-Null
     }
     Copy-Item -Path (Join-Path $outdir "*") -Destination $tasmdir -Recurse -Force
-    $oldpath = [System.Environment]::SetEnvironmentVariable("PATH", "User")
+    $oldpath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
     $newpath = "$oldpath;$tasmdir"
     [System.Environment]::SetEnvironmentVariable("PATH", $newpath, "User")
     Write-Host "Added executable path to PATH"
