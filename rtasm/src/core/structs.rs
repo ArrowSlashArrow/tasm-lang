@@ -1,4 +1,5 @@
-use std::{borrow::Cow, collections::HashMap};
+use alloc::borrow::Cow;
+use std::collections::HashMap;
 
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 

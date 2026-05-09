@@ -12,7 +12,8 @@ use crate::{
     instr::{fns::ioblock, get_item_spec},
 };
 
-use std::{borrow::Cow, collections::HashMap};
+use alloc::borrow::Cow;
+use std::collections::HashMap;
 
 pub mod consts {
     pub const ENTRY_POINT: &str = "_start";
