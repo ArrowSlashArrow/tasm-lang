@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use core::{error::Error, fmt::Display};
 
 /// Representative of TASM high-level lexer, parser, and logic errors.
 ///
@@ -19,6 +19,7 @@ pub struct TasmError {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum TasmErrorType {
     InvalidInstruction,
     InvalidArguments,
@@ -51,7 +52,7 @@ impl Error for TasmError {
 }
 
 impl Display for TasmError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if self.line != 0 {
             write!(
                 f,
