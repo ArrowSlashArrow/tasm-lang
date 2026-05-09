@@ -112,13 +112,11 @@ impl Tasm {
         // need to take to iteration with mutable references to self in self.push_error
         let instrs = std::mem::take(init_instructions);
         for (line, raw_instr) in instrs.iter() {
-            if !raw_instr.starts_with("ALIAS ") {
+            if !raw_instr.to_uppercase().starts_with("ALIAS ") {
                 continue;
             }
             let args = raw_instr.split('|').next().unwrap();
-            let trimmed = args
-                .strip_prefix("ALIAS ")
-                .unwrap()
+            let trimmed = &args[6..] // condition above ensures that this never fails
                 .split(',')
                 .map(|v| v.trim())
                 .collect::<Vec<_>>();
