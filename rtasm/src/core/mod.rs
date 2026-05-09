@@ -12,7 +12,8 @@ use crate::{
     instr::{fns::ioblock, get_item_spec},
 };
 
-use std::{borrow::Cow, collections::HashMap};
+use alloc::borrow::Cow;
+use std::collections::HashMap;
 
 pub mod consts {
     pub const ENTRY_POINT: &str = "_start";
@@ -164,7 +165,7 @@ impl Tasm {
         let resolved_args = instr_args.as_ref();
 
         // check that we are not accessing memory in init routine
-        if instr._type == InstrType::Memory {
+        if instr.itype == InstrType::Memory {
             if routine.ident == INIT_ROUTINE {
                 push_error(
                     &mut self.errors,
@@ -190,7 +191,7 @@ impl Tasm {
         }
 
         // check that any bad assignments aren't happening
-        if instr._type == InstrType::Arithmetic {
+        if instr.itype == InstrType::Arithmetic {
             // first argument is always the result
             let counter_type = get_item_spec(&resolved_args[0]).unwrap().get_type();
             if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
@@ -216,7 +217,7 @@ impl Tasm {
         }
 
         let cfg = if routine.ident == INIT_ROUTINE {
-            if let InstrType::Init = instr._type {
+            if let InstrType::Init = instr.itype {
                 // in the case of a custom init structure,
                 // leave default obj config since it likely wont be used anyways
                 GDObjConfig::default()

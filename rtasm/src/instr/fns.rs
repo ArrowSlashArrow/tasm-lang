@@ -739,7 +739,7 @@ pub fn raw_objs(args: HandlerArgs) -> HandlerReturn {
         .unwrap()
         .trim_matches(';')
         .split(';')
-        .map(|segment| GDObject::parse_str(segment))
+        .map(GDObject::parse_str)
         .collect::<Vec<GDObject>>();
     Ok(HandlerData::from_objects(objs).skip_spaces(0))
 }

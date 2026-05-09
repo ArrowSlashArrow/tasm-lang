@@ -1,4 +1,6 @@
-#![warn(clippy::std_instead_of_core)]
+#![warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)]
+
+extern crate alloc;
 
 use std::fs;
 
@@ -20,9 +22,10 @@ mod tests;
 struct Args {
     /// Path to input file.
     infile: String,
+    
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
-    /// which will reduce readability in the editor.
+    /// but will reduce readability in the editor.
     #[arg(long)]
     release: bool,
 
@@ -30,7 +33,7 @@ struct Args {
     #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
 
-    /// Whether to export the copmiled level as a .gmd
+    /// Whether to export the compiled level as a .gmd
     #[arg(long)]
     gmd: bool,
 
@@ -54,6 +57,7 @@ struct Args {
     /// Useful for compiling utility programs that don't necessarily contain an entry point.
     #[arg(long)]
     no_entry_point: bool,
+
     /// Disables logging to stdout from the compiler, including verbose logs.
     #[arg(long)]
     no_log: bool,

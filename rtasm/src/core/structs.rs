@@ -1,4 +1,5 @@
-use std::{borrow::Cow, collections::HashMap};
+use alloc::borrow::Cow;
+use std::collections::HashMap;
 
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
@@ -415,7 +416,7 @@ pub struct Routine {
 #[derive(Debug, Clone)]
 pub struct Instruction {
     pub ident: String,
-    pub _type: InstrType,
+    pub itype: InstrType,
     pub line_number: usize,
     pub args: Vec<TasmValue>,
     pub flags: Vec<Flag>,

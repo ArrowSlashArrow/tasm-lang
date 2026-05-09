@@ -226,7 +226,7 @@ fn gset2c(storeto: &Counter, lhs_counter: &Counter, value: f64, op: i32, counter
 fn show_state(
     counters: &[i32], 
     timers: &[f32], 
-    displayed_counters: &Vec<Counter>, 
+    displayed_counters: &[Counter], 
     instructions: &HashMap<String, Instruction>,
     memory_start: i32,
     memory_size: i32, 

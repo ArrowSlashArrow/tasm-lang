@@ -110,7 +110,7 @@ impl Tasm {
         let mut aliases: HashMap<String, String> = HashMap::new();
 
         // need to take to iteration with mutable references to self in self.push_error
-        let instrs = std::mem::take(init_instructions);
+        let instrs = core::mem::take(init_instructions);
         for (line, raw_instr) in instrs.iter() {
             if !raw_instr.starts_with("ALIAS ") {
                 continue;
@@ -422,7 +422,7 @@ impl Tasm {
                 // finally, add instruction to routine
                 curr_routine.add_instruction(Instruction {
                     ident: instr.clone(),
-                    _type: *itype,
+                    itype: *itype,
                     line_number: curr_line,
                     args,
                     flags,
