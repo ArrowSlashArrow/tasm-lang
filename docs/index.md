@@ -48,7 +48,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of May 5, 2026 is **v0.2.5**. 
+The current version, as of May 13, 2026 is **v0.2.6**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -689,7 +689,7 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.2.5, the aliases that exist are:
+As of TASM v0.2.6, the aliases that exist are:
 - `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
 - `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
@@ -786,7 +786,7 @@ For a memsize of more than 20, using the new system is recommended for the sake 
 
 ## 3.6. Comments
 <!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.5. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.6. 
 ## 3.7. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
@@ -795,7 +795,7 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-As of v0.2.5, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+As of v0.2.6, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
 - [Windows installer](https://tasm.mntpoint.org/install.ps1)
 - [Linux installer](https://tasm.mntpoint.org/install.sh)
 
