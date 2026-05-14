@@ -1,4 +1,4 @@
-use std::iter;
+use core::iter;
 
 use gdlib::gdobj::{
     GDObjConfig, GDObject, GDValue, Group, Item,

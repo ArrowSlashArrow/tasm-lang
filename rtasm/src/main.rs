@@ -1,10 +1,13 @@
-#![warn(clippy::std_instead_of_core)]
+#![warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)]
+
+extern crate alloc;
 
 use std::fs;
 
 use anyhow::Error;
 use clap::Parser;
-use gdlib::gdlevel::Levels;
+use gdlib::gdlevel::{Level, Levels};
+use tungstenite::{connect, Message};
 
 use crate::core::print_errors;
 
@@ -20,9 +23,10 @@ mod tests;
 struct Args {
     /// Path to input file.
     infile: String,
+    
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
-    /// which will reduce readability in the editor.
+    /// but will reduce readability in the editor.
     #[arg(long)]
     release: bool,
 
@@ -30,9 +34,13 @@ struct Args {
     #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
     mem_end_counter: i16,
 
-    /// Whether to export the copmiled level as a .gmd
+    /// Whether to export the compiled level as a .gmd
     #[arg(long)]
     gmd: bool,
+
+    /// Whether to send the compiled level to WSLive (optionally specify port)
+    #[arg(long, value_name = "PORT")]
+    wslive: Option<u16>,
 
     /// Name of exported level
     #[arg(long, value_name = "STRING")]
@@ -54,9 +62,39 @@ struct Args {
     /// Useful for compiling utility programs that don't necessarily contain an entry point.
     #[arg(long)]
     no_entry_point: bool,
+
     /// Disables logging to stdout from the compiler, including verbose logs.
     #[arg(long)]
     no_log: bool,
+}
+
+fn use_wslive(level: &mut Level, port: u16) -> Result<(), Error> {
+    let ws_url = format!("ws://127.0.0.1:{}", port);
+    let (mut socket, _response) = connect(&ws_url)?;
+
+    let mut objects_str = String::new();
+    if let Some(data) = level.get_decrypted_data_ref() {
+        objects_str = data.objects
+            .iter()
+            .map(|obj| obj.serialise_to_string())
+            .collect::<Vec<_>>()
+            .join("");
+    }
+    println!("objects_str: {}", objects_str);
+
+    let payload = format!(
+        r#"{{
+        "action": "ADD_OBJECTS",
+        "objects": "{}",
+        "close": true
+    }}"#,
+        objects_str
+    );
+
+    socket.send(Message::Text(payload.into()))?;
+    let _ = socket.close(None);
+
+    Ok(())
 }
 
 fn main() -> Result<(), Error> {
@@ -113,16 +151,25 @@ fn main() -> Result<(), Error> {
 
     log!(!args.no_log, "Encoding level...");
     match tasm.handle_routines(&level_name) {
-        Ok(level) => {
+        Ok(mut level) => {
             if !args.no_export {
-                match args.gmd {
-                    true => level.export_to_gmd(format!("{}.gmd", level_name))?,
-                    false => {
-                        let mut savefile = Levels::from_local()?;
-                        savefile.add_level(level);
-                        savefile.export_to_savefile()?;
-                        log!(!args.no_log, "exported to savefile.");
+                match args.wslive {
+                    Some(port) => {
+                        if let Err(e) = use_wslive(&mut level, port) {
+                            log!(!args.no_log, "Failed to send to WSLive: {}", e);
+                        } else {
+                            log!(!args.no_log, "Sent to WSLive");
+                        }
                     }
+                    None => match args.gmd {
+                        true => level.export_to_gmd(format!("{}.gmd", level_name))?,
+                        false => {
+                            let mut savefile = Levels::from_local()?;
+                            savefile.add_level(level);
+                            savefile.export_to_savefile()?;
+                            log!(!args.no_log, "exported to savefile.");
+                        }
+                    },
                 }
             }
         }

@@ -20,7 +20,7 @@ macro_rules! tasm_test {
                     true,
                     false
                 ).unwrap();
-                match res.handle_routines(&String::new()) {
+                match res.handle_routines("") {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -61,7 +61,7 @@ macro_rules! tasm_test {
                     true,
                     false
                 ).unwrap();
-                assert!(res.handle_routines(&String::new()).is_err())
+                assert!(res.handle_routines("").is_err())
             }
         }
     };
@@ -79,7 +79,7 @@ macro_rules! tasm_test {
                     true,
                     false
                 ).unwrap();
-                match res.handle_routines(&String::new()) {
+                match res.handle_routines("") {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -104,7 +104,7 @@ macro_rules! tasm_test {
                     true,
                     true
                 ).unwrap();
-                match res.handle_routines(&String::new()) {
+                match res.handle_routines("") {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -129,7 +129,7 @@ macro_rules! tasm_test {
                     true,
                     true // no entry point, since the routine should be named the same as the ident
                 ).unwrap();
-                assert!(res.handle_routines(&String::new()).is_ok())
+                assert!(res.handle_routines("").is_ok())
             }
         }
     };
@@ -219,7 +219,7 @@ fn parse_tasm() -> anyhow::Result<()> {
     );
 
     parse_start = Instant::now();
-    let _level = tasm.handle_routines(&"test level").unwrap();
+    let _level = tasm.handle_routines("test level").unwrap();
     println!(
         "Serialise time: {:.3}ms",
         parse_start.elapsed().as_micros() as f64 / 1000.0
