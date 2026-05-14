@@ -35,6 +35,7 @@ pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
+    // if an instruction can only go in the _init routine, it **MUST** be designated that.
     "MALLOC" => (
         true,
         &[argset!((Int, Int) => malloc)],

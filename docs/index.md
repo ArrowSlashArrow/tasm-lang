@@ -749,14 +749,17 @@ First, the memory controller toggles on all of its groups to reset its state fro
 When getting/setting an item with some arbitrary ID, all groups in the memory block are toggled off except for all the groups that the target trigger has. This is done by extracting each bit from the target address with a bit switch.
 
 A bit switch is a simple mechanism which does the following in order:
-- Shifts the target value to the left by `n` bits, which requires a temporary counter.
-- Checks if this new value is divisible by two
+- Shifts the target value to the left by `n` bits
+- Checks if this new value is divisible by two, which requires a temporary counter.
 - If this value is divisible by two, it means that this bit is a 0, and the group that corresponds to a 1 for this bit is toggled off.
-- If this vlaue is not divisible by two, the group that corresponds to a 0 is toggled off.
+- If this value is not divisible by two, the group that corresponds to a 0 is toggled off.
 
 Using a bit switch on every bit of the address (whose bitsize is determined by the compiler to be the maximum number of bits in group encoding step) allows the memory controller to toggle off every trigger that is not concerned with the target address. Since all triggers are assigned a unique combination of groups, only one trigger remains unscathed.
 
-When using either `MGET` or `MSET`, the instruction automatically despawns the opposite operation's group. For instance, when using `MGET`, the user attempts to read the value of the target address, so the write group is toggled off, and vice versa.
+When using either `MGET` or `MSET`, the instruction automatically despawns the opposite operation's group. For instance, when using `MGET`, the user attempts to read the value of the target address, so the write group is toggled off, and vice versa. 
+
+Below is a diagram of the memory structure:
+![Parts of new memory](parts_of_new_memory.png)
 
 ## 3.5. Group usage 
 Group usage in TASM is meant to be optimized, but is not expected to be fully optimized while the language is still in development.   
@@ -792,13 +795,16 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-**NOTE:** As of April 12, 2026, there are no installers. The TASM compiler is entirely portable, and should be treated as such. 
-It is encouraged to use the pre-built executables from the [GitHub repository](https://github.com/ArrowSlashArrow/tasm-lang), however, if it is not possible to use them, refer to the below instructions for manually installing the compiler:
+As of v0.2.5, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+- [Windows installer](https://tasm.mntpoint.org/install.ps1)
+- [Linux installer](https://tasm.mntpoint.org/install.sh)
+
+You may also download the pre-built executables from the [GitHub repository](https://github.com/ArrowSlashArrow/tasm-lang), however, if it is not possible to use them, refer to the below instructions for manually operating the compiler:
 ## 4.1. rtasm compiler
 Prerequisites: 
-- Rust version v1.85.0 or later
-Run `cargo build --release` to compile the executable. 
-Navigate to the executable's directory by running `cd target/release/`, and to compile a TASM program, run `tasm.exe <program>.tasm`. 
+- Rust version v1.90.0 or later
+
+In the `rtasm` directory of the project, run `cargo build --release` to compile the executable. Assuming a successful compile, the executable will be at `target/release/tasmc[.exe]`. 
 ## 4.2. pytasm compiler
 **NOTE:** pytasm is currently deprecated, and will NOT receive future updates. It is *HIGHLY* recommended to use the rust compiler instead. 
 **WARNING**: pytasm will **OVERWRITE** the first level in your savefile. Please be mindful of this when compiling a program. 
@@ -813,7 +819,9 @@ To see options, run `python main.py --help`.
 ## 4.3. The interpreter/emulator 
 Note: The interpreter is currently only accessible through the pytasm compiler
 
-The interpreter is a powerful tool whose primary function is to emulate the GD environment, which is useful when trying to debug some program without compiling it every time. It should not be considered a 1:1 replica of the GD editor, as it does have a few minor quirks associated with it. 
+The interpreter is a tool which is designed to emulate the program in the context of the GD runtime. It is intended to provide developers with a way to debug their program without having to run it in GD every time to test it. 
+It does not emulate the actual GD environment, which may involve niche edge cases and other unforeseen bugs. The interpreter program itself is written in rust, which makes it available for use on all operating systems. However, the only way to access it properly is through the pytasm compiler, which is built for windows and may break on linux.  
+
 To access the interpreter, first navigate to the `pytasm/` directory. Then, run `python main.py <program>.tasm --interpret`.
 ## 4.4. Getting started
 It may be intimidating to use a language like this one, however, the language is intended to be easy to read and understand. While the language is verbose, it should not be considered unapproachable in any way.
@@ -832,7 +840,7 @@ The code snippet above uses one group for the routine, and generates three objec
 ``` tasm
 _init:
     DISPLAY C1
-    MALLOC 50
+    LMALLOC 50
     INITMEM 0,1
 
 fib:

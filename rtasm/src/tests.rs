@@ -139,6 +139,7 @@ tasm_test!("fetch", example_no_entry_point);
 tasm_test!("fib_in_memory", example);
 tasm_test!("incrementer", example);
 tasm_test!("is_c1_prime", example);
+tasm_test!("list_search", example);
 tasm_test!("pointer_test", example);
 tasm_test!("pointer_test1", example);
 tasm_test!("proc_control", example);
