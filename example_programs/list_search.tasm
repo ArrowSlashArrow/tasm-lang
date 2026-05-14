@@ -28,7 +28,7 @@ search_iter:
     fle search_iter, not_found, PTRPOS, C5
 
 found:
-    stop search_iter
+    kill search_iter
     mov C4, 1
 not_found:
     mov C4, 0
