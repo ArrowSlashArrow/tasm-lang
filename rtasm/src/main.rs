@@ -2,12 +2,12 @@
 
 extern crate alloc;
 
-use std::fs;
+use std::{env, fs, path::PathBuf};
 
 use anyhow::Error;
 use clap::Parser;
 use gdlib::gdlevel::{Level, Levels};
-use tungstenite::{connect, Message};
+use tungstenite::{Message, connect};
 
 use crate::core::print_errors;
 
@@ -23,7 +23,7 @@ mod tests;
 struct Args {
     /// Path to input file.
     infile: String,
-    
+
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
     /// but will reduce readability in the editor.
@@ -68,19 +68,19 @@ struct Args {
     no_log: bool,
 }
 
-fn use_wslive(level: &mut Level, port: u16) -> Result<(), Error> {
+fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
     let ws_url = format!("ws://127.0.0.1:{}", port);
     let (mut socket, _response) = connect(&ws_url)?;
 
     let mut objects_str = String::new();
     if let Some(data) = level.get_decrypted_data_ref() {
-        objects_str = data.objects
+        objects_str = data
+            .objects
             .iter()
             .map(|obj| obj.serialise_to_string())
             .collect::<Vec<_>>()
             .join("");
     }
-    println!("objects_str: {}", objects_str);
 
     let payload = format!(
         r#"{{
@@ -94,6 +94,33 @@ fn use_wslive(level: &mut Level, port: u16) -> Result<(), Error> {
     socket.send(Message::Text(payload.into()))?;
     let _ = socket.close(None);
 
+    Ok(())
+}
+
+// Temporary function that will be used until the next version of gdlib when this gets fixed
+// This function does not check for the linux savefile path since this version of gdlib
+// does not implement saving to that location
+fn get_local_levels_path() -> Option<PathBuf> {
+    if let Ok(local_appdata) = env::var("LOCALAPPDATA") {
+        let path = PathBuf::from(format!("{local_appdata}/GeometryDash/CCLocalLevels.dat"));
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
+    if let None = get_local_levels_path() {
+        log!(logs_enabled, "Unable to find savefile. Please pass --gmd.");
+        return Ok(());
+    }
+
+    let mut savefile = Levels::from_local()?;
+    savefile.add_level(level);
+    savefile.export_to_savefile()?;
+    log!(logs_enabled, "Exported to savefile.");
     Ok(())
 }
 
@@ -150,33 +177,33 @@ fn main() -> Result<(), Error> {
     );
 
     log!(!args.no_log, "Encoding level...");
-    match tasm.handle_routines(&level_name) {
-        Ok(mut level) => {
-            if !args.no_export {
-                match args.wslive {
-                    Some(port) => {
-                        if let Err(e) = use_wslive(&mut level, port) {
-                            log!(!args.no_log, "Failed to send to WSLive: {}", e);
-                        } else {
-                            log!(!args.no_log, "Sent to WSLive");
-                        }
-                    }
-                    None => match args.gmd {
-                        true => level.export_to_gmd(format!("{}.gmd", level_name))?,
-                        false => {
-                            let mut savefile = Levels::from_local()?;
-                            savefile.add_level(level);
-                            savefile.export_to_savefile()?;
-                            log!(!args.no_log, "exported to savefile.");
-                        }
-                    },
+
+    let out_level = tasm.handle_routines(&level_name);
+    if let Err(e) = out_level {
+        if !args.no_log {
+            print_errors(e, "Unable to compile to level");
+        }
+        return Ok(());
+    }
+    let level = out_level.unwrap();
+
+    if !args.no_export {
+        match args.wslive {
+            Some(port) => {
+                if let Err(e) = use_wslive(level, port) {
+                    log!(!args.no_log, "Failed to send to WSLive: {}", e);
+                } else {
+                    log!(!args.no_log, "Sent to WSLive");
                 }
             }
-        }
-        Err(e) => {
-            if !args.no_log {
-                print_errors(e, "Unable to compile to level");
-            }
+            None => match args.gmd {
+                true => level.export_to_gmd(format!("{}.gmd", level_name))?,
+                false => {
+                    if let Err(e) = export_to_savefile(level, !args.no_log) {
+                        log!(!args.no_log, "Unable to export to savefile: {e}")
+                    }
+                }
+            },
         }
     }
 
