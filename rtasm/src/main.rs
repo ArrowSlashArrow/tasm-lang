@@ -6,7 +6,11 @@ use std::{env, fs, path::PathBuf};
 
 use anyhow::Error;
 use clap::Parser;
-use gdlib::gdlevel::{Level, Levels};
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use gdlib::{
+    gdlevel::{Level, Levels},
+    gdobj::GDObject,
+};
 use tungstenite::{Message, connect};
 
 use crate::core::print_errors;
@@ -27,7 +31,7 @@ struct Args {
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
     /// but will reduce readability in the editor.
-    #[arg(long)]
+    #[arg(long, short)]
     release: bool,
 
     /// Ending counter ID of memory block. Does not apply to programs using new memory.
@@ -35,7 +39,7 @@ struct Args {
     mem_end_counter: i16,
 
     /// Whether to export the compiled level as a .gmd
-    #[arg(long)]
+    #[arg(long, short)]
     gmd: bool,
 
     /// Whether to send the compiled level to WSLive (optionally specify port)
@@ -51,7 +55,7 @@ struct Args {
     group_offset: i16,
 
     /// Toggles verbose logging from the compiler
-    #[arg(long)]
+    #[arg(long, short)]
     verbose_logs: bool,
 
     /// Skips exporting the level.
@@ -66,21 +70,28 @@ struct Args {
     /// Disables logging to stdout from the compiler, including verbose logs.
     #[arg(long)]
     no_log: bool,
+
+    /// Sends the level to the clipboard instead of a file.
+    /// The compiled objects can be pasted in via BetterEdit.
+    #[arg(long, short)]
+    clipboard: bool,
+}
+
+fn get_obj_str(obj: &Vec<GDObject>) -> String {
+    obj.iter()
+        .map(|obj| obj.serialise_to_string())
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
     let ws_url = format!("ws://127.0.0.1:{}", port);
     let (mut socket, _response) = connect(&ws_url)?;
 
-    let mut objects_str = String::new();
-    if let Some(data) = level.get_decrypted_data_ref() {
-        objects_str = data
-            .objects
-            .iter()
-            .map(|obj| obj.serialise_to_string())
-            .collect::<Vec<_>>()
-            .join("");
-    }
+    let objects_str = match level.get_decrypted_data_ref() {
+        Some(data) => get_obj_str(&data.objects),
+        None => return Ok(()),
+    };
 
     let payload = format!(
         r#"{{
@@ -178,33 +189,44 @@ fn main() -> Result<(), Error> {
 
     log!(!args.no_log, "Encoding level...");
 
-    let out_level = tasm.handle_routines(&level_name);
-    if let Err(e) = out_level {
-        if !args.no_log {
-            print_errors(e, "Unable to compile to level");
+    let level = match tasm.handle_routines(&level_name) {
+        Err(e) => {
+            if !args.no_log {
+                print_errors(e, "Unable to compile to level");
+            }
+            return Ok(());
         }
+        Ok(l) => l,
+    };
+
+    if args.no_export {
         return Ok(());
     }
-    let level = out_level.unwrap();
 
-    if !args.no_export {
-        match args.wslive {
-            Some(port) => {
-                if let Err(e) = use_wslive(level, port) {
-                    log!(!args.no_log, "Failed to send to WSLive: {}", e);
-                } else {
-                    log!(!args.no_log, "Sent to WSLive");
+    if args.clipboard {
+        let mut ctx = ClipboardContext::new().unwrap();
+        let obj_str = get_obj_str(&level.get_decrypted_data().unwrap().objects);
+        ctx.set_contents(obj_str).unwrap();
+        log!(!args.no_log, "Sent to clipboard");
+        return Ok(());
+    }
+
+    match args.wslive {
+        Some(port) => {
+            if let Err(e) = use_wslive(level, port) {
+                log!(!args.no_log, "Failed to send to WSLive: {}", e);
+            } else {
+                log!(!args.no_log, "Sent to WSLive");
+            }
+        }
+        None => match args.gmd {
+            true => level.export_to_gmd(format!("{}.gmd", level_name))?,
+            false => {
+                if let Err(e) = export_to_savefile(level, !args.no_log) {
+                    log!(!args.no_log, "Unable to export to savefile: {e}")
                 }
             }
-            None => match args.gmd {
-                true => level.export_to_gmd(format!("{}.gmd", level_name))?,
-                false => {
-                    if let Err(e) = export_to_savefile(level, !args.no_log) {
-                        log!(!args.no_log, "Unable to export to savefile: {e}")
-                    }
-                }
-            },
-        }
+        },
     }
 
     Ok(())
