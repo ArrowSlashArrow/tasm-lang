@@ -185,14 +185,14 @@ Arguments: `MALLOC <int>, <int>`
 
 Creates a memory block that is able to write to and read from the first counter ID to the second counter ID inclusively. Uses counters (ints).  
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in the `_init` routine.
 
 ##### FMALLOC
 Arguments: `FMALLOC <int>, <int>`
 
 Creates a memory block that is able to write to and read from the first counter ID to the second counter ID inclusively. Uses timers (floats).  
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in the `_init` routine.
 
 ##### MSET
 Arguments: `MSET`
@@ -214,19 +214,19 @@ Execution time: 4 ticks
 Arguments: `INITMEM <numbers>`
 
 Assigns the numbers to memory in order, starting at address 0. Must be done after MALLOC. Numbers must be separated by commas, and should match the type of the memory (i.e. no floats in integer memory).  
-Only allowed `_init` routine.
+Only allowed in the `_init` routine.
 ##### LMALLOC
 Arguments: `LMALLOC <positive int>`
 
 Allocates a specified amount of counters to memory. 
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in the `_init` routine.
 ##### LFMALLOC
 Arguments: `LFMALLOC <positive int>`
 
 Allocates a specified amount of timers (floats) to memory. 
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in the `_init` routine.
 ##### LMFUNC
 Arguments: `LMFUNC`
 

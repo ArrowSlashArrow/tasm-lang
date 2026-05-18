@@ -43,7 +43,7 @@ use crate::{
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
         structs::{
-            Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature,
+            InstrType, Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature,
             is_builtin_alias,
         },
     },
@@ -96,10 +96,49 @@ impl Tasm {
         verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
 
+        if !disable_entry_point_check {
+            self.insert_start_ioblock();
+        }
+
         if !self.errors.is_empty() {
             verbose_log!(self, "Parsed file with {} errors.", self.errors.len());
         } else {
             verbose_log!(self, "Parsed file successfully with 0 errors.")
+        }
+    }
+
+    fn insert_start_ioblock(&mut self) {
+        let entry_point = self
+            .routines
+            .iter()
+            .find(|rtn| rtn.ident == ENTRY_POINT)
+            .map(|r| r.group)
+            .unwrap();
+        let argset = vec![
+            TasmValue::Group(entry_point),
+            TasmValue::Number(0.0),
+            TasmValue::String("_start".into()),
+        ];
+        if let Some(init) = self
+            .routines
+            .iter_mut()
+            .find(|rtn| rtn.ident.as_str() == INIT_ROUTINE)
+        {
+            if let None = init.instructions.iter().find(|instr| {
+                instr.ident == "IOBLOCK"
+                    && instr.args.get(0) == Some(&TasmValue::Group(entry_point))
+            }) {
+                // ioblock for _start not included
+                init.add_instruction(Instruction {
+                    ident: "IOBLOCK".into(),
+                    itype: InstrType::Init,
+                    line_number: usize::MAX,
+                    args: argset,
+                    flags: vec![],
+                    handler_fn: crate::instr::fns::ioblock,
+                    is_concurrent: false,
+                });
+            }
         }
     }
 

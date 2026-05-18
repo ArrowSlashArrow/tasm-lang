@@ -9,9 +9,10 @@ use clap::Parser;
 use gdlib::gdlevel::{Level, Levels};
 use tungstenite::{Message, connect};
 
-use crate::core::print_errors;
+use crate::{core::print_errors, debugger::emulate};
 
 pub mod core;
+pub mod debugger;
 pub mod instr;
 pub mod lexer;
 
@@ -27,7 +28,7 @@ struct Args {
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
     /// but will reduce readability in the editor.
-    #[arg(long)]
+    #[arg(long, short)]
     release: bool,
 
     /// Ending counter ID of memory block. Does not apply to programs using new memory.
@@ -35,7 +36,7 @@ struct Args {
     mem_end_counter: i16,
 
     /// Whether to export the compiled level as a .gmd
-    #[arg(long)]
+    #[arg(long, short)]
     gmd: bool,
 
     /// Whether to send the compiled level to WSLive (optionally specify port)
@@ -51,7 +52,7 @@ struct Args {
     group_offset: i16,
 
     /// Toggles verbose logging from the compiler
-    #[arg(long)]
+    #[arg(long, short)]
     verbose_logs: bool,
 
     /// Skips exporting the level.
@@ -66,6 +67,10 @@ struct Args {
     /// Disables logging to stdout from the compiler, including verbose logs.
     #[arg(long)]
     no_log: bool,
+
+    /// Emulate the program in the tasm debugger
+    #[arg(long, short)]
+    emulate: bool,
 }
 
 fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
@@ -169,6 +174,23 @@ fn main() -> Result<(), Error> {
         None => args.infile,
     };
 
+    if args.emulate {
+        // first, check if this program is valid
+        let res = tasm.handle_routines(&level_name);
+        match res {
+            Err(es) => {
+                if !args.no_log {
+                    print_errors(es, "Unable to compile to level");
+                }
+            }
+
+            Ok(_) => {
+                emulate(tasm);
+            }
+        }
+        return Ok(());
+    }
+
     log!(
         !args.no_log,
         "Using groups {} - {}",
@@ -187,24 +209,26 @@ fn main() -> Result<(), Error> {
     }
     let level = out_level.unwrap();
 
-    if !args.no_export {
-        match args.wslive {
-            Some(port) => {
-                if let Err(e) = use_wslive(level, port) {
-                    log!(!args.no_log, "Failed to send to WSLive: {}", e);
-                } else {
-                    log!(!args.no_log, "Sent to WSLive");
+    if args.no_export {
+        return Ok(());
+    }
+
+    match args.wslive {
+        Some(port) => {
+            if let Err(e) = use_wslive(level, port) {
+                log!(!args.no_log, "Failed to send to WSLive: {}", e);
+            } else {
+                log!(!args.no_log, "Sent to WSLive");
+            }
+        }
+        None => match args.gmd {
+            true => level.export_to_gmd(format!("{}.gmd", level_name))?,
+            false => {
+                if let Err(e) = export_to_savefile(level, !args.no_log) {
+                    log!(!args.no_log, "Unable to export to savefile: {e}")
                 }
             }
-            None => match args.gmd {
-                true => level.export_to_gmd(format!("{}.gmd", level_name))?,
-                false => {
-                    if let Err(e) = export_to_savefile(level, !args.no_log) {
-                        log!(!args.no_log, "Unable to export to savefile: {e}")
-                    }
-                }
-            },
-        }
+        },
     }
 
     Ok(())

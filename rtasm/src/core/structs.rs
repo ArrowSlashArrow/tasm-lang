@@ -22,7 +22,7 @@ pub enum InstrType {
     Debug, // any instruction that is only used by the emulator, and ignored when parsing to GD objects.
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TasmValue {
     Counter(i16),
     Timer(i16),
