@@ -414,6 +414,15 @@ One may obtain an object string by using the BetterEdit mod for Geode, and simpl
 > Please double-check and comment usages of this instruction thoroughly. Object strings are notoriously opaque and difficult to read, which makes them very prone to accidental misformatting.
 
 Execution time: 0 ticks.
+#### 3.1.2.9.1. The `RAWTRG` instruction
+Much like the `RAW` instruction, the `RAWTRG` instruction takes an object string and inserts it into the level, except that all given objects are treated as part of the routine. This has the follow implications: 
+- All given objects are placed the compiler-assigned position in the respective routine, in the respective instruction position. 
+- All given objects are appended to the group of routine
+- All given objects are made multi-spawntriggerable.
+
+This instruction is to give the programmer the option to place a trigger that is not yet supported by TASM in the usual position and have the compiler treat that object as a trigger in the routine.
+
+Execution time: 1 tick.
 #### 3.1.2.10. Excluded instructions
 Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
 It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  

@@ -1,5 +1,5 @@
 use gdlib::gdobj::{
-    GDObjConfig, GDObject, ItemType, ZLayer,
+    GDObjConfig, GDObject, Group, ItemType, ZLayer,
     misc::{default_block, text},
     triggers::{
         CompareOp, CompareOperand, ItemAlign, Op, RoundMode, SignMode, StopMode, TimeTriggerConfig,
@@ -124,7 +124,7 @@ pub fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
         result,
         modifier,
         get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
             .to_bool()
             .unwrap(),
         get_flag_value_opt(&args, "op").map(|f| f.to_op().unwrap()),
@@ -160,7 +160,7 @@ pub fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
         res,
         modifier,
         get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
             .to_bool()
             .unwrap(),
         Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
@@ -194,7 +194,7 @@ pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GD
         res,
         modifier,
         get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
             .to_bool()
             .unwrap(),
         get_flag_value_opt(&args, "op").map(|f| f.to_op().unwrap()),
@@ -228,7 +228,7 @@ pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<
         modifier,
         get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
         // since we know this is only used for mul and div instructions, this is fine.
-        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Mul))
+        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
             .to_bool()
             .unwrap(),
         Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
@@ -742,4 +742,25 @@ pub fn raw_objs(args: HandlerArgs) -> HandlerReturn {
         .map(GDObject::parse_str)
         .collect::<Vec<GDObject>>();
     Ok(HandlerData::from_objects(objs).skip_spaces(0))
+}
+
+pub fn raw_trigger(args: HandlerArgs) -> HandlerReturn {
+    let (x, y) = args.cfg.pos;
+    let group = args.cfg.groups.get(0).unwrap_or(&Group::Regular(0));
+    let objs = args.args[0]
+        .to_string()
+        .unwrap()
+        .trim_matches(';')
+        .split(';')
+        .map(GDObject::parse_str)
+        .map(|obj| {
+            // inherit assigned position and group
+            let mut o = obj;
+            o.config = o.config.pos(x, y).spawnable(true).multitrigger(true);
+            o.config.add_group(*group);
+            o
+        })
+        .collect::<Vec<GDObject>>();
+
+    Ok(HandlerData::from_objects(objs))
 }

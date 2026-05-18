@@ -212,13 +212,10 @@ fn main() -> Result<(), Error> {
     }
 
     match args.wslive {
-        Some(port) => {
-            if let Err(e) = use_wslive(level, port) {
-                log!(!args.no_log, "Failed to send to WSLive: {}", e);
-            } else {
-                log!(!args.no_log, "Sent to WSLive");
-            }
-        }
+        Some(port) => match use_wslive(level, port) {
+            Ok(()) => log!(!args.no_log, "Sent to WSLive"),
+            Err(e) => log!(!args.no_log, "Failed to send to WSLive: {}", e),
+        },
         None => match args.gmd {
             true => level.export_to_gmd(format!("{}.gmd", level_name))?,
             false => {

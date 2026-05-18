@@ -19,7 +19,7 @@ _start:
     MOV T4, T3
     MUL T4, T2
 
-    MOV T5, T3
+    MOV T5, T4
     MUL T5, T2
 
     MOV T6, T1

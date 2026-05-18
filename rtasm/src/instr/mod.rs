@@ -361,6 +361,11 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         &[argset!((String) => raw_objs)],
         InstrType::Special,
     ),
+    "RAWTRG" => (
+        false,
+        &[argset!((String) => raw_trigger)],
+        InstrType::Special,
+    ),
 };
 
 // -- utils -- \\
