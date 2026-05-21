@@ -11,7 +11,11 @@ use crate::debugger::{Emulator, RunningRoutine};
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
     ("Space", "Un/pause the emulator"),
-    ("Enter", "Spawn this IOBlock")
+    ("Enter", "Spawn this IOBlock"),
+    ("Up", "Previous IOBlock"),
+    ("Down", "Next IOBlock"),
+    ("PgUp", "Go to top of IOBlocks"),
+    ("PgDn", "Go to end of IOBlocks"),
 ];
 
 impl Widget for &Emulator {
@@ -333,9 +337,6 @@ impl Emulator {
                 }
             )
             .into(),
-            format!("self.ioblock_idx: {}", self.ioblock_idx)
-                .italic()
-                .into(),
         ]))
         .block(
             Block::bordered()

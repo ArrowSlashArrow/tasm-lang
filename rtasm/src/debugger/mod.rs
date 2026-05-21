@@ -252,6 +252,9 @@ impl Emulator {
                     self.ioblock_idx += 1;
                 }
             }
+            kc @ (KeyCode::PageUp | KeyCode::PageDown | KeyCode::Enter) => {
+                self.add_log(format!("Key {kc:?} is not yet supported."));
+            }
             _ => {}
         }
     }
