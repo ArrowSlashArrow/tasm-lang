@@ -11,6 +11,7 @@ use crate::debugger::{Emulator, RunningRoutine};
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
     ("Space", "Un/pause the emulator"),
+    ("Enter", "Spawn this IOBlock")
 ];
 
 impl Widget for &Emulator {
@@ -198,45 +199,69 @@ impl Emulator {
     }
 
     fn render_ioblocks(&self, ioblocks_area: Rect, buf: &mut Buffer) {
-        Paragraph::new(Text::from(
-            self.ioblocks
-                .iter()
-                .enumerate()
-                .map(|(ioblock_idx, &idx)| {
-                    Line::from(
-                        vec![
-                            " ".bold(),
-                            if ioblock_idx == self.ioblock_idx {
-                                "> ".green()  
-                            } else {
-                                "".into()
-                            },
-                            if ioblock_idx >= self.ioblocks.len() {
-                                "<No routine>".gray()
-                            } else {
-                                self.tasm.routines[idx].ident.clone().into()
-                            }
-                        ]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(idx, line)| {
-                            // todo: fix bolding not working
-                            if idx == self.ioblock_idx {
-                                line.bold()
-                            } else {
-                                line
-                            }
-                        }).collect::<Vec<_>>(),
-                    )
-                })
-                .collect::<Vec<Line<'_>>>(),
-        ))
-        .block(
-            Block::bordered()
-                .border_set(border::PLAIN)
-                .title(" IOBlocks ".green().into_centered_line()),
-        )
-        .render(ioblocks_area, buf);
+        let lines = self
+            .ioblocks
+            .iter()
+            .enumerate()
+            .map(|(ioblock_idx, &idx)| {
+                Line::from(
+                    vec![
+                        " ".bold(),
+                        if ioblock_idx == self.ioblock_idx {
+                            "> ".green()
+                        } else {
+                            "".into()
+                        },
+                        if ioblock_idx >= self.ioblocks.len() {
+                            "<No routine>".gray()
+                        } else {
+                            self.tasm.routines[idx].ident.clone().into()
+                        },
+                    ]
+                    .into_iter()
+                    .map(|line| {
+                        // todo: fix bolding not working
+                        if ioblock_idx == self.ioblock_idx {
+                            line.bold()
+                        } else {
+                            line
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<Line<'_>>>();
+
+        let displayed_lines = if self.ioblock_idx < 5 {
+            &lines[..]
+        } else {
+            &lines[(self.ioblock_idx - 4)..]
+        }
+        .to_vec();
+
+        let more_lines = match lines.len() > 5 {
+            true => {
+                let lines_left = lines.len() - self.ioblock_idx - 1;
+                match lines_left > 0 {
+                    // use one of these: ↓⌄
+                    true => Some(format!(" {lines_left} more ↓ ")),
+                    false => None,
+                }
+            }
+            false => None,
+        };
+
+        let mut pg_block = Block::bordered()
+            .border_set(border::PLAIN)
+            .title(" IOBlocks ".green().into_centered_line());
+
+        if let Some(line) = more_lines {
+            pg_block = pg_block.title_bottom(line.italic());
+        }
+
+        Paragraph::new(Text::from(displayed_lines))
+            .block(pg_block)
+            .render(ioblocks_area, buf);
     }
 
     fn render_routines(&self, routines_area: Rect, buf: &mut Buffer) {
@@ -308,7 +333,9 @@ impl Emulator {
                 }
             )
             .into(),
-            format!("self.ioblock_idx: {}", self.ioblock_idx).italic().into()
+            format!("self.ioblock_idx: {}", self.ioblock_idx)
+                .italic()
+                .into(),
         ]))
         .block(
             Block::bordered()

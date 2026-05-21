@@ -118,7 +118,10 @@ fn get_local_levels_path() -> Option<PathBuf> {
 
 fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
     if let None = get_local_levels_path() {
-        log!(logs_enabled, "Unable to find savefile. Please pass --gmd or --emulate.");
+        log!(
+            logs_enabled,
+            "Unable to find savefile. Please pass --gmd or --emulate."
+        );
         return Ok(());
     }
 

@@ -9,13 +9,12 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use gdlib::gdobj::Item;
 use ratatui::{
-    self,
+    self, Frame,
     layout::{Constraint, Layout},
     style::Stylize,
     symbols::border,
     text::{Line, Text},
     widgets::{Block, Paragraph, Widget},
-    Frame,
 };
 
 pub mod ui;
@@ -80,7 +79,7 @@ struct Emulator {
     paused: bool, // true if paused. happens when tripping a breakpoint
     running_routines: Vec<RunningRoutine>, // all current running routines
     ioblocks: Vec<usize>, // idxs to self.tasm.routines
-    ioblock_idx: usize,      // index into ioblocks
+    ioblock_idx: usize, // index into ioblocks
     displays: Vec<Item>,
     init_instrs: Vec<Instruction>, // executed every reset
     ticks: u32,                    // tick counter
@@ -146,7 +145,7 @@ impl Emulator {
             if !self.paused {
                 self.tick();
             }
-            
+
             if let Ok(c) = crossterm::event::poll(Duration::from_millis(0))
                 && c
             {
@@ -170,7 +169,7 @@ impl Emulator {
     fn load_ioblocks(&mut self) {
         // list of routines which have ioblocks
         // i.e. pointers to those routines
-        let mut ioblocks = vec![];    // sentinel value for no ioblocks
+        let mut ioblocks = vec![]; // sentinel value for no ioblocks
         if let Some(init) = self
             .tasm
             .routines
@@ -198,7 +197,7 @@ impl Emulator {
         if ioblocks.len() == 0 {
             ioblocks.push(usize::MAX)
         }
-        
+
         self.ioblocks = ioblocks;
     }
 
@@ -239,15 +238,15 @@ impl Emulator {
         match k.code {
             KeyCode::Esc => {
                 self.running = false;
-            },
+            }
             KeyCode::Char(' ') => {
                 self.paused = !self.paused;
-            },
+            }
             KeyCode::Up => {
                 if self.ioblock_idx > 0 {
                     self.ioblock_idx -= 1;
                 }
-            },
+            }
             KeyCode::Down => {
                 if self.ioblock_idx < self.ioblocks.len() - 1 {
                     self.ioblock_idx += 1;
