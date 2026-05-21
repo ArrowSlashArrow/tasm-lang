@@ -1,14 +1,16 @@
 [package]
 name = "tasmc"
-rust-version = "1.90"
+rust-version = "1.88"
 version = "0.2.6"
 edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.54", features = ["derive"] }
+crossterm = "0.29.0"
 gdlib = "0.3.3"
 paste = "1.0.15"
 phf = "0.13.1"
+ratatui = "0.30.0"
 tungstenite = "0.24"
 url = "2.5"

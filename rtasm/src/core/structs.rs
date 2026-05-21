@@ -22,7 +22,7 @@ pub enum InstrType {
     Debug, // any instruction that is only used by the emulator, and ignored when parsing to GD objects.
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TasmValue {
     Counter(i16),
     Timer(i16),
@@ -241,6 +241,15 @@ impl TasmValue {
         }
     }
 
+    pub fn to_item(&self) -> Option<Item> {
+        match self {
+            Self::Counter(c) => Some(Item::Counter(*c)),
+            Self::Timer(t) => Some(Item::Timer(*t)),
+            Self::GDItem(i) => Some(*i),
+            _ => None,
+        }
+    }
+
     pub fn to_group_id(&self) -> Option<i16> {
         match self {
             Self::Group(n) => Some(*n),
@@ -415,13 +424,70 @@ pub struct Routine {
 
 #[derive(Debug, Clone)]
 pub struct Instruction {
-    pub ident: String,
+    pub ident: InstrIdent,
     pub itype: InstrType,
     pub line_number: usize,
     pub args: Vec<TasmValue>,
     pub flags: Vec<Flag>,
     pub handler_fn: HandlerFn,
     pub is_concurrent: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InstrIdent {
+    MALLOC,
+    FMALLOC,
+    INITMEM,
+    PERS,
+    DISPLAY,
+    IOBLOCK,
+    LMALLOC,
+    LFMALLOC,
+    LMFUNC,
+    LMREAD,
+    LMWRITE,
+    LMPTR,
+    LMRESET,
+    MOV,
+    MSET,
+    MGET,
+    BREAKPOINT,
+    SPAWN,
+    NOP,
+    WAIT,
+    WAITS,
+    ADD,
+    SUB,
+    ADDM,
+    SUBM,
+    ADDD,
+    SUBD,
+    MUL,
+    DIV,
+    FLDIV,
+    SE,
+    SNE,
+    SL,
+    SLE,
+    SG,
+    SGE,
+    FE,
+    FNE,
+    FL,
+    FLE,
+    FG,
+    FGE,
+    SRAND,
+    FRAND,
+    TSPAWN,
+    TSTART,
+    TSTOP,
+    PAUSE,
+    RESUME,
+    KILL,
+    TOGGLEON,
+    TOGGLEOFF,
+    RAW,
 }
 
 impl Routine {

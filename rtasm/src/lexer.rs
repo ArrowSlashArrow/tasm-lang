@@ -43,8 +43,8 @@ use crate::{
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
         structs::{
-            Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature,
-            is_builtin_alias,
+            InstrIdent, InstrType, Instruction, Routine, RoutineData, Tasm, TasmValue,
+            fits_arg_signature, is_builtin_alias,
         },
     },
     instr::INSTR_SPEC,
@@ -96,10 +96,52 @@ impl Tasm {
         verbose_log!(self, "Parsing instructions.");
         self.handle_instructions();
 
+        if !disable_entry_point_check {
+            self.insert_start_ioblock();
+        }
+
         if !self.errors.is_empty() {
             verbose_log!(self, "Parsed file with {} errors.", self.errors.len());
         } else {
             verbose_log!(self, "Parsed file successfully with 0 errors.")
+        }
+    }
+
+    fn insert_start_ioblock(&mut self) {
+        let entry_point = match self
+            .routines
+            .iter()
+            .find(|rtn| rtn.ident == ENTRY_POINT)
+            .map(|r| r.group)
+        {
+            Some(e) => e,
+            None => return,
+        };
+        let argset = vec![
+            TasmValue::Group(entry_point),
+            TasmValue::Number(0.0),
+            TasmValue::String("_start".into()),
+        ];
+        if let Some(init) = self
+            .routines
+            .iter_mut()
+            .find(|rtn| rtn.ident.as_str() == INIT_ROUTINE)
+        {
+            if let None = init.instructions.iter().find(|instr| {
+                instr.ident == InstrIdent::IOBLOCK
+                    && instr.args.get(0) == Some(&TasmValue::Group(entry_point))
+            }) {
+                // ioblock for _start not included
+                init.add_instruction(Instruction {
+                    ident: InstrIdent::IOBLOCK,
+                    itype: InstrType::Init,
+                    line_number: usize::MAX,
+                    args: argset,
+                    flags: vec![],
+                    handler_fn: crate::instr::fns::ioblock,
+                    is_concurrent: false,
+                });
+            }
         }
     }
 
@@ -379,7 +421,7 @@ impl Tasm {
         }
 
         // find the instruction spec which contains arg handlers
-        let (init_exclusive, handlers, itype) = match INSTR_SPEC.get(&instr) {
+        let (init_exclusive, handlers, itype, instr_ident) = match INSTR_SPEC.get(&instr) {
             Some(spec) => spec,
             None => {
                 push_error(
@@ -419,7 +461,7 @@ impl Tasm {
             Some(handler) => {
                 // finally, add instruction to routine
                 curr_routine.add_instruction(Instruction {
-                    ident: instr.clone(),
+                    ident: *instr_ident,
                     itype: *itype,
                     line_number: curr_line,
                     args,

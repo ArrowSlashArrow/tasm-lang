@@ -109,26 +109,6 @@ impl Tasm {
         }
         self.routines = routines;
 
-        if self.start_rtn_group != 0 {
-            let ioblock_result = ioblock(HandlerArgs {
-                args: Cow::Owned(vec![
-                    TasmValue::Group(self.start_rtn_group),
-                    TasmValue::Number(0.0),
-                    TasmValue::String("start".into()),
-                ]),
-                cfg: GDObjConfig::new(),
-                displayed_items: self.displayed_items,
-                curr_group: self.curr_group,
-                ..Default::default()
-            })
-            .unwrap();
-
-            // add starting block
-            for obj in ioblock_result.objects.into_iter() {
-                level.add_object(obj);
-            }
-        }
-
         if !self.errors.is_empty() {
             // Given that we won't be using this TASM-object again (since we faild to compile),
             // taking the errors will be ultimately more efficient.
