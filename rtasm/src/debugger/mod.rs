@@ -17,6 +17,8 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget},
 };
 
+pub mod ui;
+
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
         println!("Emulator failed to run: {e}")
@@ -77,6 +79,7 @@ struct Emulator {
     paused: bool, // true if paused. happens when tripping a breakpoint
     running_routines: Vec<RunningRoutine>, // all current running routines
     ioblocks: Vec<usize>, // idxs to self.tasm.routines
+    ioblock_idx: usize, // index into ioblocks
     displays: Vec<Item>,
     init_instrs: Vec<Instruction>, // executed every reset
     ticks: u32,                    // tick counter
@@ -138,7 +141,10 @@ impl Emulator {
         let mut terminal = ratatui::init();
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
-            self.tick();
+            if !self.paused {
+                self.tick();
+            }
+
             if let Ok(c) = crossterm::event::poll(Duration::from_millis(0))
                 && c
             {
@@ -187,6 +193,9 @@ impl Emulator {
                 }
             }
         }
+        if ioblocks.len() == 0 {
+            ioblocks.push(usize::MAX)
+        }
 
         self.ioblocks = ioblocks;
     }
@@ -228,6 +237,22 @@ impl Emulator {
         match k.code {
             KeyCode::Esc => {
                 self.running = false;
+            }
+            KeyCode::Char(' ') => {
+                self.paused = !self.paused;
+            }
+            KeyCode::Up => {
+                if self.ioblock_idx > 0 {
+                    self.ioblock_idx -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if self.ioblock_idx < self.ioblocks.len() - 1 {
+                    self.ioblock_idx += 1;
+                }
+            }
+            kc @ (KeyCode::PageUp | KeyCode::PageDown | KeyCode::Enter) => {
+                self.add_log(format!("Key {kc:?} is not yet supported."));
             }
             _ => {}
         }
@@ -280,102 +305,4 @@ struct RunningRoutine {
     instr_ptr: usize,
     waiting: i32, // how many ticks it is waiting
     done: bool,
-}
-
-impl Widget for &Emulator {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
-        // outline
-        Block::bordered()
-            .border_set(border::ROUNDED)
-            .render(area, buf);
-
-        let middle_h_temp = Layout::horizontal(vec![
-            Constraint::Length(2),
-            Constraint::Min(1),
-            Constraint::Length(2),
-        ])
-        .split(area);
-
-        let workable_area = Layout::vertical(vec![
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
-        .split(middle_h_temp[1])[1];
-
-        /* setup areas */
-        let h_layout = Layout::horizontal(vec![Constraint::Percentage(50), Constraint::Min(1)])
-            .split(workable_area);
-
-        let vleft_layout =
-            Layout::vertical(vec![Constraint::Min(1), Constraint::Min(1)]).split(h_layout[0]);
-
-        let htopleft_layout = Layout::horizontal(vec![Constraint::Min(1), Constraint::Length(32)])
-            .split(vleft_layout[0]);
-
-        let vbottomleft_layout = Layout::vertical(vec![Constraint::Length(5), Constraint::Min(1)])
-            .split(vleft_layout[1]);
-
-        let vright_layout =
-            Layout::vertical(vec![Constraint::Min(1), Constraint::Length(10)]).split(h_layout[1]);
-
-        let logbox_area = htopleft_layout[0];
-        let display_area = htopleft_layout[1];
-        let info_area = vbottomleft_layout[0];
-        let routines_area = vbottomleft_layout[1];
-        let memory_area = vright_layout[0];
-        let keys_area = vright_layout[1];
-
-        /* logbox */
-
-        let logbox_height = logbox_area.height as usize;
-        let logs = if self.logbox.len() > logbox_height {
-            &self.logbox[(&self.logbox.len() - logbox_height)..]
-        } else {
-            &self.logbox[..]
-        };
-
-        Paragraph::new(Text::from(
-            logs.iter()
-                .map(|log| Line::from(format!(" {log} ")))
-                .collect::<Vec<Line<'_>>>(),
-        ))
-        .block(
-            Block::bordered()
-                .border_set(border::DOUBLE)
-                .title(" Emulator logs ".yellow().into_centered_line()),
-        )
-        .render(logbox_area, buf);
-
-        /* Displays */
-
-        let displays_height = display_area.height as usize;
-        let displays = if self.displays.len() > displays_height {
-            &self.displays[..displays_height]
-        } else {
-            &self.displays[..]
-        };
-
-        Paragraph::new(Text::from(
-            displays
-                .iter()
-                .map(|item| {
-                    Line::from(format!(
-                        " {:<13} : {:>12} ",
-                        format!("{item:?}"),
-                        self.state.get_item_value(*item)
-                    ))
-                })
-                .collect::<Vec<Line<'_>>>(),
-        ))
-        .block(
-            Block::bordered()
-                .border_set(border::DOUBLE)
-                .title(" Displayed items ".green().into_centered_line()),
-        )
-        .render(display_area, buf);
-    }
 }

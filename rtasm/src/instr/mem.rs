@@ -266,7 +266,6 @@ pub fn legacy_malloc(args: HandlerArgs) -> HandlerReturn {
     Ok(legacy_malloc_inner(args, false))
 }
 pub fn legacy_fmalloc(args: HandlerArgs) -> HandlerReturn {
-    println!("nigga we called fmalloc {args:#?}");
     Ok(legacy_malloc_inner(args, true))
 }
 

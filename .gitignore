@@ -6,3 +6,6 @@ pytasm/namespace.json
 # docs stuff
 .retype/
 retype.manifest
+# replit
+.replit
+rust-toolchain.toml
