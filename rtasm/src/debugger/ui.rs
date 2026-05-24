@@ -20,6 +20,7 @@ const KEYBINDS: &[(&str, &str)] = &[
     (".", "Step forward when paused"),
     ("c", "Clear emulator logs"),
     ("r", "Reset VM state"),
+    ("Tab", "Peek IOBlock"),
 ];
 
 impl Widget for &Emulator {
@@ -79,8 +80,17 @@ impl Widget for &Emulator {
         self.render_keys(keys_area, buf);
         self.render_memory(memory_area, buf);
         self.render_ioblocks(ioblocks_area, buf);
-        self.render_routines(routines_area, buf);
         self.render_info(info_area, buf);
+
+        if self.peeking_ioblock {
+            let bottom_left_layout =
+                Layout::horizontal(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .split(routines_area);
+            self.render_routines(bottom_left_layout[0], buf);
+            self.render_ioblock_peek(bottom_left_layout[1], buf);
+        } else {
+            self.render_routines(routines_area, buf);
+        }
     }
 }
 
@@ -141,7 +151,7 @@ impl Emulator {
                     Line::from(format!(
                         " {:<13} : {:>12} ",
                         format!("{item:?}"),
-                        self.state.get_item_value(*item)
+                        self.state.get_item_value_str(*item)
                     ))
                 })
                 .collect::<Vec<Line<'_>>>(),
@@ -219,11 +229,15 @@ impl Emulator {
     }
 
     fn render_memory(&self, memory_area: Rect, buf: &mut Buffer) {
-        Block::bordered()
-            .border_set(border::PLAIN)
-            .title(" Memory cells ".blue().into_centered_line())
-            .render(memory_area, buf);
-        // todeo
+        display_centered_message(
+            "// todo",
+            Block::bordered()
+                .border_set(border::PLAIN)
+                .title(" Memory cells ".blue().into_centered_line()),
+            memory_area,
+            buf,
+        );
+        // todo
     }
 
     fn render_ioblocks(&self, ioblocks_area: Rect, buf: &mut Buffer) {
@@ -370,4 +384,50 @@ impl Emulator {
         )
         .render(info_area, buf);
     }
+
+    fn render_ioblock_peek(&self, peek_area: Rect, buf: &mut Buffer) {
+        let rtn_ident = self.tasm.routine_data[self.ioblocks[self.ioblock_idx]]
+            .routine_ident
+            .as_str();
+        let block = Block::bordered().border_set(border::EMPTY).title(
+            format!(" {rtn_ident} instructions ")
+                .red()
+                .into_centered_line(),
+        );
+        if self.ioblocks[0] == usize::MAX {
+            display_centered_message(" <No routine> ".italic(), block, peek_area, buf);
+            return;
+        }
+
+        // assume that we are peeking from the start of the routine
+        // maybe there can be some way to scroll in that window
+
+        let raw_routine = &self.tasm.routine_data[self.ioblocks[self.ioblock_idx]].lines[..];
+
+        Paragraph::new(Text::from(
+            raw_routine
+                .iter()
+                .map(|(_, s)| s.as_str().into())
+                .collect::<Vec<_>>(),
+        ))
+        .block(block)
+        .render(peek_area, buf);
+    }
+}
+
+fn display_centered_message<'a, L: Into<Line<'a>>>(
+    message: L,
+    block: Block,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let area_split = Layout::vertical(vec![
+        Constraint::Fill(1),
+        Constraint::Length(1),
+        Constraint::Fill(1),
+    ])
+    .split(area);
+
+    block.render(area, buf);
+    Paragraph::new(Text::from(message.into().centered())).render(area_split[1], buf);
 }

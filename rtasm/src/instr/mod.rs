@@ -131,8 +131,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "MOV" => (
         false,
         &[
-            argset!((Item, Number) => arithmetic_item_num_mov),
-            argset!((Item, Item) => arithmetic_2items_mov),
+            argset!((Item, Number) => arithmetic_item_num_mov, mov_item_num),
+            argset!((Item, Item) => arithmetic_2items_mov, mov_item_item),
         ],
         InstrType::Arithmetic,
         InstrIdent::MOV
@@ -149,7 +149,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     // Process
     "SPAWN" => (
         false,
-        &[argset!((Group) => spawn)],
+        &[argset!((Group) => spawn, spawn)],
         InstrType::Process,
         InstrIdent::SPAWN,
     ),

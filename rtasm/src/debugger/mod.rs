@@ -6,13 +6,15 @@ use crate::core::{
 };
 
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use gdlib::gdobj::Item;
 use ratatui::{self, Frame};
 use std::mem::take;
 
 pub mod instr;
 pub mod ui;
+
+const TOGGLE_KEYS: &[KeyCode] = &[KeyCode::Tab];
 
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
@@ -24,8 +26,8 @@ pub fn emulate(tasm: Tasm) {
 
 #[derive(Debug)]
 pub struct EmulatorState {
-    counters: [i32; 9999],
-    timers: [f32; 9999],
+    counters: [i32; 10_000],
+    timers: [f32; 10_000],
     attempts: i32,
     points: f32,
     maintime: f32,
@@ -34,8 +36,8 @@ pub struct EmulatorState {
 impl Default for EmulatorState {
     fn default() -> Self {
         Self {
-            counters: [0; 9999],
-            timers: [0.; 9999],
+            counters: [0; 10_000],
+            timers: [0.; 10_000],
             attempts: 0,
             points: 0.,
             maintime: 0.,
@@ -44,24 +46,33 @@ impl Default for EmulatorState {
 }
 
 impl EmulatorState {
-    fn new() -> Self {
-        Self {
-            counters: [0; 9999],
-            timers: [0.0; 9999],
-            attempts: 1,
-            points: 0.0,
-            maintime: 0.0,
-        }
-    }
-
     // returns the given item value as a string
-    fn get_item_value(&self, item: Item) -> String {
+    fn get_item_value_str(&self, item: Item) -> String {
         match item {
             Item::Counter(c) => self.counters[c as usize].to_string(),
             Item::Timer(t) => self.timers[t as usize].to_string(),
             Item::Attempts => self.attempts.to_string(),
             Item::MainTime => self.maintime.to_string(),
             Item::Points => self.points.to_string(),
+        }
+    }
+
+    fn set_item(&mut self, item: Item, num: f64) {
+        match item {
+            Item::Counter(c) => self.counters[c as usize] = num as i32,
+            Item::Timer(t) => self.timers[t as usize] = num as f32,
+            Item::Attempts | Item::MainTime => {}
+            Item::Points => self.points = num as f32,
+        }
+    }
+
+    fn get_num(&self, item: Item) -> f64 {
+        match item {
+            Item::Counter(c) => self.counters[c as usize] as f64,
+            Item::Timer(t) => self.timers[t as usize] as f64,
+            Item::Attempts => self.attempts as f64,
+            Item::MainTime => self.maintime as f64,
+            Item::Points => self.points as f64,
         }
     }
 }
@@ -75,6 +86,7 @@ pub struct Emulator {
     running_routines: Vec<RunningRoutine>, // all current running routines
     ioblocks: Vec<usize>, // idxs to self.tasm.routines
     ioblock_idx: usize, // index into ioblocks
+    peeking_ioblock: bool, // whether to peek the selected ioblock (see instructions of that routine)
     displays: Vec<Item>,
     init_instrs: Vec<Instruction>, // executed every reset
     ticks: u32,                    // tick counter
@@ -83,13 +95,7 @@ pub struct Emulator {
 
 impl Emulator {
     fn reset_state(&mut self) {
-        self.state = EmulatorState {
-            counters: [0i32; 9999],
-            timers: [0.0f32; 9999],
-            attempts: 1,
-            points: 0.0f32,
-            maintime: 0.0f32,
-        };
+        self.state = EmulatorState::default();
         self.running_routines.clear();
         self.ticks = 0;
     }
@@ -122,7 +128,7 @@ impl Emulator {
             };
 
         Self {
-            state: EmulatorState::new(),
+            state: EmulatorState::default(),
             tasm,
             running: true,
             init_instrs,
@@ -147,6 +153,7 @@ impl Emulator {
             {
                 self.handle_key();
             }
+            // fix timing to be at 240hz
         }
 
         Ok(())
@@ -211,7 +218,17 @@ impl Emulator {
         };
 
         match event {
-            Event::Key(k) if !k.is_release() => {
+            Event::Key(k) => {
+                if TOGGLE_KEYS.contains(&k.code) {
+                    self.handle_toggle_key(k);
+                    return;
+                }
+
+                // filter release
+                if k.is_release() {
+                    return;
+                }
+
                 if k.modifiers.contains(KeyModifiers::CONTROL) {
                     if let KeyCode::Char('c') = k.code {
                         self.running = false;
@@ -219,13 +236,33 @@ impl Emulator {
                     return;
                 }
 
-                self.handle_regular_key(k);
+                self.handle_keypress(k);
             }
             _ => {}
         }
     }
 
-    fn handle_regular_key(&mut self, k: KeyEvent) {
+    fn handle_toggle_key(&mut self, k: KeyEvent) {
+        match k.kind {
+            // on state
+            KeyEventKind::Press => match k.code {
+                KeyCode::Tab => {
+                    self.peeking_ioblock = true;
+                }
+                _ => {}
+            },
+            // off state
+            KeyEventKind::Release => match k.code {
+                KeyCode::Tab => {
+                    self.peeking_ioblock = false;
+                }
+                _ => {}
+            },
+            KeyEventKind::Repeat => {}
+        }
+    }
+
+    fn handle_keypress(&mut self, k: KeyEvent) {
         match k.code {
             KeyCode::Esc => self.running = false,
             KeyCode::Char(' ') => self.paused = !self.paused,
