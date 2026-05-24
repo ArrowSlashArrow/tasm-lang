@@ -386,8 +386,8 @@ impl Emulator {
     }
 
     fn render_ioblock_peek(&self, peek_area: Rect, buf: &mut Buffer) {
-        let rtn_ident = self.tasm.routine_data[self.ioblocks[self.ioblock_idx]]
-            .routine_ident
+        let rtn_ident = &self.tasm.routines[self.ioblocks[self.ioblock_idx]]
+            .ident
             .as_str();
         let block = Block::bordered().border_set(border::EMPTY).title(
             format!(" {rtn_ident} instructions ")
@@ -402,7 +402,13 @@ impl Emulator {
         // assume that we are peeking from the start of the routine
         // maybe there can be some way to scroll in that window
 
-        let raw_routine = &self.tasm.routine_data[self.ioblocks[self.ioblock_idx]].lines[..];
+        let raw_routine = &self
+            .tasm
+            .routine_data
+            .iter()
+            .find(|r| r.routine_ident.as_str() == *rtn_ident)
+            .unwrap()
+            .lines[..];
 
         Paragraph::new(Text::from(
             raw_routine
