@@ -89,7 +89,9 @@ impl Emulator {
             attempts: 1,
             points: 0.0f32,
             maintime: 0.0f32,
-        }
+        };
+        self.running_routines.clear();
+        self.ticks = 0;
     }
 
     pub fn new(tasm: Tasm) -> Self {
@@ -99,7 +101,7 @@ impl Emulator {
                 rtn.instructions
                     .iter()
                     .filter(|&instr| {
-                        // all init instructions are encoded in some other way (e.g. MEMINFO)
+                        // all init instructions are encoded in some other way (e.g. meminfo)
                         // other than INITMEM, DISPLAY
                         instr.itype != InstrType::Init
                             || instr.ident == InstrIdent::INITMEM
@@ -180,15 +182,14 @@ impl Emulator {
                 }
                 // get group of routine
                 let target_rtn = instr.args[0].to_group_id().unwrap();
-                if let Some((idx, _)) = self
+                if let Some((routine_idx, _)) = self
                     .tasm
                     .routines
                     .iter()
                     .enumerate()
                     .find(|(_, rtn)| rtn.group == target_rtn)
                 {
-                    // push idx
-                    ioblocks.push(idx);
+                    ioblocks.push(routine_idx);
                 }
             }
         }
@@ -212,7 +213,9 @@ impl Emulator {
         match event {
             Event::Key(k) if !k.is_release() => {
                 if k.modifiers.contains(KeyModifiers::CONTROL) {
-                    self.handle_ctrl_key(k);
+                    if let KeyCode::Char('c') = k.code {
+                        self.running = false;
+                    }
                     return;
                 }
 
@@ -222,24 +225,10 @@ impl Emulator {
         }
     }
 
-    fn handle_ctrl_key(&mut self, k: KeyEvent) {
-        match k.code {
-            KeyCode::Char('c') => {
-                self.running = false;
-                return;
-            }
-            _ => {}
-        }
-    }
-
     fn handle_regular_key(&mut self, k: KeyEvent) {
         match k.code {
-            KeyCode::Esc => {
-                self.running = false;
-            }
-            KeyCode::Char(' ') => {
-                self.paused = !self.paused;
-            }
+            KeyCode::Esc => self.running = false,
+            KeyCode::Char(' ') => self.paused = !self.paused,
             KeyCode::Up => {
                 if self.ioblock_idx > 0 {
                     self.ioblock_idx -= 1;
@@ -253,7 +242,12 @@ impl Emulator {
             KeyCode::PageUp => self.ioblock_idx = 0,
             KeyCode::PageDown => self.ioblock_idx = self.ioblocks.len() - 1,
             KeyCode::Enter => {
-                let routine = self.tasm.routines[self.ioblocks[self.ioblock_idx]].clone();
+                let routine_idx = self.ioblocks[self.ioblock_idx];
+                // happens if there are no ioblocks
+                if routine_idx == usize::MAX {
+                    return;
+                }
+                let routine = self.tasm.routines[routine_idx].clone();
                 self.add_running_routine(routine);
             }
             KeyCode::Char('.') => {
@@ -261,8 +255,10 @@ impl Emulator {
                     self.tick();
                 }
             }
-            KeyCode::Char('c') => {
-                self.logbox.clear();
+            KeyCode::Char('c') => self.logbox.clear(),
+            KeyCode::Char('r') => {
+                self.reset_state();
+                self.setup();
             }
             // kc @ (_) => {
             //     self.add_log(format!("Key {kc:?} is not yet supported."));
@@ -280,11 +276,12 @@ impl Emulator {
             }
 
             // otherwise, increment instruction ptr
-            if routine.instr_ptr < routine.routine.instructions.len() - 1 {
+            if routine.instr_ptr < routine.routine.instructions.len() {
                 // todo: figure out concurrent instructions
-                routine.instr_ptr += 1;
                 instrs_todo.push(routine.routine.instructions[routine.instr_ptr].clone());
-            } else {
+                routine.instr_ptr += 1;
+            }
+            if routine.instr_ptr == routine.routine.instructions.len() {
                 // end routine
                 routine.done = true;
             }
@@ -328,5 +325,9 @@ impl RunningRoutine {
             waiting: 0,
             done: false,
         }
+    }
+
+    pub fn get_line(&self) -> usize {
+        self.routine.instructions[self.instr_ptr].line_number
     }
 }

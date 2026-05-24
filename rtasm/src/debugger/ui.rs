@@ -7,10 +7,7 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget},
 };
 
-use crate::{
-    core::structs::Instruction,
-    debugger::{Emulator, RunningRoutine},
-};
+use crate::debugger::{Emulator, RunningRoutine};
 
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
@@ -22,6 +19,7 @@ const KEYBINDS: &[(&str, &str)] = &[
     ("PgDn", "Go to end of IOBlocks"),
     (".", "Step forward when paused"),
     ("c", "Clear emulator logs"),
+    ("r", "Reset VM state"),
 ];
 
 impl Widget for &Emulator {
@@ -233,19 +231,21 @@ impl Emulator {
             .ioblocks
             .iter()
             .enumerate()
-            .map(|(ioblock_idx, &idx)| {
+            .map(|(ioblock_idx, &routine_idx)| {
                 Line::from(
                     vec![
                         " ".bold(),
                         if ioblock_idx == self.ioblock_idx {
-                            "> ".green()
+                            "> ".green() // highlight
                         } else {
                             "".into()
                         },
-                        if ioblock_idx >= self.ioblocks.len() {
+                        if routine_idx >= self.tasm.routines.len() {
+                            // happens if the element is usize::MAX
+                            // which happens if there are no ioblocks
                             "<No routine>".gray()
                         } else {
-                            self.tasm.routines[idx].ident.clone().into()
+                            self.tasm.routines[routine_idx].ident.clone().into()
                         },
                     ]
                     .into_iter()
@@ -309,9 +309,8 @@ impl Emulator {
         .render(routines_area, buf);
     }
 
-    fn get_instr_line(&self, instr: &Instruction) -> String {
-        let line = instr.line_number as usize;
-        self.tasm.lines[line - 1].trim().to_owned()
+    fn get_instr_line(&self, line: usize) -> String {
+        self.tasm.lines[line].trim().to_owned()
     }
 
     fn get_state(&self, rtn: &RunningRoutine) -> String {
@@ -323,7 +322,7 @@ impl Emulator {
                 "{}: [{}] {} (waiting {} ticks)",
                 rtn.routine.ident,
                 rtn.instr_ptr,
-                self.get_instr_line(&rtn.routine.instructions[rtn.instr_ptr]),
+                self.get_instr_line(rtn.get_line()),
                 rtn.waiting
             );
         } else {
@@ -331,7 +330,7 @@ impl Emulator {
                 "{}: [{}] {}",
                 rtn.routine.ident,
                 rtn.instr_ptr,
-                self.get_instr_line(&rtn.routine.instructions[rtn.instr_ptr])
+                self.get_instr_line(rtn.get_line())
             );
         }
     }

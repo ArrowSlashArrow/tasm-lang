@@ -56,8 +56,6 @@ const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
 
 impl Tasm {
     pub fn parse(&mut self, group_offset: i16, disable_entry_point_check: bool) {
-        // index routines before anything else
-
         verbose_log!(self, "Indexing routines.");
         self.curr_group = group_offset;
         self.index_routines();
@@ -71,7 +69,7 @@ impl Tasm {
 
         verbose_log!(self, "Pushing _init to front of routine data");
         // push _init routine to the start to process it before anyting else
-        // important to do for alias resolution, since memtype is determined in init.
+        // important to do for alias resolution, since memory and aliases are declared there.
         if let Some(init_pos) = self
             .routine_data
             .iter()
@@ -117,31 +115,52 @@ impl Tasm {
             Some(e) => e,
             None => return,
         };
-        let argset = vec![
-            TasmValue::Group(entry_point),
-            TasmValue::Number(0.0),
-            TasmValue::String("_start".into()),
-        ];
-        if let Some(init) = self
-            .routines
-            .iter_mut()
-            .find(|rtn| rtn.ident.as_str() == INIT_ROUTINE)
-        {
+
+        let start_ioblock_instruction = Instruction {
+            ident: InstrIdent::IOBLOCK,
+            itype: InstrType::Init,
+            line_number: usize::MAX,
+            args: vec![
+                TasmValue::Group(entry_point),
+                TasmValue::Number(0.0),
+                TasmValue::String("_start".into()),
+            ],
+            flags: vec![],
+            handler_fn: crate::instr::fns::ioblock,
+            handler_fn_emu: crate::debugger::Emulator::unreachable,
+            is_concurrent: false,
+        };
+
+        // by now, the _init routine has been moved to the front of the array
+        // therefore, we only need to check that element 0
+        // 1. exists, and
+        // 2. is the _init routine
+
+        let init_exists =
+            self.routines.len() > 0 && self.routines[0].ident.as_str() == INIT_ROUTINE;
+
+        if !init_exists {
+            // create the routine if it does not exist
+            self.routines.insert(
+                0,
+                Routine {
+                    ident: INIT_ROUTINE.to_owned(),
+                    group: 0,
+                    instructions: vec![start_ioblock_instruction],
+                },
+            );
+            return;
+        }
+
+        // we know that init exists and that it is at the first index
+        // therefore searching for it is not necessary
+        if let Some(init) = self.routines.first_mut() {
+            // add the ioblock for _start if it wasn't already added
             if let None = init.instructions.iter().find(|instr| {
                 instr.ident == InstrIdent::IOBLOCK
                     && instr.args.get(0) == Some(&TasmValue::Group(entry_point))
             }) {
-                // ioblock for _start not included
-                init.add_instruction(Instruction {
-                    ident: InstrIdent::IOBLOCK,
-                    itype: InstrType::Init,
-                    line_number: usize::MAX,
-                    args: argset,
-                    flags: vec![],
-                    handler_fn: crate::instr::fns::ioblock,
-                    handler_fn_emu: crate::debugger::Emulator::unreachable,
-                    is_concurrent: false,
-                });
+                init.add_instruction(start_ioblock_instruction);
             }
         }
     }

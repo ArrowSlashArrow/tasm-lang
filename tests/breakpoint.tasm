@@ -1,0 +1,7 @@
+; This program is a test for the breakpoint handling in the emulator
+_start:
+    add C1, 1
+    mov C2, C2
+    breakpoint
+    mov C3, 3
+    mov C4, C4
