@@ -8,15 +8,10 @@ use crate::core::{
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use gdlib::gdobj::Item;
-use ratatui::{
-    self, Frame,
-    layout::{Constraint, Layout},
-    style::Stylize,
-    symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
-};
+use ratatui::{self, Frame};
+use std::mem::take;
 
+pub mod instr;
 pub mod ui;
 
 pub fn emulate(tasm: Tasm) {
@@ -28,7 +23,7 @@ pub fn emulate(tasm: Tasm) {
 }
 
 #[derive(Debug)]
-struct EmulatorState {
+pub struct EmulatorState {
     counters: [i32; 9999],
     timers: [f32; 9999],
     attempts: i32,
@@ -72,7 +67,7 @@ impl EmulatorState {
 }
 
 #[derive(Debug, Default)]
-struct Emulator {
+pub struct Emulator {
     state: EmulatorState, // counter state
     tasm: Tasm,           // original compiled tasm
     running: bool,
@@ -160,9 +155,13 @@ impl Emulator {
         // for stuff like running _init
 
         self.load_ioblocks();
-        for instr in self.init_instrs.clone() {
+        let instrs = take(&mut self.init_instrs);
+
+        for instr in instrs.iter() {
             self.exec_instr(instr);
         }
+
+        self.init_instrs = instrs;
     }
 
     fn load_ioblocks(&mut self) {
@@ -251,9 +250,23 @@ impl Emulator {
                     self.ioblock_idx += 1;
                 }
             }
-            kc @ (KeyCode::PageUp | KeyCode::PageDown | KeyCode::Enter) => {
-                self.add_log(format!("Key {kc:?} is not yet supported."));
+            KeyCode::PageUp => self.ioblock_idx = 0,
+            KeyCode::PageDown => self.ioblock_idx = self.ioblocks.len() - 1,
+            KeyCode::Enter => {
+                let routine = self.tasm.routines[self.ioblocks[self.ioblock_idx]].clone();
+                self.add_running_routine(routine);
             }
+            KeyCode::Char('.') => {
+                if self.paused {
+                    self.tick();
+                }
+            }
+            KeyCode::Char('c') => {
+                self.logbox.clear();
+            }
+            // kc @ (_) => {
+            //     self.add_log(format!("Key {kc:?} is not yet supported."));
+            // }
             _ => {}
         }
     }
@@ -277,7 +290,7 @@ impl Emulator {
             }
         }
 
-        for instr in instrs_todo {
+        for instr in instrs_todo.iter() {
             self.exec_instr(instr);
         }
 
@@ -289,20 +302,31 @@ impl Emulator {
         self.logbox.push(log);
     }
 
-    fn exec_instr(&mut self, instr: Instruction) {
-        match instr.ident {
-            _ => self.add_log(format!(
-                "Instruction {:?} is not implemented in the emulator yet.",
-                instr.ident
-            )),
-        }
+    fn exec_instr(&mut self, instr: &Instruction) {
+        (instr.handler_fn_emu)(self, instr);
+    }
+
+    fn add_running_routine(&mut self, routine: Routine) {
+        self.add_log(format!("Spawned routine {}", routine.ident));
+        self.running_routines.push(RunningRoutine::new(routine));
     }
 }
 
 #[derive(Debug, Default)]
-struct RunningRoutine {
+pub struct RunningRoutine {
     routine: Routine,
     instr_ptr: usize,
     waiting: i32, // how many ticks it is waiting
     done: bool,
+}
+
+impl RunningRoutine {
+    pub fn new(routine: Routine) -> Self {
+        Self {
+            routine,
+            instr_ptr: 0,
+            waiting: 0,
+            done: false,
+        }
+    }
 }

@@ -9,7 +9,7 @@ use crate::{
         error::{TasmError, TasmErrorType},
         structs::{HandlerArgs, HandlerData, InstrType, Instruction, Routine, Tasm, TasmValue},
     },
-    instr::{fns::ioblock, get_item_spec},
+    instr::get_item_spec,
 };
 
 use alloc::borrow::Cow;

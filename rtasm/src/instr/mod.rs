@@ -9,8 +9,12 @@ use crate::{
     core::{
         HandlerFn,
         flags::FlagValue,
-        structs::{HandlerArgs, InstrIdent, InstrType, TasmPrimitive, TasmValue, TasmValueType},
+        structs::{
+            HandlerArgs, InstrIdent, InstrType, Instruction, TasmPrimitive, TasmValue,
+            TasmValueType,
+        },
     },
+    debugger::Emulator,
     instr::{fns::*, mem::*},
 };
 
@@ -21,49 +25,62 @@ pub const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 // convert a list of type identifiers into a slice
 macro_rules! argset {
+    // **TEMP FIX**
+    // TODO: REMOVE WHEN WE HAVE HANDLERS FOR ALL INSTRUCTIONS!!!!
     (($($arg:ident),*) => $fn:ident) => {
-        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn)
+        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn, Emulator::not_implemented)
+    };
+
+    (($($arg:ident),*) => $fn:ident, $emu_fn:ident) => {
+        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn, Emulator::$emu_fn)
+    };
+
+    // THIS IS ALSO A TEMP FIX!!
+    ([$argtype:ident] => $fn:ident) => {
+        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn, Emulator::not_implemented)
     };
 
     // use this for list args
-    ([$argtype:ident] => $fn:ident) => {
-        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn)
+    ([$argtype:ident] => $fn:ident, $emu_fn:ident) => {
+        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn, Emulator::$emu_fn)
     }
 }
 
-pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
+pub type EmulatorArgs<'a> = &'a Instruction;
+pub type EmulatorHandler = fn(&mut Emulator, EmulatorArgs) -> ();
+pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn, EmulatorHandler);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrIdent)> = phf_map! {
     // inits
     // if an instruction can only go in the _init routine, it **MUST** be designated that.
     "MALLOC" => (
         true,
-        &[argset!((Int, Int) => malloc)],
+        &[argset!((Int, Int) => malloc, unreachable)],
         InstrType::Init,
         InstrIdent::MALLOC,
     ),
     "FMALLOC" => (
         true,
-        &[argset!((Int, Int) => fmalloc)],
+        &[argset!((Int, Int) => fmalloc, unreachable)],
         InstrType::Init,
         InstrIdent::FMALLOC,
     ),
     "INITMEM" => (
         true,
-        &[argset!([Number] => init_mem)],
+        &[argset!([Number] => init_mem, not_implemented)],
         InstrType::Init,
         InstrIdent::INITMEM,
     ),
-    "PERS" => (true, &[argset!((Item) => pers)], InstrType::Init, InstrIdent::PERS),
+    "PERS" => (true, &[argset!((Item) => pers, not_implemented)], InstrType::Init, InstrIdent::PERS),
     "DISPLAY" => (
         true,
-        &[argset!((Item) => display)],
+        &[argset!((Item) => display, unreachable)],
         InstrType::Init,
         InstrIdent::DISPLAY,
     ),
     "IOBLOCK" => (
         true,
-        &[argset!((Group, Int, String) => ioblock)],
+        &[argset!((Group, Int, String) => ioblock, unreachable)],
         InstrType::Init,
         InstrIdent::IOBLOCK,
     ),
@@ -125,7 +142,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     // debug
     "BREAKPOINT" => (
         false,
-        &[argset!(() => skip)],
+        &[argset!(() => skip, breakpoint)],
         InstrType::Debug,
         InstrIdent::BREAKPOINT,
     ),

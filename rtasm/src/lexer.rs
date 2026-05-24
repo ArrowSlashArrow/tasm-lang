@@ -139,6 +139,7 @@ impl Tasm {
                     args: argset,
                     flags: vec![],
                     handler_fn: crate::instr::fns::ioblock,
+                    handler_fn_emu: crate::debugger::Emulator::unreachable,
                     is_concurrent: false,
                 });
             }
@@ -455,10 +456,10 @@ impl Tasm {
         // find the handler function
         match handlers
             .iter()
-            .find(|&(sig, _)| fits_arg_signature(&args, sig))
-            .map(|v| v.1)
+            .find(|&(sig, _, _)| fits_arg_signature(&args, sig))
+            .map(|v| (v.1, v.2))
         {
-            Some(handler) => {
+            Some((gmd_handler, emu_handler)) => {
                 // finally, add instruction to routine
                 curr_routine.add_instruction(Instruction {
                     ident: *instr_ident,
@@ -466,7 +467,8 @@ impl Tasm {
                     line_number: curr_line,
                     args,
                     flags,
-                    handler_fn: handler,
+                    handler_fn: gmd_handler,
+                    handler_fn_emu: emu_handler,
                     is_concurrent,
                 });
             }

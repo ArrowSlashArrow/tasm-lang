@@ -3,11 +3,14 @@ use std::collections::HashMap;
 
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
-use crate::core::{
-    HandlerFn,
-    consts::GROUP_LIMIT,
-    error::{ParseErrorType, TasmError},
-    flags::Flag,
+use crate::{
+    core::{
+        HandlerFn,
+        consts::GROUP_LIMIT,
+        error::{ParseErrorType, TasmError},
+        flags::Flag,
+    },
+    instr::EmulatorHandler,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -430,6 +433,7 @@ pub struct Instruction {
     pub args: Vec<TasmValue>,
     pub flags: Vec<Flag>,
     pub handler_fn: HandlerFn,
+    pub handler_fn_emu: EmulatorHandler,
     pub is_concurrent: bool,
 }
 

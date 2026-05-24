@@ -1,12 +1,16 @@
-use ratatui::layout::{Constraint, Layout};
-use ratatui::prelude::{Buffer, Rect};
-use ratatui::style::Stylize;
-use ratatui::symbols::border;
-use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, Paragraph, Widget};
+use ratatui::{
+    layout::{Constraint, Layout},
+    prelude::{Buffer, Rect},
+    style::Stylize,
+    symbols::border,
+    text::{Line, Text},
+    widgets::{Block, Paragraph, Widget},
+};
 
-use crate::core::structs::Instruction;
-use crate::debugger::{Emulator, RunningRoutine};
+use crate::{
+    core::structs::Instruction,
+    debugger::{Emulator, RunningRoutine},
+};
 
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
@@ -16,6 +20,8 @@ const KEYBINDS: &[(&str, &str)] = &[
     ("Down", "Next IOBlock"),
     ("PgUp", "Go to top of IOBlocks"),
     ("PgDn", "Go to end of IOBlocks"),
+    (".", "Step forward when paused"),
+    ("c", "Clear emulator logs"),
 ];
 
 impl Widget for &Emulator {
@@ -82,21 +88,41 @@ impl Widget for &Emulator {
 
 impl Emulator {
     fn render_logbox(&self, logbox_area: Rect, buf: &mut Buffer) {
-        let logbox_height = logbox_area.height as usize;
+        let logbox_height = (logbox_area.height - 2) as usize;
         let logs = if self.logbox.len() > logbox_height {
             &self.logbox[(&self.logbox.len() - logbox_height)..]
         } else {
             &self.logbox[..]
         };
 
+        // -2: 1 char padding on each side
+        let max_log_length = (logbox_area.width - 2) as usize;
+
         Paragraph::new(Text::from(
             logs.iter()
-                .map(|log| Line::from(format!(" {log} ")))
+                .map(|reflog| {
+                    let mut log = reflog.clone();
+                    let truncated;
+                    if log.len() > max_log_length {
+                        log.truncate(max_log_length - 5);
+                        truncated = true;
+                    } else {
+                        truncated = false;
+                    }
+                    Line::from(vec![
+                        " ".into(),
+                        log.into(),
+                        match truncated {
+                            true => "...".gray(),
+                            false => "".into(),
+                        },
+                    ])
+                })
                 .collect::<Vec<Line<'_>>>(),
         ))
         .block(
             Block::bordered()
-                .border_set(border::DOUBLE)
+                .border_set(border::PLAIN)
                 .title(" Emulator logs ".yellow()),
         )
         .render(logbox_area, buf);
@@ -124,7 +150,7 @@ impl Emulator {
         ))
         .block(
             Block::bordered()
-                .border_set(border::DOUBLE)
+                .border_set(border::PLAIN)
                 .title(" Displayed items ".green().into_centered_line()),
         )
         .render(display_area, buf);
@@ -256,7 +282,7 @@ impl Emulator {
         };
 
         let mut pg_block = Block::bordered()
-            .border_set(border::PLAIN)
+            .border_set(border::DOUBLE)
             .title(" IOBlocks ".green().into_centered_line());
 
         if let Some(line) = more_lines {
@@ -285,7 +311,7 @@ impl Emulator {
 
     fn get_instr_line(&self, instr: &Instruction) -> String {
         let line = instr.line_number as usize;
-        self.tasm.lines[line - 1].clone()
+        self.tasm.lines[line - 1].trim().to_owned()
     }
 
     fn get_state(&self, rtn: &RunningRoutine) -> String {
@@ -294,7 +320,7 @@ impl Emulator {
         }
         if rtn.waiting > 0 {
             return format!(
-                "{}: [{}] {:?} (waiting {} ticks)",
+                "{}: [{}] {} (waiting {} ticks)",
                 rtn.routine.ident,
                 rtn.instr_ptr,
                 self.get_instr_line(&rtn.routine.instructions[rtn.instr_ptr]),
@@ -302,7 +328,7 @@ impl Emulator {
             );
         } else {
             return format!(
-                "{}: [{}] {:?}",
+                "{}: [{}] {}",
                 rtn.routine.ident,
                 rtn.instr_ptr,
                 self.get_instr_line(&rtn.routine.instructions[rtn.instr_ptr])
