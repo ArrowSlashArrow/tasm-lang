@@ -255,8 +255,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SE" => (
         false,
         &[
-            argset!((Group, Item, Item) => spawn_item_item_eq),
-            argset!((Group, Item, Number) => spawn_item_num_eq),
+            argset!((Group, Item, Item) => spawn_item_item_eq, compare_spawn_eq),
+            argset!((Group, Item, Number) => spawn_item_num_eq, compare_spawn_eq),
         ],
         InstrType::Process,
         InstrIdent::SE
@@ -264,8 +264,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SNE" => (
         false,
         &[
-            argset!((Group, Item, Item) => spawn_item_item_ne),
-            argset!((Group, Item, Number) => spawn_item_num_ne),
+            argset!((Group, Item, Item) => spawn_item_item_ne, compare_spawn_ne),
+            argset!((Group, Item, Number) => spawn_item_num_ne, compare_spawn_ne),
         ],
         InstrType::Process,
         InstrIdent::SNE
@@ -273,8 +273,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SL" => (
         false,
         &[
-            argset!((Group, Item, Item) => spawn_item_item_le),
-            argset!((Group, Item, Number) => spawn_item_num_le),
+            argset!((Group, Item, Item) => spawn_item_item_le, compare_spawn_lt),
+            argset!((Group, Item, Number) => spawn_item_num_le, compare_spawn_lt),
         ],
         InstrType::Process,
         InstrIdent::SL
@@ -282,8 +282,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SLE" => (
         false,
         &[
-            argset!((Group, Item, Item) => spawn_item_item_leq),
-            argset!((Group, Item, Number) => spawn_item_num_leq),
+            argset!((Group, Item, Item) => spawn_item_item_leq, compare_spawn_le),
+            argset!((Group, Item, Number) => spawn_item_num_leq, compare_spawn_le),
         ],
         InstrType::Process,
         InstrIdent::SLE
@@ -291,8 +291,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SG" => (
         false,
         &[
-            argset!((Group, Item, Item) => spawn_item_item_ge),
-            argset!((Group, Item, Number) => spawn_item_num_ge),
+            argset!((Group, Item, Item) => spawn_item_item_ge, compare_spawn_gt),
+            argset!((Group, Item, Number) => spawn_item_num_ge, compare_spawn_gt),
         ],
         InstrType::Process,
         InstrIdent::SG
@@ -300,8 +300,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SGE" => (
         false,
         &[
-            argset!((Group, Item, Item) => spawn_item_item_geq),
-            argset!((Group, Item, Number) => spawn_item_num_geq),
+            argset!((Group, Item, Item) => spawn_item_item_geq, compare_spawn_ge),
+            argset!((Group, Item, Number) => spawn_item_num_geq, compare_spawn_ge),
         ],
         InstrType::Process,
         InstrIdent::SGE
@@ -309,8 +309,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FE" => (
         false,
         &[
-            argset!((Group, Group, Item, Item) => fork_item_item_eq),
-            argset!((Group, Group, Item, Number) => fork_item_num_eq),
+            argset!((Group, Group, Item, Item) => fork_item_item_eq, compare_fork_eq),
+            argset!((Group, Group, Item, Number) => fork_item_num_eq, compare_fork_eq),
         ],
         InstrType::Process,
         InstrIdent::FE
@@ -318,8 +318,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FNE" => (
         false,
         &[
-            argset!((Group, Group, Item, Item) => fork_item_item_ne),
-            argset!((Group, Group, Item, Number) => fork_item_num_ne),
+            argset!((Group, Group, Item, Item) => fork_item_item_ne, compare_fork_ne),
+            argset!((Group, Group, Item, Number) => fork_item_num_ne, compare_fork_ne),
         ],
         InstrType::Process,
         InstrIdent::FNE
@@ -327,8 +327,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FL" => (
         false,
         &[
-            argset!((Group, Group, Item, Item) => fork_item_item_le),
-            argset!((Group, Group, Item, Number) => fork_item_num_le),
+            argset!((Group, Group, Item, Item) => fork_item_item_le, compare_fork_lt),
+            argset!((Group, Group, Item, Number) => fork_item_num_le, compare_fork_lt),
         ],
         InstrType::Process,
         InstrIdent::FL
@@ -336,8 +336,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FLE" => (
         false,
         &[
-            argset!((Group, Group, Item, Item) => fork_item_item_leq),
-            argset!((Group, Group, Item, Number) => fork_item_num_leq),
+            argset!((Group, Group, Item, Item) => fork_item_item_leq, compare_fork_le),
+            argset!((Group, Group, Item, Number) => fork_item_num_leq, compare_fork_le),
         ],
         InstrType::Process,
         InstrIdent::FLE
@@ -345,8 +345,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FG" => (
         false,
         &[
-            argset!((Group, Group, Item, Item) => fork_item_item_ge),
-            argset!((Group, Group, Item, Number) => fork_item_num_ge),
+            argset!((Group, Group, Item, Item) => fork_item_item_ge, compare_fork_gt),
+            argset!((Group, Group, Item, Number) => fork_item_num_ge, compare_fork_gt),
         ],
         InstrType::Process,
         InstrIdent::FG
@@ -354,21 +354,21 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FGE" => (
         false,
         &[
-            argset!((Group, Group, Item, Item) => fork_item_item_geq),
-            argset!((Group, Group, Item, Number) => fork_item_num_geq),
+            argset!((Group, Group, Item, Item) => fork_item_item_geq, compare_fork_ge),
+            argset!((Group, Group, Item, Number) => fork_item_num_geq, compare_fork_ge),
         ],
         InstrType::Process,
         InstrIdent::FGE
     ),
     "SRAND" => (
         false,
-        &[argset!((Group, Number) => spawn_random)],
+        &[argset!((Group, Number) => spawn_random, srand)],
         InstrType::Process,
         InstrIdent::SRAND,
     ),
     "FRAND" => (
         false,
-        &[argset!((Group, Group, Number) => fork_random)],
+        &[argset!((Group, Group, Number) => fork_random, frand)],
         InstrType::Process,
         InstrIdent::FRAND,
     ),

@@ -1,5 +1,6 @@
 use gdlib::gdobj::Item;
 use paste::paste;
+use rand::RngExt;
 
 use crate::{
     core::structs::{Instruction, TasmValue},
@@ -35,8 +36,7 @@ impl Emulator {
         self.paused = true;
     }
 
-    pub fn spawn(&mut self, args: &Instruction) {
-        let group = args.args[0].to_group_id().unwrap();
+    fn spawn_group(&mut self, group: i16) {
         match self.tasm.routines.iter().find(|&rtn| rtn.group == group) {
             Some(routine) => {
                 self.add_running_routine(routine.clone());
@@ -46,31 +46,33 @@ impl Emulator {
             }
         }
     }
-    pub fn nop(&mut self, args: &Instruction) {
-        if let Some(rtn) = self
-            .running_routines
-            .get_mut(args.parent_running_routine_idx)
-        {
-            rtn.waiting = 1;
+
+    fn wait_ticks(&mut self, rtn_idx: usize, ticks: i32) {
+        if let Some(rtn) = self.running_routines.get_mut(rtn_idx) {
+            rtn.waiting = ticks;
         }
+    }
+
+    pub fn spawn(&mut self, args: &Instruction) {
+        let group = args.args[0].to_group_id().unwrap();
+        self.spawn_group(group);
+    }
+    pub fn nop(&mut self, args: &Instruction) {
+        self.wait_ticks(args.parent_running_routine_idx, 1);
     }
 
     pub fn wait(&mut self, args: &Instruction) {
-        if let Some(rtn) = self
-            .running_routines
-            .get_mut(args.parent_running_routine_idx)
-        {
-            rtn.waiting = args.args[0].to_int().unwrap();
-        }
+        self.wait_ticks(
+            args.parent_running_routine_idx,
+            args.args[0].to_int().unwrap(),
+        );
     }
 
     pub fn waits(&mut self, args: &Instruction) {
-        if let Some(rtn) = self
-            .running_routines
-            .get_mut(args.parent_running_routine_idx)
-        {
-            rtn.waiting = (args.args[0].to_float().unwrap() * 240.0) as i32;
-        }
+        self.wait_ticks(
+            args.parent_running_routine_idx,
+            (args.args[0].to_float().unwrap() * 240.0) as i32,
+        );
     }
 
     // do NOT use this on anything but a valid number
@@ -105,6 +107,46 @@ impl Emulator {
         );
         self.state.set_item(args[0].to_item().unwrap(), res);
     }
+
+    fn compare_spawn<F: Fn(f64, f64) -> bool>(
+        &mut self,
+        args: &[TasmValue],
+        spawn_cond: F,
+        parent: usize,
+    ) {
+        if spawn_cond(self.to_f64(&args[1]), self.to_f64(&args[2])) {
+            self.spawn_group(args[0].to_group_id().unwrap());
+        }
+        self.wait_ticks(parent, 2);
+    }
+    fn compare_fork<F: Fn(f64, f64) -> bool>(
+        &mut self,
+        args: &[TasmValue],
+        spawn_cond: F,
+        parent: usize,
+    ) {
+        if spawn_cond(self.to_f64(&args[2]), self.to_f64(&args[3])) {
+            self.spawn_group(args[0].to_group_id().unwrap());
+        } else {
+            self.spawn_group(args[1].to_group_id().unwrap());
+        }
+        self.wait_ticks(parent, 2);
+    }
+
+    pub fn srand(&mut self, args: &Instruction) {
+        if rand::rng().random_range(0.0..100.0) < args.args[1].to_float().unwrap() {
+            self.spawn_group(args.args[0].to_group_id().unwrap());
+        }
+        self.wait_ticks(args.parent_running_routine_idx, 2);
+    }
+    pub fn frand(&mut self, args: &Instruction) {
+        if rand::rng().random_range(0.0..100.0) < args.args[2].to_float().unwrap() {
+            self.spawn_group(args.args[0].to_group_id().unwrap());
+        } else {
+            self.spawn_group(args.args[1].to_group_id().unwrap());
+        }
+        self.wait_ticks(args.parent_running_routine_idx, 2);
+    }
 }
 
 macro_rules! op_fn {
@@ -117,7 +159,19 @@ macro_rules! op_fn {
             }
         }
     };
+
+    ($new_ident:ident => $underlying:ident, $closure:expr) => {
+        paste! {
+            impl Emulator {
+                pub fn [<$underlying _ $new_ident>](&mut self, args: &Instruction) {
+                    self.$underlying(&args.args[..], $closure, args.parent_running_routine_idx as usize)
+                }
+            }
+        }
+    };
 }
+
+/* the great big macro wall */
 
 op_fn!(mov, arithmetic_2items, |_, b| b);
 op_fn!(add, arithmetic_2items, |a, b| a + b);
@@ -140,3 +194,16 @@ op_fn!(addm, arithmetic_4items, |_, a, b, c| (a + b) * c);
 op_fn!(addd, arithmetic_4items, |_, a, b, c| (a + b) / c);
 op_fn!(subm, arithmetic_4items, |_, a, b, c| (a - b) * c);
 op_fn!(subd, arithmetic_4items, |_, a, b, c| (a - b) / c);
+
+op_fn!(eq => compare_spawn, |a, b| a == b);
+op_fn!(ne => compare_spawn, |a, b| a != b);
+op_fn!(gt => compare_spawn, |a, b| a > b);
+op_fn!(ge => compare_spawn, |a, b| a >= b);
+op_fn!(lt => compare_spawn, |a, b| a < b);
+op_fn!(le => compare_spawn, |a, b| a <= b);
+op_fn!(eq => compare_fork, |a, b| a == b);
+op_fn!(ne => compare_fork, |a, b| a != b);
+op_fn!(gt => compare_fork, |a, b| a > b);
+op_fn!(ge => compare_fork, |a, b| a >= b);
+op_fn!(lt => compare_fork, |a, b| a < b);
+op_fn!(le => compare_fork, |a, b| a <= b);
