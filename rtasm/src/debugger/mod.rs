@@ -23,6 +23,8 @@ const TOGGLE_KEYS: &[KeyCode] = &[KeyCode::Tab];
 // use f(x) = 2^(1/x)
 // using f(5) here
 const HZ_SCALE: f64 = 1.148698355;
+// seconds in a tick
+const TICK_LENGTH: f32 = 0.00416666667;
 
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
@@ -58,7 +60,7 @@ impl EmulatorState {
     fn get_item_value_str(&self, item: Item) -> String {
         match item {
             Item::Counter(c) => self.counters[c as usize].to_string(),
-            Item::Timer(t) => self.timers[t as usize].to_string(),
+            Item::Timer(t) => format!("{:.6}", self.timers[t as usize]),
             Item::Attempts => self.attempts.to_string(),
             Item::MainTime => self.maintime.to_string(),
             Item::Points => self.points.to_string(),
@@ -87,21 +89,23 @@ impl EmulatorState {
 
 #[derive(Debug, Default)]
 pub struct Emulator {
-    state: EmulatorState, // counter state
-    tasm: Tasm,           // original compiled tasm
     running: bool,
-    paused: bool, // true if paused. happens when tripping a breakpoint
+    state: EmulatorState,                  // counter state
+    tasm: Tasm,                            // original compiled tasm
+    paused: bool,                          // happens when tripping a breakpoint
     running_routines: Vec<RunningRoutine>, // all current running routines
-    ioblocks: Vec<usize>, // idxs to self.tasm.routines
-    ioblock_idx: usize, // index into ioblocks
+    ioblocks: Vec<usize>,                  // idxs to self.tasm.routines
+    ioblock_idx: usize,                    // index into ioblocks
     peeking_ioblock: bool, // whether to peek the selected ioblock (see instructions of that routine)
     displays: Vec<Item>,
-    init_instrs: Vec<Instruction>, // executed every reset
-    ticks: u32,                    // tick counter
-    hz: f64,                       // ticks per second
-    lagging: bool,                 // whether the emulator is lagging behind
-    last_tick_time: Duration,      // how long the previous tick took to run
-    logbox: Vec<String>,           // box of messages from the emulator
+    init_instrs: Vec<Instruction>,     // executed every reset
+    ticks: u32,                        // tick counter
+    hz: f64,                           // ticks per second
+    lagging: bool,                     // whether the emulator is lagging behind
+    last_tick_time: Duration,          // how long the previous tick took to run
+    logbox: Vec<String>,               // box of messages from the emulator
+    ticking_timers: Vec<TickingTimer>, // list of timers that are currently ticking
+    started_timers: Vec<i16>,          // list of timer ids that have been initailized
 }
 
 impl Emulator {
@@ -335,8 +339,12 @@ impl Emulator {
     }
 
     pub fn tick(&mut self) {
+        self.running_routines.retain(|r| !r.done);
         let mut instrs_todo = vec![];
         for (rtn_idx, routine) in self.running_routines.iter_mut().enumerate() {
+            if routine.paused {
+                continue;
+            }
             if routine.waiting > 0 {
                 routine.waiting -= 1;
                 if routine.waiting > 0 {
@@ -366,7 +374,23 @@ impl Emulator {
             self.exec_instr(instr);
         }
 
-        self.running_routines.retain(|r| !r.done);
+        let mut spawns_todo = vec![];
+        for timer in self.ticking_timers.iter() {
+            if timer.paused {
+                continue;
+            }
+            let time = self.state.timers.get_mut(timer.id as usize).unwrap();
+            *time += TICK_LENGTH;
+            if *time >= timer.target_time {
+                spawns_todo.push((timer.group, timer.id));
+            }
+        }
+
+        for (sp, id) in spawns_todo {
+            self.spawn_group(sp);
+            self.ticking_timers.retain(|t| t.id != id);
+        }
+
         self.ticks += 1;
     }
 
@@ -390,6 +414,7 @@ pub struct RunningRoutine {
     instr_ptr: usize,
     waiting: i32, // how many ticks it is waiting
     done: bool,
+    paused: bool,
 }
 
 impl RunningRoutine {
@@ -399,10 +424,19 @@ impl RunningRoutine {
             instr_ptr: 0,
             waiting: 0,
             done: false,
+            paused: false,
         }
     }
 
     pub fn get_line(&self) -> usize {
         self.routine.instructions[self.instr_ptr].line_number
     }
+}
+
+#[derive(Debug, Default)]
+pub struct TickingTimer {
+    pub id: i16,
+    pub group: i16,
+    pub target_time: f32,
+    pub paused: bool,
 }

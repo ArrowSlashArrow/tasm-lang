@@ -124,7 +124,7 @@ Useful for shortening expression which follow the form of:
 - for `SUBD`, `result = result - (operand / modifier)`
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
-All compare instructions are 1-tick.  
+All compare instructions are 2-tick.  
 Execution timeline:
 - Tick n: the compare trigger is called
 - Tick n + 1: 
