@@ -5,7 +5,7 @@ A computational language that compiles to Geometry Dash trigger objects. Allows 
 Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/wiki/Turbo_Assembler).  
   
 TASM is currently in **version v0.2.6**.  
-The working compiler is in the `rtasm/` directory. Note that the compiler is not a standalone executable, and must be executed from source.
+The working compiler is in the `rtasm/` directory.
 
 Documentation can be found [here](https://tasm.mntpoint.org/docs/).  
 Join the TASM community on Discord [here](https://discord.gg/spqKPeFvYf).
@@ -24,6 +24,7 @@ Features:
 * Quick compilation to trigger objects
 * Integration with dedicated backend: [GDlib](https://crates.io/crates/gdlib)
 * Fast and versatile compiler
+* Built-in debugger with UI
 
 # Quick Start and Tutorial
 ## Quick Install

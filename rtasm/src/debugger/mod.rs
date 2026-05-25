@@ -1,4 +1,7 @@
-use std::{time::Duration, vec};
+use std::{
+    time::{Duration, Instant},
+    vec,
+};
 
 use crate::core::{
     consts::INIT_ROUTINE,
@@ -16,6 +19,10 @@ pub mod instr;
 pub mod ui;
 
 const TOGGLE_KEYS: &[KeyCode] = &[KeyCode::Tab];
+// to find how many keybinds it should take to double the speed,
+// use f(x) = 2^(1/x)
+// using f(5) here
+const HZ_SCALE: f64 = 1.148698355;
 
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
@@ -91,6 +98,9 @@ pub struct Emulator {
     displays: Vec<Item>,
     init_instrs: Vec<Instruction>, // executed every reset
     ticks: u32,                    // tick counter
+    hz: f64,                       // ticks per second
+    lagging: bool,                 // whether the emulator is lagging behind
+    last_tick_time: Duration,      // how long the previous tick took to run
     logbox: Vec<String>,           // box of messages from the emulator
 }
 
@@ -134,6 +144,7 @@ impl Emulator {
             running: true,
             init_instrs,
             displays,
+            hz: 240.0,
             ..Default::default()
         }
     }
@@ -143,7 +154,10 @@ impl Emulator {
         self.setup();
 
         let mut terminal = ratatui::init();
+
+        let mut next_tick_time;
         while self.running {
+            next_tick_time = Instant::now();
             terminal.draw(|frame| self.draw(frame))?;
             if !self.paused {
                 self.tick();
@@ -154,7 +168,19 @@ impl Emulator {
             {
                 self.handle_key();
             }
-            // fix timing to be at 240hz
+
+            // hold specified timing
+            self.last_tick_time = next_tick_time.elapsed();
+            next_tick_time += Duration::from_nanos((1_000_000_000.0 / self.hz) as u64);
+            if Instant::now() > next_tick_time {
+                self.lagging = true;
+                continue;
+            } else {
+                self.lagging = false;
+            }
+            while Instant::now() < next_tick_time {
+                std::hint::spin_loop();
+            }
         }
 
         Ok(())
@@ -298,6 +324,9 @@ impl Emulator {
                 self.reset_state();
                 self.setup();
             }
+            KeyCode::Char('-') => self.hz /= HZ_SCALE,
+            KeyCode::Char('=') => self.hz *= HZ_SCALE,
+            KeyCode::Char('0') => self.hz = 240.0,
             // kc @ (_) => {
             //     self.add_log(format!("Key {kc:?} is not yet supported."));
             // }
@@ -307,16 +336,21 @@ impl Emulator {
 
     pub fn tick(&mut self) {
         let mut instrs_todo = vec![];
-        for routine in self.running_routines.iter_mut() {
+        for (rtn_idx, routine) in self.running_routines.iter_mut().enumerate() {
             if routine.waiting > 0 {
                 routine.waiting -= 1;
-                continue;
+                if routine.waiting > 0 {
+                    continue;
+                }
             }
 
             // otherwise, increment instruction ptr
             if routine.instr_ptr < routine.routine.instructions.len() {
                 // todo: figure out concurrent instructions
-                instrs_todo.push(routine.routine.instructions[routine.instr_ptr].clone());
+                instrs_todo.push((
+                    rtn_idx,
+                    routine.routine.instructions[routine.instr_ptr].clone(),
+                ));
                 routine.instr_ptr += 1;
             }
             if routine.instr_ptr == routine.routine.instructions.len() {
@@ -325,9 +359,10 @@ impl Emulator {
             }
         }
 
-        for instr in instrs_todo.iter_mut() {
+        for (parent, instr) in instrs_todo.iter_mut() {
             let resolved_args = resolve_aliases(&self.tasm.aliases, &instr);
             instr.args = resolved_args.to_vec();
+            instr.parent_running_routine_idx = *parent;
             self.exec_instr(instr);
         }
 

@@ -435,6 +435,10 @@ pub struct Instruction {
     pub handler_fn: HandlerFn,
     pub handler_fn_emu: EmulatorHandler,
     pub is_concurrent: bool,
+    // this is an emulator-only field
+    // used to identify parent routine
+    // leave blank when instantiating this struct
+    pub parent_running_routine_idx: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

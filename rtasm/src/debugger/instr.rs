@@ -1,4 +1,10 @@
-use crate::{core::structs::Instruction, debugger::Emulator};
+use gdlib::gdobj::Item;
+use paste::paste;
+
+use crate::{
+    core::structs::{Instruction, TasmValue},
+    debugger::Emulator,
+};
 
 // todo: handle flags
 
@@ -40,16 +46,97 @@ impl Emulator {
             }
         }
     }
-
-    pub fn mov_item_num(&mut self, args: &Instruction) {
-        let dest = args.args[0].to_item().unwrap();
-        let num = args.args[1].to_float().unwrap();
-        self.state.set_item(dest, num);
+    pub fn nop(&mut self, args: &Instruction) {
+        if let Some(rtn) = self
+            .running_routines
+            .get_mut(args.parent_running_routine_idx)
+        {
+            rtn.waiting = 1;
+        }
     }
 
-    pub fn mov_item_item(&mut self, args: &Instruction) {
-        let dest = args.args[0].to_item().unwrap();
-        let src = args.args[1].to_item().unwrap();
-        self.state.set_item(dest, self.state.get_num(src));
+    pub fn wait(&mut self, args: &Instruction) {
+        if let Some(rtn) = self
+            .running_routines
+            .get_mut(args.parent_running_routine_idx)
+        {
+            rtn.waiting = args.args[0].to_int().unwrap();
+        }
+    }
+
+    pub fn waits(&mut self, args: &Instruction) {
+        if let Some(rtn) = self
+            .running_routines
+            .get_mut(args.parent_running_routine_idx)
+        {
+            rtn.waiting = (args.args[0].to_float().unwrap() * 240.0) as i32;
+        }
+    }
+
+    // do NOT use this on anything but a valid number
+    fn to_f64(&self, v: &TasmValue) -> f64 {
+        match v {
+            TasmValue::Counter(c) => self.state.get_num(Item::Counter(*c)),
+            TasmValue::Timer(c) => self.state.get_num(Item::Timer(*c)),
+            TasmValue::Number(f) => *f,
+            _ => unreachable!(),
+        }
+    }
+
+    fn arithmetic_2items<F: Fn(f64, f64) -> f64>(&mut self, args: &[TasmValue], op: F) {
+        let res = op(self.to_f64(&args[0]), self.to_f64(&args[1]));
+        self.state.set_item(args[0].to_item().unwrap(), res);
+    }
+
+    fn arithmetic_3items<F: Fn(f64, f64, f64) -> f64>(&mut self, args: &[TasmValue], op: F) {
+        let res = op(
+            self.to_f64(&args[0]),
+            self.to_f64(&args[1]),
+            self.to_f64(&args[2]),
+        );
+        self.state.set_item(args[0].to_item().unwrap(), res);
+    }
+    fn arithmetic_4items<F: Fn(f64, f64, f64, f64) -> f64>(&mut self, args: &[TasmValue], op: F) {
+        let res = op(
+            self.to_f64(&args[0]),
+            self.to_f64(&args[1]),
+            self.to_f64(&args[2]),
+            self.to_f64(&args[3]),
+        );
+        self.state.set_item(args[0].to_item().unwrap(), res);
     }
 }
+
+macro_rules! op_fn {
+    ($new_ident:ident, $underlying:ident, $closure:expr) => {
+        paste! {
+            impl Emulator {
+                pub fn [<$underlying _ $new_ident>](&mut self, args: &Instruction) {
+                    self.$underlying(&args.args[..], $closure)
+                }
+            }
+        }
+    };
+}
+
+op_fn!(mov, arithmetic_2items, |_, b| b);
+op_fn!(add, arithmetic_2items, |a, b| a + b);
+op_fn!(sub, arithmetic_2items, |a, b| a - b);
+op_fn!(mul, arithmetic_2items, |a, b| a * b);
+op_fn!(div, arithmetic_2items, |a, b| a / b);
+op_fn!(fldiv, arithmetic_2items, |a, b| (a / b).floor());
+
+op_fn!(add, arithmetic_3items, |_, a, b| a + b);
+op_fn!(sub, arithmetic_3items, |_, a, b| a - b);
+op_fn!(mul, arithmetic_3items, |_, a, b| a * b);
+op_fn!(div, arithmetic_3items, |_, a, b| a / b);
+op_fn!(fldiv, arithmetic_3items, |_, a, b| (a / b).floor());
+
+op_fn!(addm, arithmetic_3items, |a, b, c| (a + b) * c);
+op_fn!(addd, arithmetic_3items, |a, b, c| (a + b) / c);
+op_fn!(subm, arithmetic_3items, |a, b, c| (a - b) * c);
+op_fn!(subd, arithmetic_3items, |a, b, c| (a - b) / c);
+op_fn!(addm, arithmetic_4items, |_, a, b, c| (a + b) * c);
+op_fn!(addd, arithmetic_4items, |_, a, b, c| (a + b) / c);
+op_fn!(subm, arithmetic_4items, |_, a, b, c| (a - b) * c);
+op_fn!(subd, arithmetic_4items, |_, a, b, c| (a - b) / c);

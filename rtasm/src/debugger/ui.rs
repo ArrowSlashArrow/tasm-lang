@@ -21,6 +21,9 @@ const KEYBINDS: &[(&str, &str)] = &[
     ("c", "Clear emulator logs"),
     ("r", "Reset VM state"),
     ("Tab", "Peek IOBlock"),
+    ("-", "Slow down"),
+    ("+", "Speed up"),
+    ("0", "Reset speed"),
 ];
 
 impl Widget for &Emulator {
@@ -264,7 +267,6 @@ impl Emulator {
                     ]
                     .into_iter()
                     .map(|line| {
-                        // todo: fix bolding not working
                         if ioblock_idx == self.ioblock_idx {
                             line.bold()
                         } else {
@@ -350,17 +352,26 @@ impl Emulator {
     }
 
     fn render_info(&self, info_area: Rect, buf: &mut Buffer) {
-        // todo:
-        // render ticks, puased, mem info, file, group usage
         Paragraph::new(Text::from(vec![
             self.tasm.fname.clone().into(),
+            Line::from(vec![
+                format!("Speed: {:.2}Hz // {:.2}x speed ", self.hz, self.hz / 240.0).into(),
+                match self.lagging {
+                    true => format!(
+                        " Lag! Last tick: {:.3}ms",
+                        self.last_tick_time.as_nanos() as f64 / 1_000_000.0 // scale to ms with dp precision
+                    )
+                    .red(),
+                    false => "".into(),
+                },
+            ]),
             format!(
                 "Tick {} [{}]",
                 self.ticks,
                 match self.paused {
                     true => "Paused",
-                    false => "Running...",
-                }
+                    false => "Running",
+                },
             )
             .into(),
             format!(

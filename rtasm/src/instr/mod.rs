@@ -131,8 +131,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "MOV" => (
         false,
         &[
-            argset!((Item, Number) => arithmetic_item_num_mov, mov_item_num),
-            argset!((Item, Item) => arithmetic_2items_mov, mov_item_item),
+            argset!((Item, Number) => arithmetic_item_num_mov, arithmetic_2items_mov),
+            argset!((Item, Item) => arithmetic_2items_mov, arithmetic_2items_mov),
         ],
         InstrType::Arithmetic,
         InstrIdent::MOV
@@ -154,11 +154,11 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
         InstrIdent::SPAWN,
     ),
     // Waits
-    "NOP" => (false, &[argset!(() => nop)], InstrType::Wait, InstrIdent::NOP),
-    "WAIT" => (false, &[argset!((Int) => wait)], InstrType::Wait, InstrIdent::WAIT),
+    "NOP" => (false, &[argset!(() => nop, nop)], InstrType::Wait, InstrIdent::NOP),
+    "WAIT" => (false, &[argset!((Int) => wait, wait)], InstrType::Wait, InstrIdent::WAIT),
     "WAITS" => (
         false,
-        &[argset!((Number) => waits)],
+        &[argset!((Number) => waits, waits)],
         InstrType::Wait,
         InstrIdent::WAITS,
     ),
@@ -166,9 +166,9 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "ADD" => (
         false,
         &[
-            argset!((Item, Item) => arithmetic_2items_add),
-            argset!((Item, Number) => arithmetic_item_num_add),
-            argset!((Item, Item, Item) => arithmetic_3items_add),
+            argset!((Item, Item) => arithmetic_2items_add, arithmetic_2items_add),
+            argset!((Item, Number) => arithmetic_item_num_add, arithmetic_2items_add),
+            argset!((Item, Item, Item) => arithmetic_3items_add, arithmetic_3items_add),
         ],
         InstrType::Arithmetic,
         InstrIdent::ADD
@@ -176,9 +176,9 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SUB" => (
         false,
         &[
-            argset!((Item, Item) => arithmetic_2items_sub),
-            argset!((Item, Number) => arithmetic_item_num_sub),
-            argset!((Item, Item, Item) => arithmetic_3items_sub),
+            argset!((Item, Item) => arithmetic_2items_sub, arithmetic_2items_sub),
+            argset!((Item, Number) => arithmetic_item_num_sub, arithmetic_2items_sub),
+            argset!((Item, Item, Item) => arithmetic_3items_sub, arithmetic_3items_sub),
         ],
         InstrType::Arithmetic,
         InstrIdent::SUB
@@ -186,8 +186,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "ADDM" => (
         false,
         &[
-            argset!((Item, Item, Number) => add_mod_2items_num),
-            argset!((Item, Item, Item, Number) => add_mod_3items_num),
+            argset!((Item, Item, Number) => add_mod_2items_num, arithmetic_3items_addm),
+            argset!((Item, Item, Item, Number) => add_mod_3items_num, arithmetic_4items_addm),
         ],
         InstrType::Arithmetic,
         InstrIdent::ADDM
@@ -195,8 +195,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SUBM" => (
         false,
         &[
-            argset!((Item, Item, Number) => sub_mod_2items_num),
-            argset!((Item, Item, Item, Number) => sub_mod_3items_num),
+            argset!((Item, Item, Number) => sub_mod_2items_num, arithmetic_3items_subm),
+            argset!((Item, Item, Item, Number) => sub_mod_3items_num, arithmetic_4items_subm),
         ],
         InstrType::Arithmetic,
         InstrIdent::SUBM
@@ -204,8 +204,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "ADDD" => (
         false,
         &[
-            argset!((Item, Item, Number) => add_div_2items_num),
-            argset!((Item, Item, Item, Number) => add_div_3items_num),
+            argset!((Item, Item, Number) => add_div_2items_num, arithmetic_3items_addd),
+            argset!((Item, Item, Item, Number) => add_div_3items_num, arithmetic_4items_addd),
         ],
         InstrType::Arithmetic,
         InstrIdent::ADDD
@@ -213,8 +213,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "SUBD" => (
         false,
         &[
-            argset!((Item, Item, Number) => sub_div_2items_num),
-            argset!((Item, Item, Item, Number) => sub_div_3items_num),
+            argset!((Item, Item, Number) => sub_div_2items_num, arithmetic_3items_subd),
+            argset!((Item, Item, Item, Number) => sub_div_3items_num, arithmetic_4items_subd),
         ],
         InstrType::Arithmetic,
         InstrIdent::SUBD
@@ -222,10 +222,10 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "MUL" => (
         false,
         &[
-            argset!((Item, Item) => arithmetic_2items_mul),
-            argset!((Item, Number) => arithmetic_item_num_mul),
-            argset!((Item, Item, Item) => arithmetic_3items_mul),
-            argset!((Item, Item, Number) => arithmetic_2items_num_mul),
+            argset!((Item, Item) => arithmetic_2items_mul, arithmetic_2items_mul),
+            argset!((Item, Number) => arithmetic_item_num_mul, arithmetic_2items_mul),
+            argset!((Item, Item, Item) => arithmetic_3items_mul, arithmetic_3items_mul),
+            argset!((Item, Item, Number) => arithmetic_2items_num_mul, arithmetic_3items_mul),
         ],
         InstrType::Arithmetic,
         InstrIdent::MUL
@@ -233,10 +233,10 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "DIV" => (
         false,
         &[
-            argset!((Item, Item) => arithmetic_2items_div),
-            argset!((Item, Number) => arithmetic_item_num_div),
-            argset!((Item, Item, Item) => arithmetic_3items_div),
-            argset!((Item, Item, Number) => arithmetic_2items_num_div),
+            argset!((Item, Item) => arithmetic_2items_div, arithmetic_2items_div),
+            argset!((Item, Number) => arithmetic_item_num_div, arithmetic_2items_div),
+            argset!((Item, Item, Item) => arithmetic_3items_div, arithmetic_3items_div),
+            argset!((Item, Item, Number) => arithmetic_2items_num_div, arithmetic_3items_div),
         ],
         InstrType::Arithmetic,
         InstrIdent::DIV
@@ -244,10 +244,10 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     "FLDIV" => (
         false,
         &[
-            argset!((Item, Item) => fldiv_2items),
-            argset!((Item, Number) => fldiv_item_num),
-            argset!((Item, Item, Item) => fldiv_3items),
-            argset!((Item, Item, Number) => fldiv_2items_num),
+            argset!((Item, Item) => fldiv_2items, arithmetic_2items_fldiv),
+            argset!((Item, Number) => fldiv_item_num, arithmetic_2items_fldiv),
+            argset!((Item, Item, Item) => fldiv_3items, arithmetic_3items_fldiv),
+            argset!((Item, Item, Number) => fldiv_2items_num, arithmetic_3items_fldiv),
         ],
         InstrType::Arithmetic,
         InstrIdent::FLDIV

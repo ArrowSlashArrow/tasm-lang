@@ -129,6 +129,7 @@ impl Tasm {
             handler_fn: crate::instr::fns::ioblock,
             handler_fn_emu: crate::debugger::Emulator::unreachable,
             is_concurrent: false,
+            parent_running_routine_idx: 0,
         };
 
         // by now, the _init routine has been moved to the front of the array
@@ -489,6 +490,7 @@ impl Tasm {
                     handler_fn: gmd_handler,
                     handler_fn_emu: emu_handler,
                     is_concurrent,
+                    parent_running_routine_idx: 0,
                 });
             }
             None => {
