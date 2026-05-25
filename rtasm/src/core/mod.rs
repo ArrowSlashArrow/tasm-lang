@@ -7,7 +7,10 @@ use crate::{
     core::{
         consts::{ENTRY_POINT, GROUP_LIMIT, INIT_ROUTINE},
         error::{TasmError, TasmErrorType},
-        structs::{HandlerArgs, HandlerData, InstrType, Instruction, Routine, Tasm, TasmValue},
+        structs::{
+            Aliases, HandlerArgs, HandlerData, InstrType, Instruction, MemInfo, Routine, Tasm,
+            TasmValue,
+        },
     },
     instr::get_item_spec,
 };
@@ -129,62 +132,34 @@ impl Tasm {
         routine_count: usize,
         level: &mut Level,
     ) {
-        let instr_args: Cow<'_, [TasmValue]> =
-            if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
-                let mut resolved = instr.args.clone();
-                for v in &mut resolved {
-                    if let TasmValue::Alias(alias) = v {
-                        // builtin alias
-                        *v = self.aliases.get_value(*alias)
-                    }
-                }
-                Cow::Owned(resolved)
-            } else {
-                Cow::Borrowed(instr.args.as_slice())
-            };
-        let resolved_args = instr_args.as_ref();
+        let resolved_args = resolve_aliases(&self.aliases, &instr);
 
         // check that we are not accessing memory in init routine
-        if instr.itype == InstrType::Memory {
-            if routine.ident == INIT_ROUTINE {
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::InitRoutineMemoryAccess,
-                    instr.line_number,
-                    INIT_ROUTINE.into(),
-                    "Cannot access memory in the init routine.".to_string(),
-                );
-                return;
-            }
-            if self.mem_info.is_none() {
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::NonexistentMemoryAccess,
-                    instr.line_number,
-                    routine.ident.clone(),
-                    "Cannot access memory when none exists.".to_string(),
-                );
-                return;
-            }
+        if let Err((etype, msg)) =
+            verify_memory_access(&instr, routine.ident.as_str(), &self.mem_info)
+        {
+            push_error(
+                &mut self.errors,
+                &self.fname,
+                etype,
+                instr.line_number,
+                routine.ident.clone(),
+                msg,
+            );
+            return;
         }
 
         // check that any bad assignments aren't happening
-        if instr.itype == InstrType::Arithmetic {
-            // first argument is always the result
-            let counter_type = get_item_spec(&resolved_args[0]).unwrap().get_type();
-            if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::InvalidAssignment,
-                    instr.line_number,
-                    routine.ident.clone(),
-                    format!("Cannot overwrite value of {counter_type:?}."),
-                );
-                return;
-            }
+        if let Err(err) = verify_assign(&instr, &resolved_args[..]) {
+            push_error(
+                &mut self.errors,
+                &self.fname,
+                TasmErrorType::InvalidAssignment,
+                instr.line_number,
+                routine.ident.clone(),
+                err,
+            );
+            return;
         }
 
         // do not increment x-position if this instruction is concurrent.
@@ -223,7 +198,7 @@ impl Tasm {
 
         let handler = instr.handler_fn;
         let args = HandlerArgs {
-            args: instr_args,
+            args: resolved_args,
             // assuming that all init instructions are before x=0,
             // which only doesnt happen if the triggers were manually moved,
             // then they all execute immediately at the start of the level,
@@ -356,4 +331,52 @@ pub fn print_errors(es: Vec<TasmError>, err_msg: &str) {
     for e in es {
         println!("{e}");
     }
+}
+
+pub fn verify_assign(instr: &Instruction, args: &[TasmValue]) -> Result<(), String> {
+    if instr.itype == InstrType::Arithmetic {
+        // first argument is always the result
+        let counter_type = get_item_spec(&args[0]).unwrap().get_type();
+        if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
+            return Err(format!("Cannot overwrite value of {counter_type:?}."));
+        }
+    }
+    Ok(())
+}
+
+pub fn resolve_aliases<'a>(aliases: &Aliases, instr: &'a Instruction) -> Cow<'a, [TasmValue]> {
+    if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
+        let mut resolved = instr.args.clone();
+        for v in &mut resolved {
+            if let TasmValue::Alias(alias) = v {
+                // builtin alias
+                *v = aliases.get_value(*alias)
+            }
+        }
+        Cow::Owned(resolved)
+    } else {
+        Cow::Borrowed(instr.args.as_slice())
+    }
+}
+
+pub fn verify_memory_access(
+    instr: &Instruction,
+    routine_ident: &str,
+    mem_info: &Option<MemInfo>,
+) -> Result<(), (TasmErrorType, String)> {
+    if instr.itype == InstrType::Memory {
+        if routine_ident == INIT_ROUTINE {
+            return Err((
+                TasmErrorType::InitRoutineMemoryAccess,
+                "Cannot access memory in the init routine.".to_string(),
+            ));
+        }
+        if mem_info.is_none() {
+            return Err((
+                TasmErrorType::NonexistentMemoryAccess,
+                "Cannot access memory when none exists.".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }

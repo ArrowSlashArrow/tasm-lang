@@ -2,6 +2,7 @@ use std::{time::Duration, vec};
 
 use crate::core::{
     consts::INIT_ROUTINE,
+    resolve_aliases,
     structs::{InstrIdent, InstrType, Instruction, Routine, Tasm},
 };
 
@@ -324,7 +325,9 @@ impl Emulator {
             }
         }
 
-        for instr in instrs_todo.iter() {
+        for instr in instrs_todo.iter_mut() {
+            let resolved_args = resolve_aliases(&self.tasm.aliases, &instr);
+            instr.args = resolved_args.to_vec();
             self.exec_instr(instr);
         }
 
