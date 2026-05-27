@@ -154,11 +154,11 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
         InstrIdent::SPAWN,
     ),
     // Waits
-    "NOP" => (false, &[argset!(() => nop, nop)], InstrType::Wait, InstrIdent::NOP),
-    "WAIT" => (false, &[argset!((Int) => wait, wait)], InstrType::Wait, InstrIdent::WAIT),
+    "NOP" => (false, &[argset!(() => nop, silent_skip)], InstrType::Wait, InstrIdent::NOP),
+    "WAIT" => (false, &[argset!((Int) => wait, silent_skip)], InstrType::Wait, InstrIdent::WAIT),
     "WAITS" => (
         false,
-        &[argset!((Number) => waits, waits)],
+        &[argset!((Number) => waits, silent_skip)],
         InstrType::Wait,
         InstrIdent::WAITS,
     ),
@@ -410,13 +410,13 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     ),
     "TOGGLEON" => (
         false,
-        &[argset!((Group) => ton)],
+        &[argset!((Group) => ton, toggleon)],
         InstrType::Process,
         InstrIdent::TOGGLEON,
     ),
     "TOGGLEOFF" => (
         false,
-        &[argset!((Group) => toff)],
+        &[argset!((Group) => toff, toggleoff)],
         InstrType::Process,
         InstrIdent::TOGGLEOFF,
     ),

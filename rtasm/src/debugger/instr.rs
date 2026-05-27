@@ -4,7 +4,7 @@ use rand::RngExt;
 
 use crate::{
     core::structs::{Instruction, TasmValue},
-    debugger::{Emulator, TickingTimer},
+    debugger::{Emulator, LegacyMemstate, TickingTimer},
 };
 
 // todo: handle flags
@@ -38,6 +38,10 @@ impl Emulator {
         ));
     }
 
+    pub fn silent_skip(&mut self, _args: &Instruction) {
+        // ...
+    }
+
     /* Instruction handlers */
 
     pub fn breakpoint(&mut self, _args: &Instruction) {
@@ -45,19 +49,16 @@ impl Emulator {
     }
 
     pub fn spawn_group(&mut self, group: i16) {
+        if let Some(_) = self.toggled_groups.iter().find(|&g| *g == group) {
+            return; // don't spawn if this group is toggled off
+        }
         match self.tasm.routines.iter().find(|&rtn| rtn.group == group) {
             Some(routine) => {
                 self.add_running_routine(routine.clone());
             }
             None => {
-                self.add_log(format!("Spawned external group {group:?}"));
+                self.add_log(format!("Spawned external group {group}"));
             }
-        }
-    }
-
-    fn wait_ticks(&mut self, rtn_idx: usize, ticks: i32) {
-        if let Some(rtn) = self.running_routines.get_mut(rtn_idx) {
-            rtn.waiting = ticks;
         }
     }
 
@@ -65,23 +66,8 @@ impl Emulator {
         let group = args.args[0].to_group_id().unwrap();
         self.spawn_group(group);
     }
-    pub fn nop(&mut self, args: &Instruction) {
-        self.wait_ticks(args.parent_running_routine_idx, 1);
-    }
 
-    pub fn wait(&mut self, args: &Instruction) {
-        self.wait_ticks(
-            args.parent_running_routine_idx,
-            args.args[0].to_int().unwrap(),
-        );
-    }
-
-    pub fn waits(&mut self, args: &Instruction) {
-        self.wait_ticks(
-            args.parent_running_routine_idx,
-            (args.args[0].to_float().unwrap() * 240.0) as i32,
-        );
-    }
+    /* NOP, WAIT, WAITS are omitted since their whole point is waiting */
 
     // do NOT use this on anything but a valid number
     fn to_f64(&self, v: &TasmValue) -> f64 {
@@ -115,36 +101,23 @@ impl Emulator {
         self.state.set_item(args[0].to_item().unwrap(), res);
     }
 
-    fn compare_spawn<F: Fn(f64, f64) -> bool>(
-        &mut self,
-        args: &[TasmValue],
-        spawn_cond: F,
-        parent: usize,
-    ) {
+    fn compare_spawn<F: Fn(f64, f64) -> bool>(&mut self, args: &[TasmValue], spawn_cond: F) {
         if spawn_cond(self.to_f64(&args[1]), self.to_f64(&args[2])) {
             self.spawn_group(args[0].to_group_id().unwrap());
         }
-        self.wait_ticks(parent, 2);
     }
-    fn compare_fork<F: Fn(f64, f64) -> bool>(
-        &mut self,
-        args: &[TasmValue],
-        spawn_cond: F,
-        parent: usize,
-    ) {
+    fn compare_fork<F: Fn(f64, f64) -> bool>(&mut self, args: &[TasmValue], spawn_cond: F) {
         if spawn_cond(self.to_f64(&args[2]), self.to_f64(&args[3])) {
             self.spawn_group(args[0].to_group_id().unwrap());
         } else {
             self.spawn_group(args[1].to_group_id().unwrap());
         }
-        self.wait_ticks(parent, 2);
     }
 
     pub fn srand(&mut self, args: &Instruction) {
         if rand::rng().random_range(0.0..100.0) < args.args[1].to_float().unwrap() {
             self.spawn_group(args.args[0].to_group_id().unwrap());
         }
-        self.wait_ticks(args.parent_running_routine_idx, 2);
     }
     pub fn frand(&mut self, args: &Instruction) {
         if rand::rng().random_range(0.0..100.0) < args.args[2].to_float().unwrap() {
@@ -152,7 +125,6 @@ impl Emulator {
         } else {
             self.spawn_group(args.args[1].to_group_id().unwrap());
         }
-        self.wait_ticks(args.parent_running_routine_idx, 2);
     }
 
     pub fn pause(&mut self, args: &Instruction) {
@@ -179,9 +151,6 @@ impl Emulator {
             rtn.paused = false;
         }
     }
-
-    // pray to torvalds this works because i didnt test it
-    // nobody uses these instructions let alone the language anyways
 
     pub fn tspawn(&mut self, args: &Instruction) {
         let timer = args.args[0].to_timer_id().unwrap();
@@ -240,6 +209,120 @@ impl Emulator {
             t.paused = true;
         }
     }
+
+    pub fn toggleon(&mut self, args: &Instruction) {
+        let group = args.args[0].to_group_id().unwrap();
+        match self.tasm.routines.iter().find(|&rtn| rtn.group == group) {
+            Some(_) => {
+                // toggleable routine
+                self.toggled_groups.retain(|g| *g != group);
+
+                // then, update all running routines
+                for rtn in self.running_routines.iter_mut() {
+                    if rtn.routine.group == group {
+                        rtn.toggled = true;
+                    }
+                }
+            }
+            None => self.add_log(format!("Toggled on external group {group}")),
+        }
+    }
+
+    pub fn toggleoff(&mut self, args: &Instruction) {
+        let group = args.args[0].to_group_id().unwrap();
+        // todo: optimize the group search to be a flat array (cache friendly)
+        // this is too much since were only checking if the group exists
+        // same for toggleon
+        match self.tasm.routines.iter().find(|&rtn| rtn.group == group) {
+            Some(_) => {
+                self.toggled_groups.push(group);
+
+                // then, update all running routines
+                for rtn in self.running_routines.iter_mut() {
+                    if rtn.routine.group == group {
+                        rtn.toggled = false;
+                    }
+                }
+            }
+            None => self.add_log(format!("Toggled off external group {group}")),
+        }
+    }
+
+    pub fn lmreset(&mut self, _args: &Instruction) {
+        let mem = self.tasm.mem_info.as_ref().unwrap();
+        let ctr_id = mem.ptrpos.to_counter_id().unwrap();
+        self.state.set_item(Item::Counter(ctr_id), 0.0);
+    }
+
+    pub fn lmptr(&mut self, args: &Instruction) {
+        let move_amount = args.args[0].to_int().unwrap();
+        let mem = self.tasm.mem_info.as_ref().unwrap();
+        let ctr_id = mem.ptrpos.to_counter_id().unwrap();
+        self.state
+            .set_item(Item::Counter(ctr_id), move_amount as f64);
+    }
+
+    pub fn lmread(&mut self, _args: &Instruction) {
+        self.legacy_memstate = LegacyMemstate::Read;
+    }
+    pub fn lmwrite(&mut self, _args: &Instruction) {
+        self.legacy_memstate = LegacyMemstate::Write;
+    }
+
+    /// Returns addr and if it is in valid range
+    fn get_ptrpos_value(&self) -> (i32, bool) {
+        let mem = self.tasm.mem_info.as_ref().unwrap();
+        let addr = self.state.get_num(mem.ptrpos.to_item().unwrap()) as i32;
+        if addr < 0 || addr >= mem.size as i32 {
+            (addr, false)
+        } else {
+            (addr, true)
+        }
+    }
+
+    fn get_memreg(&self) -> Item {
+        self.tasm
+            .mem_info
+            .as_ref()
+            .unwrap()
+            .memreg
+            .to_item()
+            .unwrap()
+    }
+
+    pub fn lmfunc(&mut self, _args: &Instruction) {
+        match self.legacy_memstate {
+            LegacyMemstate::None => {
+                // skip mem io, since the operation has not been initialised
+                self.add_log(
+                    "[WARN] Memory mode uninitialised! Memory operation skipped due to possible UB.".into(),
+                );
+            }
+            LegacyMemstate::Read => {
+                let (addr, valid) = self.get_ptrpos_value();
+
+                if !valid {
+                    self.add_log(format!("[WARN] Cannot read address {addr} (out of range)"));
+                    return;
+                }
+
+                let variable = self.read_mem(addr as i16);
+                self.state.set_item(self.get_memreg(), variable);
+            }
+            LegacyMemstate::Write => {
+                let (addr, valid) = self.get_ptrpos_value();
+
+                if !valid {
+                    self.add_log(format!(
+                        "[WARN] Cannot write to address {addr} (out of range)"
+                    ));
+                    return;
+                }
+
+                self.write_mem(addr as i16, self.state.get_num(self.get_memreg()));
+            }
+        }
+    }
 }
 
 macro_rules! op_fn {
@@ -248,16 +331,6 @@ macro_rules! op_fn {
             impl Emulator {
                 pub fn [<$underlying _ $new_ident>](&mut self, args: &Instruction) {
                     self.$underlying(&args.args[..], $closure)
-                }
-            }
-        }
-    };
-
-    ($new_ident:ident => $underlying:ident, $closure:expr) => {
-        paste! {
-            impl Emulator {
-                pub fn [<$underlying _ $new_ident>](&mut self, args: &Instruction) {
-                    self.$underlying(&args.args[..], $closure, args.parent_running_routine_idx as usize)
                 }
             }
         }
@@ -288,15 +361,15 @@ op_fn!(addd, arithmetic_4items, |_, a, b, c| (a + b) / c);
 op_fn!(subm, arithmetic_4items, |_, a, b, c| (a - b) * c);
 op_fn!(subd, arithmetic_4items, |_, a, b, c| (a - b) / c);
 
-op_fn!(eq => compare_spawn, |a, b| a == b);
-op_fn!(ne => compare_spawn, |a, b| a != b);
-op_fn!(gt => compare_spawn, |a, b| a > b);
-op_fn!(ge => compare_spawn, |a, b| a >= b);
-op_fn!(lt => compare_spawn, |a, b| a < b);
-op_fn!(le => compare_spawn, |a, b| a <= b);
-op_fn!(eq => compare_fork, |a, b| a == b);
-op_fn!(ne => compare_fork, |a, b| a != b);
-op_fn!(gt => compare_fork, |a, b| a > b);
-op_fn!(ge => compare_fork, |a, b| a >= b);
-op_fn!(lt => compare_fork, |a, b| a < b);
-op_fn!(le => compare_fork, |a, b| a <= b);
+op_fn!(eq, compare_spawn, |a, b| a == b);
+op_fn!(ne, compare_spawn, |a, b| a != b);
+op_fn!(gt, compare_spawn, |a, b| a > b);
+op_fn!(ge, compare_spawn, |a, b| a >= b);
+op_fn!(lt, compare_spawn, |a, b| a < b);
+op_fn!(le, compare_spawn, |a, b| a <= b);
+op_fn!(eq, compare_fork, |a, b| a == b);
+op_fn!(ne, compare_fork, |a, b| a != b);
+op_fn!(gt, compare_fork, |a, b| a > b);
+op_fn!(ge, compare_fork, |a, b| a >= b);
+op_fn!(lt, compare_fork, |a, b| a < b);
+op_fn!(le, compare_fork, |a, b| a <= b);

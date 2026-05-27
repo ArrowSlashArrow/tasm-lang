@@ -24,6 +24,18 @@ const KEYBINDS: &[(&str, &str)] = &[
     ("-", "Slow down"),
     ("+", "Speed up"),
     ("0", "Reset speed"),
+    /* todos */
+    /* active routine controls */
+    // left: select next process
+    // right: select prev. process (if at idx 0, set to None; none selected)
+    // t: toggle off/on
+    // p: pause/unpause
+    // k: kill process
+    // /: peek details of active process
+    //  - next instruction to process (+ index) + instr time
+    //  - previous instruction processed
+    //  - waiting time (if waiting) // is paused
+    //  - is toggled
 ];
 
 impl Widget for &Emulator {

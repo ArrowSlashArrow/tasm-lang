@@ -6,7 +6,7 @@ use std::{
 use crate::core::{
     consts::INIT_ROUTINE,
     resolve_aliases,
-    structs::{InstrIdent, InstrType, Instruction, Routine, Tasm},
+    structs::{InstrIdent, InstrType, Instruction, MemType, Routine, Tasm},
 };
 
 use anyhow::Result;
@@ -106,6 +106,20 @@ pub struct Emulator {
     logbox: Vec<String>,               // box of messages from the emulator
     ticking_timers: Vec<TickingTimer>, // list of timers that are currently ticking
     started_timers: Vec<i16>,          // list of timer ids that have been initailized
+    // list of groups that are toggled off
+    // before spawning a group, check that it isn't in here
+    // if there *is* an active process with this group, toggle it off
+    toggled_groups: Vec<i16>,
+    /// Tracks what mode the memory is in right now
+    legacy_memstate: LegacyMemstate,
+}
+
+#[derive(Debug, Default)]
+pub enum LegacyMemstate {
+    #[default]
+    None,
+    Read,
+    Write,
 }
 
 impl Emulator {
@@ -341,6 +355,7 @@ impl Emulator {
     pub fn tick(&mut self) {
         self.running_routines.retain(|r| !r.done);
         let mut instrs_todo = vec![];
+        let mut waits_todo = vec![];
         for (rtn_idx, routine) in self.running_routines.iter_mut().enumerate() {
             if routine.paused {
                 continue;
@@ -355,10 +370,16 @@ impl Emulator {
             // otherwise, increment instruction ptr
             if routine.instr_ptr < routine.routine.instructions.len() {
                 // todo: figure out concurrent instructions
-                instrs_todo.push((
-                    rtn_idx,
-                    routine.routine.instructions[routine.instr_ptr].clone(),
-                ));
+                if routine.toggled {
+                    instrs_todo.push((
+                        rtn_idx,
+                        routine.routine.instructions[routine.instr_ptr].clone(),
+                    ));
+                }
+                // progression still happens even if routine is not toggled
+                let instr = &routine.routine.instructions[routine.instr_ptr];
+                let wait_time = get_time(instr);
+                waits_todo.push((instr.parent_running_routine_idx, wait_time));
                 routine.instr_ptr += 1;
             }
             if routine.instr_ptr == routine.routine.instructions.len() {
@@ -372,6 +393,10 @@ impl Emulator {
             instr.args = resolved_args.to_vec();
             instr.parent_running_routine_idx = *parent;
             self.exec_instr(instr);
+        }
+
+        for (parent, wait) in waits_todo {
+            self.wait_ticks(parent, wait);
         }
 
         let mut spawns_todo = vec![];
@@ -392,6 +417,12 @@ impl Emulator {
         }
 
         self.ticks += 1;
+    }
+
+    fn wait_ticks(&mut self, rtn_idx: usize, ticks: i32) {
+        if let Some(rtn) = self.running_routines.get_mut(rtn_idx) {
+            rtn.waiting = ticks;
+        }
     }
 
     fn add_log(&mut self, log: String) {
@@ -415,6 +446,7 @@ pub struct RunningRoutine {
     waiting: i32, // how many ticks it is waiting
     done: bool,
     paused: bool,
+    toggled: bool, // true: on; vv.
 }
 
 impl RunningRoutine {
@@ -425,6 +457,7 @@ impl RunningRoutine {
             waiting: 0,
             done: false,
             paused: false,
+            toggled: true,
         }
     }
 
@@ -439,4 +472,100 @@ pub struct TickingTimer {
     pub group: i16,
     pub target_time: f32,
     pub paused: bool,
+}
+
+pub fn get_time(instr: &Instruction) -> i32 {
+    match instr.ident {
+        /* never executed */
+        InstrIdent::MALLOC => 0,
+        InstrIdent::FMALLOC => 0,
+        InstrIdent::INITMEM => 0,
+        InstrIdent::PERS => 0,
+        InstrIdent::DISPLAY => 0,
+        InstrIdent::IOBLOCK => 0,
+        InstrIdent::LMALLOC => 0,
+        InstrIdent::LFMALLOC => 0,
+        /* execution time in ticks */
+        InstrIdent::LMFUNC => 2,
+        InstrIdent::LMREAD => 1,
+        InstrIdent::LMWRITE => 1,
+        InstrIdent::LMPTR => 1,
+        InstrIdent::LMRESET => 1,
+        InstrIdent::MOV => 1,
+        InstrIdent::MSET => 4,
+        InstrIdent::MGET => 4,
+        InstrIdent::BREAKPOINT => 1,
+        InstrIdent::SPAWN => 1,
+        InstrIdent::NOP => 1,
+        InstrIdent::WAIT => instr.args[0].to_int().unwrap(),
+        InstrIdent::WAITS => (instr.args[0].to_float().unwrap() * 240.0) as i32,
+        InstrIdent::ADD => 1,
+        InstrIdent::SUB => 1,
+        InstrIdent::ADDM => 1,
+        InstrIdent::SUBM => 1,
+        InstrIdent::ADDD => 1,
+        InstrIdent::SUBD => 1,
+        InstrIdent::MUL => 1,
+        InstrIdent::DIV => 1,
+        InstrIdent::FLDIV => 1,
+        InstrIdent::SE => 2,
+        InstrIdent::SNE => 2,
+        InstrIdent::SL => 2,
+        InstrIdent::SLE => 2,
+        InstrIdent::SG => 2,
+        InstrIdent::SGE => 2,
+        InstrIdent::FE => 2,
+        InstrIdent::FNE => 2,
+        InstrIdent::FL => 2,
+        InstrIdent::FLE => 2,
+        InstrIdent::FG => 2,
+        InstrIdent::FGE => 2,
+        InstrIdent::SRAND => 2,
+        InstrIdent::FRAND => 2,
+        InstrIdent::TSPAWN => 1,
+        InstrIdent::TSTART => 1,
+        InstrIdent::TSTOP => 1,
+        InstrIdent::PAUSE => 1,
+        InstrIdent::RESUME => 1,
+        InstrIdent::KILL => 1,
+        InstrIdent::TOGGLEON => 1,
+        InstrIdent::TOGGLEOFF => 1,
+        InstrIdent::RAW => 0,
+    }
+}
+
+impl Emulator {
+    pub fn write_mem(&mut self, addr: i16, value: f64) {
+        match self.tasm.mem_info {
+            None => return,
+            Some(ref mem) => {
+                // get true counter
+                let true_addr = match mem._type {
+                    MemType::LegacyInt | MemType::Int => Item::Counter(mem.start_counter_id + addr),
+                    MemType::LegacyFloat | MemType::Float => {
+                        Item::Timer(mem.start_counter_id + addr)
+                    }
+                };
+
+                self.state.set_item(true_addr, value);
+            }
+        }
+    }
+
+    pub fn read_mem(&mut self, addr: i16) -> f64 {
+        match self.tasm.mem_info {
+            None => 0.0,
+            Some(ref mem) => {
+                // get true counter
+                let true_addr = match mem._type {
+                    MemType::LegacyInt | MemType::Int => Item::Counter(mem.start_counter_id + addr),
+                    MemType::LegacyFloat | MemType::Float => {
+                        Item::Timer(mem.start_counter_id + addr)
+                    }
+                };
+
+                self.state.get_num(true_addr)
+            }
+        }
+    }
 }
