@@ -67,11 +67,11 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     ),
     "INITMEM" => (
         true,
-        &[argset!([Number] => init_mem, not_implemented)],
+        &[argset!([Number] => init_mem, initmem)],
         InstrType::Init,
         InstrIdent::INITMEM,
     ),
-    "PERS" => (true, &[argset!((Item) => pers, not_implemented)], InstrType::Init, InstrIdent::PERS),
+    "PERS" => (true, &[argset!((Item) => pers, unreachable)], InstrType::Init, InstrIdent::PERS),
     "DISPLAY" => (
         true,
         &[argset!((Item) => display, unreachable)],
@@ -87,43 +87,43 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
     // legacy memory
     "LMALLOC" => (
         true,
-        &[argset!((Int) => legacy_malloc)],
+        &[argset!((Int) => legacy_malloc, unreachable)],
         InstrType::Init,
         InstrIdent::LMALLOC,
     ),
     "LFMALLOC" => (
         true,
-        &[argset!((Int) => legacy_fmalloc)],
+        &[argset!((Int) => legacy_fmalloc, unreachable)],
         InstrType::Init,
         InstrIdent::LFMALLOC,
     ),
     "LMFUNC" => (
         false,
-        &[argset!(() => legacy_mfunc)],
+        &[argset!(() => legacy_mfunc, lmfunc)],
         InstrType::Memory,
         InstrIdent::LMFUNC,
     ),
     "LMREAD" => (
         false,
-        &[argset!(() => legacy_mread)],
+        &[argset!(() => legacy_mread, lmread)],
         InstrType::Memory,
         InstrIdent::LMREAD,
     ),
     "LMWRITE" => (
         false,
-        &[argset!(() => legacy_mwrite)],
+        &[argset!(() => legacy_mwrite, lmwrite)],
         InstrType::Memory,
         InstrIdent::LMWRITE,
     ),
     "LMPTR" => (
         false,
-        &[argset!((Int) => legacy_mptr)],
+        &[argset!((Int) => legacy_mptr, lmptr)],
         InstrType::Memory,
         InstrIdent::LMPTR,
     ),
     "LMRESET" => (
         false,
-        &[argset!(() => legacy_mreset)],
+        &[argset!(() => legacy_mreset, lmreset)],
         InstrType::Memory,
         InstrIdent::LMRESET,
     ),
@@ -137,8 +137,8 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrId
         InstrType::Arithmetic,
         InstrIdent::MOV
     ),
-    "MSET" => (false, &[argset!(() => mset)], InstrType::Memory, InstrIdent::MSET),
-    "MGET" => (false, &[argset!(() => mget)], InstrType::Memory, InstrIdent::MGET),
+    "MSET" => (false, &[argset!(() => mset, mset)], InstrType::Memory, InstrIdent::MSET),
+    "MGET" => (false, &[argset!(() => mget, mget)], InstrType::Memory, InstrIdent::MGET),
     // debug
     "BREAKPOINT" => (
         false,

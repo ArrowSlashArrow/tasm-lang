@@ -298,29 +298,39 @@ impl Emulator {
                     "[WARN] Memory mode uninitialised! Memory operation skipped due to possible UB.".into(),
                 );
             }
-            LegacyMemstate::Read => {
-                let (addr, valid) = self.get_ptrpos_value();
+            LegacyMemstate::Read => self.mget(_args),
+            LegacyMemstate::Write => self.mset(_args),
+        }
+    }
 
-                if !valid {
-                    self.add_log(format!("[WARN] Cannot read address {addr} (out of range)"));
-                    return;
-                }
+    pub fn mset(&mut self, _args: &Instruction) {
+        let (addr, valid) = self.get_ptrpos_value();
 
-                let variable = self.read_mem(addr as i16);
-                self.state.set_item(self.get_memreg(), variable);
-            }
-            LegacyMemstate::Write => {
-                let (addr, valid) = self.get_ptrpos_value();
+        if !valid {
+            self.add_log(format!(
+                "[WARN] Cannot write to address {addr} (out of range)"
+            ));
+            return;
+        }
 
-                if !valid {
-                    self.add_log(format!(
-                        "[WARN] Cannot write to address {addr} (out of range)"
-                    ));
-                    return;
-                }
+        self.write_mem(addr as i16, self.state.get_num(self.get_memreg()));
+    }
 
-                self.write_mem(addr as i16, self.state.get_num(self.get_memreg()));
-            }
+    pub fn mget(&mut self, _args: &Instruction) {
+        let (addr, valid) = self.get_ptrpos_value();
+
+        if !valid {
+            self.add_log(format!("[WARN] Cannot read address {addr} (out of range)"));
+            return;
+        }
+
+        let variable = self.read_mem(addr as i16);
+        self.state.set_item(self.get_memreg(), variable);
+    }
+
+    pub fn initmem(&mut self, args: &Instruction) {
+        for (addr, num) in args.args.iter().enumerate() {
+            self.write_mem(addr as i16, num.to_float().unwrap());
         }
     }
 }
