@@ -359,7 +359,7 @@ pub struct HandlerData {
 
 #[derive(Debug, Clone)]
 pub struct MemInfo {
-    pub _type: MemType,
+    _type: MemType,
     pub memreg: TasmValue,
     pub ptrpos: TasmValue,
     pub size: i16,
@@ -367,6 +367,45 @@ pub struct MemInfo {
     pub write_group: i16,
     pub start_counter_id: i16,
     pub line: usize, // where is was created
+}
+
+impl MemInfo {
+    pub fn is_int(&self) -> bool {
+        self._type == MemType::Int || self._type == MemType::LegacyInt
+    }
+
+    pub fn is_legacy(&self) -> bool {
+        self._type == MemType::LegacyInt || self._type == MemType::LegacyFloat
+    }
+
+    pub fn new(
+        memreg_id: i16,
+        ptrpos_id: i16,
+        mtype: MemType,
+        size: i16,
+        read: i16,
+        write: i16,
+        start: i16,
+        line: usize,
+    ) -> Self {
+        Self {
+            _type: mtype,
+            memreg: match mtype.is_int() {
+                false => TasmValue::Timer(memreg_id),
+                true => TasmValue::Counter(memreg_id),
+            },
+            size,
+            ptrpos: TasmValue::Counter(ptrpos_id),
+            read_group: read,
+            write_group: write,
+            start_counter_id: start,
+            line,
+        }
+    }
+
+    pub fn get_type(&self) -> MemType {
+        self._type
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -410,12 +449,18 @@ pub struct Aliases {
     pub memsize: i16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemType {
     Float,
     Int,
     LegacyFloat,
     LegacyInt,
+}
+
+impl MemType {
+    pub fn is_int(&self) -> bool {
+        *self == MemType::Int || *self == MemType::LegacyInt
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -519,6 +564,10 @@ impl Routine {
 
     pub fn add_instruction(&mut self, instr: Instruction) {
         self.instructions.push(instr);
+    }
+
+    pub fn prepend_instr(&mut self, instr: Instruction) {
+        self.instructions.insert(0, instr);
     }
 }
 

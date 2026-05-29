@@ -22,7 +22,7 @@ use gdlib::gdobj::{
 use crate::core::{
     HandlerReturn,
     error::{TasmError, TasmErrorType},
-    structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
+    structs::{HandlerArgs, HandlerData, MemInfo, MemType},
 };
 
 // TODO: get rid for this when the gdlib maintainer fixes his crate
@@ -242,22 +242,20 @@ pub fn legacy_malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     data.used_extra_groups = next_free_group - args.curr_group;
     data.ptr_reset_group = ptr_reset_group;
     data.ptr_group = ptr_group;
-    data.new_mem = Some(MemInfo {
-        _type: match float_mem {
+
+    data.new_mem = Some(MemInfo::new(
+        memreg_id,
+        args.ptrpos_id,
+        match float_mem {
             true => MemType::LegacyFloat,
             false => MemType::LegacyInt,
         },
-        memreg: match float_mem {
-            true => TasmValue::Timer(memreg_id),
-            false => TasmValue::Counter(memreg_id),
-        },
-        size: mem_size,
-        ptrpos: TasmValue::Counter(args.ptrpos_id),
+        mem_size,
         read_group,
         write_group,
         start_counter_id,
-        line: args.line,
-    });
+        args.line,
+    ));
 
     data
 }
@@ -297,9 +295,9 @@ pub fn init_mem(args: HandlerArgs) -> HandlerReturn {
             &cfg,
             None,
             None,
-            match mem_info._type {
-                MemType::Float | MemType::LegacyFloat => Item::Timer(start_counter + idx as i16),
-                MemType::Int | MemType::LegacyInt => Item::Counter(start_counter + idx as i16),
+            match mem_info.is_int() {
+                false => Item::Timer(start_counter + idx as i16),
+                true => Item::Counter(start_counter + idx as i16),
             },
             v.to_float().unwrap(),
             Op::Set,
@@ -677,22 +675,19 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerReturn {
     data.ptr_reset_group = controller_group;
     data.ptr_group = shared_group;
 
-    data.new_mem = Some(MemInfo {
-        _type: match float_mem {
+    data.new_mem = Some(MemInfo::new(
+        memreg,
+        args.ptrpos_id,
+        match float_mem {
             true => MemType::Float,
             false => MemType::Int,
         },
-        memreg: match float_mem {
-            true => TasmValue::Timer(memreg),
-            false => TasmValue::Counter(memreg),
-        },
-        size: memsize,
-        ptrpos: TasmValue::Counter(ptrpos),
+        memsize,
         read_group,
         write_group,
-        start_counter_id: start_ctr,
-        line: args.line,
-    });
+        start_ctr,
+        args.line,
+    ));
 
     Ok(data)
 }

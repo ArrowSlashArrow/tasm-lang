@@ -1,0 +1,14 @@
+_init:
+    malloc 1, 9973
+    mov PTRPOS, 1
+
+_start:
+    ; some arbitrary pointer movement
+    add PTRPOS, 10
+    fldiv C1, PTRPOS, MEMSIZE
+    mul C1, MEMSIZE
+    sub PTRPOS, C1
+    ; set new value
+    add MEMREG, 1
+    mset
+    spawn _start

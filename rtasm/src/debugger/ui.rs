@@ -3,16 +3,13 @@ use ratatui::{
     prelude::{Buffer, Rect},
     style::{Color, Stylize},
     symbols::{border, merge::MergeStrategy},
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Paragraph, Widget},
 };
 
 use std::fmt::Write;
 
-use crate::{
-    core::structs::MemType,
-    debugger::{Emulator, RunningRoutine, TICKS_PER_SECOND},
-};
+use crate::debugger::{Emulator, LegacyMemstate, RunningRoutine, TICKS_PER_SECOND};
 
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
@@ -50,9 +47,19 @@ const KEYBINDS: &[(&str, &str)] = &[
     //  - this doesn't impede searching ability since `q` is irrelevant to item ids
     // e: exit query
     // w: watch counter
+    /* memory scrolling */
+    // [: scroll left
+    // ]: scroll right
+
+    /* ui todos */
+    // add highlight at the top of each memory column to briefly show the addresses (e.g. [000-020] )
 ];
 
 const KEY_AREA_HEIGHT: u16 = 15;
+
+const MEM_HIGHLIGHT: Color = Color::Rgb(255, 115, 15);
+const MEM_HIGHLIGHT_BG: Color = Color::Rgb(60, 60, 60);
+const MEM_ACCENT: Color = Color::Rgb(255, 230, 115);
 
 impl Widget for &Emulator {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
@@ -85,8 +92,12 @@ impl Widget for &Emulator {
         let vleft_layout =
             Layout::vertical(vec![Constraint::Min(1), Constraint::Min(1)]).split(h_layout[0]);
 
-        let htopleft_layout = Layout::horizontal(vec![Constraint::Min(1), Constraint::Length(32)])
-            .split(vleft_layout[0]);
+        let htopleft_layout = Layout::horizontal(vec![
+            Constraint::Min(1),
+            Constraint::Length(1),
+            Constraint::Length(32),
+        ])
+        .split(vleft_layout[0]);
 
         let vbottomleft_layout = Layout::vertical(vec![Constraint::Length(7), Constraint::Min(1)])
             .split(vleft_layout[1]);
@@ -96,23 +107,26 @@ impl Widget for &Emulator {
                 .split(vbottomleft_layout[0]);
 
         let vright_layout = Layout::vertical(vec![
-            Constraint::Min(1), // note to future self: we don't need all that space just for memory
+            Constraint::Percentage(50), // aligned to be in the same vertical area as logs and items; looks better
+            Constraint::Min(1),
             Constraint::Length(KEY_AREA_HEIGHT),
         ])
         .split(h_layout[1]);
 
         let logbox_area = htopleft_layout[0];
-        let display_area = htopleft_layout[1];
+        let display_area = htopleft_layout[2];
         let ioblocks_area = hbottomleft_layout[0];
         let info_area = hbottomleft_layout[1];
         let routines_area = vbottomleft_layout[1];
-        let memory_area = vright_layout[0];
-        let keys_area = vright_layout[1];
+        let memory_cells_area = vright_layout[0];
+        let memory_info_area = vright_layout[1];
+        let keys_area = vright_layout[2];
 
         self.render_logbox(logbox_area, buf);
         self.render_displays(display_area, buf);
         self.render_keys(keys_area, buf);
-        self.render_memory(memory_area, buf);
+        self.render_memory(memory_cells_area, buf);
+        self.render_memory_info(memory_info_area, buf);
         self.render_ioblocks(ioblocks_area, buf);
         self.render_info(info_area, buf);
 
@@ -262,6 +276,7 @@ impl Emulator {
         }
     }
 
+    // renders only the memory cells, not the state or any metadata
     fn render_memory(&self, memory_area: Rect, buf: &mut Buffer) {
         if let None = self.tasm.mem_info {
             display_centered_message(
@@ -276,12 +291,8 @@ impl Emulator {
         }
 
         // sections: title, body, metadata/info
-        let split = Layout::vertical(vec![
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(7),
-        ])
-        .split(memory_area);
+        let split =
+            Layout::vertical(vec![Constraint::Length(1), Constraint::Min(1)]).split(memory_area);
 
         // render title
         Block::new()
@@ -303,27 +314,23 @@ impl Emulator {
         // = 17 + log10(memsize)
 
         // set up preliminary size vars
-        let col_width = 18.0 + f64::log10(mem.size as f64);
-        let max_cols = ((cols_area.width - 1) as f64 / col_width) as u16;
+        let idx_width = f64::log10(mem.size as f64).ceil() as usize;
+        let col_width = 18 + idx_width;
+        let max_cols = ((cols_area.width - 1) as f64 / col_width as f64) as u16;
         let col_height = u16::min(
             cols_area.height - 2,
             (mem.size as u16 + max_cols) / max_cols,
         );
 
-        cols_area.height = col_height;
+        cols_area.height = col_height + 2;
 
         let cols_division = Layout::horizontal(
-            std::iter::repeat(Constraint::Fill(col_width as u16 + 2)).take(max_cols as usize),
+            std::iter::repeat(Constraint::Fill((col_width + 2) as u16)).take(max_cols as usize),
         )
         .spacing(Spacing::Overlap(1))
         .split(cols_area);
 
-        let highlight = Color::Rgb(255, 115, 15);
-        let highlight_bg = Color::Rgb(60, 60, 60);
-        let accent = Color::Rgb(255, 230, 115);
-
         // now, build all of the lines for each column
-        let number_width = 11usize;
         let mut cols = vec![];
         let mut idx = 0;
 
@@ -331,48 +338,30 @@ impl Emulator {
             let mut curr_col = vec![];
             while curr_col.len() < col_height as usize && idx < mem.size {
                 let num = self.read_mem(idx);
-                let neg = num.is_sign_negative();
 
                 let is_selected = self.get_ptrpos_value().0 == idx as i32;
 
                 let mut line_segments = vec![
                     " ".into(),
                     if is_selected {
-                        "  >".fg(highlight)
+                        "  >".fg(MEM_HIGHLIGHT)
                     } else {
-                        format!("{idx:0>3}").fg(accent)
+                        format!("{idx:0>idx_width$}").fg(MEM_ACCENT)
                     },
                     if is_selected {
                         "  ".into()
                     } else {
                         ": ".into()
                     },
-                    if neg { "-" } else { " " }.into(),
                 ];
 
-                // fill in the leading zeros with gray zeros
-                let mut num_str = if mem._type == MemType::Int || mem._type == MemType::LegacyInt {
-                    (num as i32).abs().to_string()
-                } else {
-                    format!("{:.2}", num.abs())
-                };
-
-                if num_str.len() > number_width {
-                    num_str.truncate(number_width);
-                } else if num_str.len() < number_width {
-                    line_segments.push("0".repeat(number_width - num_str.len()).fg(highlight_bg));
-                }
-
-                line_segments.push(num_str.fg(match is_selected {
-                    false => accent,
-                    true => highlight,
-                }));
+                render_number(&mut line_segments, num, mem.is_int(), is_selected);
 
                 line_segments.push(" ".into());
 
                 let mut line = Line::from(line_segments).centered();
                 if is_selected {
-                    line = line.bg(highlight_bg)
+                    line = line.bg(MEM_HIGHLIGHT_BG)
                 }
 
                 curr_col.push(line);
@@ -391,6 +380,73 @@ impl Emulator {
         // todo: render memory metadata
     }
 
+    fn render_memory_info(&self, memory_info_area: Rect, buf: &mut Buffer) {
+        let mut lines = match self.tasm.mem_info {
+            Some(ref mem) => {
+                let mut memreg_line_segments = vec![Span::from("Register: ")];
+                render_number(
+                    &mut memreg_line_segments,
+                    self.state.get_num(mem.memreg.to_item().unwrap()),
+                    mem.is_int(),
+                    false,
+                );
+                let mut ptrpos_line_segments = vec![Span::from("Position: ")];
+                render_number(
+                    &mut ptrpos_line_segments,
+                    self.get_ptrpos_value().0 as f64,
+                    true,
+                    false,
+                );
+                vec![
+                    Line::from(memreg_line_segments),
+                    Line::from(ptrpos_line_segments),
+                    format!(
+                        "Memory: {}",
+                        format!(
+                            "[{:?}] {} - {}",
+                            mem.get_type(),
+                            mem.start_counter_id,
+                            mem.start_counter_id + mem.size - 1,
+                        )
+                    )
+                    .into(),
+                    format!("Size: {}", mem.size).into(),
+                ]
+            }
+            None => vec![Line::from(
+                "This program does not use memory.".fg(MEM_ACCENT),
+            )],
+        };
+
+        match self.legacy_memstate {
+            LegacyMemstate::None => {
+                // check that legacy memory is being used here
+                if let Some(ref mem) = self.tasm.mem_info
+                    && (mem.is_legacy())
+                {
+                    lines.push(Line::from(vec![
+                        "Memory mode: ".into(),
+                        "uninitialised".gray().italic(),
+                    ]))
+                }
+            }
+            LegacyMemstate::Read => {
+                lines.push(Line::from(vec!["Memory mode: ".into(), "READ".green()]))
+            }
+            LegacyMemstate::Write => {
+                lines.push(Line::from(vec!["Memory mode: ".into(), "WRITE".red()]))
+            }
+        }
+
+        Paragraph::new(Text::from(lines))
+            .block(
+                Block::bordered()
+                    .border_set(border::EMPTY)
+                    .title(" Memory State".bold().fg(MEM_ACCENT)),
+            )
+            .render(memory_info_area, buf);
+    }
+
     fn render_ioblocks(&self, ioblocks_area: Rect, buf: &mut Buffer) {
         let lines = self
             .ioblocks
@@ -401,7 +457,7 @@ impl Emulator {
                     vec![
                         " ".bold(),
                         if ioblock_idx == self.ioblock_idx {
-                            "> ".green() // highlight
+                            "> ".green() // MEM_HIGHLIGHT
                         } else {
                             "".into()
                         },
@@ -523,19 +579,6 @@ impl Emulator {
                 display_time(self.ticks as f64 / TICKS_PER_SECOND)
             )
             .into(),
-            format!(
-                "Memory: {}",
-                match &self.tasm.mem_info {
-                    Some(m) => format!(
-                        "[{:?}] {} - {}",
-                        m._type,
-                        m.start_counter_id,
-                        m.start_counter_id + m.size
-                    ),
-                    None => "No memory".into(),
-                }
-            )
-            .into(),
         ]))
         .block(
             Block::bordered()
@@ -618,4 +661,34 @@ fn display_time(secs: f64) -> String {
     write!(time_str, "{minutes:0>2}:{seconds:0>2}.{ms:0>3}").unwrap();
 
     time_str
+}
+
+fn render_number(line_segments: &mut Vec<Span<'_>>, num: f64, is_int: bool, colour_num_str: bool) {
+    let number_width = 11usize;
+    let neg = num.is_sign_negative();
+
+    // push negative sign
+    line_segments.push(if neg { "-" } else { " " }.into());
+
+    // fill in the leading zeros with gray zeros
+    let mut num_str = if is_int {
+        (num as i32).abs().to_string()
+    } else {
+        format!("{:.2}", num.abs())
+    };
+
+    // add the number
+    if num_str.len() > number_width {
+        num_str.truncate(number_width);
+    } else if num_str.len() < number_width {
+        line_segments.push(
+            "0".repeat(number_width - num_str.len())
+                .fg(MEM_HIGHLIGHT_BG),
+        );
+    };
+
+    line_segments.push(num_str.fg(match colour_num_str {
+        false => MEM_ACCENT,
+        true => MEM_HIGHLIGHT,
+    }));
 }

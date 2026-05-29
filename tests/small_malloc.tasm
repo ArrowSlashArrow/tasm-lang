@@ -1,0 +1,6 @@
+_init:
+    malloc 1, 4
+
+_start:
+    add PTRPOS, 1
+    mset

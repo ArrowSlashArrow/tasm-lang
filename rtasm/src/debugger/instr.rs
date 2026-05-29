@@ -313,6 +313,7 @@ impl Emulator {
         }
     }
 
+    // TODO: replicate temporary counter storage
     pub fn mset(&mut self, _args: &Instruction) {
         let (addr, valid) = self.get_ptrpos_value();
 

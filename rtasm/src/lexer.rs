@@ -161,7 +161,7 @@ impl Tasm {
                 instr.ident == InstrIdent::IOBLOCK
                     && instr.args.get(0) == Some(&TasmValue::Group(entry_point))
             }) {
-                init.add_instruction(start_ioblock_instruction);
+                init.prepend_instr(start_ioblock_instruction);
             }
         }
     }

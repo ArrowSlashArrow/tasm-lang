@@ -6,7 +6,7 @@ use std::{
 use crate::core::{
     consts::INIT_ROUTINE,
     resolve_aliases,
-    structs::{InstrIdent, InstrType, Instruction, MemType, Routine, Tasm},
+    structs::{InstrIdent, InstrType, Instruction, Routine, Tasm},
 };
 
 use anyhow::Result;
@@ -71,7 +71,7 @@ impl EmulatorState {
     fn set_item(&mut self, item: Item, num: f64) {
         match item {
             Item::Counter(c) => self.counters[c as usize] = num as i32,
-            Item::Timer(t) => self.timers[t as usize] = (num as f32),
+            Item::Timer(t) => self.timers[t as usize] = num as f32,
             Item::Attempts | Item::MainTime => {}
             Item::Points => self.points = num as f32,
         }
@@ -213,7 +213,7 @@ impl Emulator {
         self.load_ioblocks();
         let instrs = take(&mut self.init_instrs);
 
-        for instr in instrs.iter() {
+        for instr in instrs.clone().iter_mut() {
             self.exec_instr(instr);
         }
 
@@ -391,8 +391,6 @@ impl Emulator {
         }
 
         for (parent, instr) in instrs_todo.iter_mut() {
-            let resolved_args = resolve_aliases(&self.tasm.aliases, &instr);
-            instr.args = resolved_args.to_vec();
             instr.parent_running_routine_idx = *parent;
             self.exec_instr(instr);
         }
@@ -431,7 +429,9 @@ impl Emulator {
         self.logbox.push(format!("[{}] {log}", self.ticks));
     }
 
-    fn exec_instr(&mut self, instr: &Instruction) {
+    fn exec_instr(&mut self, instr: &mut Instruction) {
+        let resolved_args = resolve_aliases(&instr, &self.tasm.aliases);
+        instr.args = resolved_args.to_vec();
         (instr.handler_fn_emu)(self, instr);
     }
 
@@ -542,11 +542,9 @@ impl Emulator {
             None => return,
             Some(ref mem) => {
                 // get true counter
-                let true_addr = match mem._type {
-                    MemType::LegacyInt | MemType::Int => Item::Counter(mem.start_counter_id + addr),
-                    MemType::LegacyFloat | MemType::Float => {
-                        Item::Timer(mem.start_counter_id + addr)
-                    }
+                let true_addr = match mem.is_int() {
+                    true => Item::Counter(mem.start_counter_id + addr),
+                    false => Item::Timer(mem.start_counter_id + addr),
                 };
 
                 self.state.set_item(true_addr, value);
@@ -559,11 +557,9 @@ impl Emulator {
             None => 0.0,
             Some(ref mem) => {
                 // get true counter
-                let true_addr = match mem._type {
-                    MemType::LegacyInt | MemType::Int => Item::Counter(mem.start_counter_id + addr),
-                    MemType::LegacyFloat | MemType::Float => {
-                        Item::Timer(mem.start_counter_id + addr)
-                    }
+                let true_addr = match mem.is_int() {
+                    true => Item::Counter(mem.start_counter_id + addr),
+                    false => Item::Timer(mem.start_counter_id + addr),
                 };
 
                 self.state.get_num(true_addr)

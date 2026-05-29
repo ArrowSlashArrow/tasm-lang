@@ -132,7 +132,7 @@ impl Tasm {
         routine_count: usize,
         level: &mut Level,
     ) {
-        let resolved_args = resolve_aliases(&self.aliases, &instr);
+        let resolved_args = resolve_aliases(&instr, &self.aliases);
 
         // check that we are not accessing memory in init routine
         if let Err((etype, msg)) =
@@ -344,13 +344,16 @@ pub fn verify_assign(instr: &Instruction, args: &[TasmValue]) -> Result<(), Stri
     Ok(())
 }
 
-pub fn resolve_aliases<'a>(aliases: &Aliases, instr: &'a Instruction) -> Cow<'a, [TasmValue]> {
+pub fn resolve_aliases<'a>(instr: &'a Instruction, aliases: &Aliases) -> Cow<'a, [TasmValue]> {
     if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
         let mut resolved = instr.args.clone();
         for v in &mut resolved {
             if let TasmValue::Alias(alias) = v {
                 // builtin alias
                 *v = aliases.get_value(*alias)
+            };
+            if let TasmValue::String(possible_alias) = v {
+                // todo: scan for defined alias
             }
         }
         Cow::Owned(resolved)
