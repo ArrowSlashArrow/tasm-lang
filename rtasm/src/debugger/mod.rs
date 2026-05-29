@@ -25,6 +25,7 @@ const TOGGLE_KEYS: &[KeyCode] = &[KeyCode::Tab];
 const HZ_SCALE: f64 = 1.148698355;
 // seconds in a tick
 const TICK_LENGTH: f32 = 0.00416666667;
+const TICKS_PER_SECOND: f64 = 240.0;
 
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
@@ -70,7 +71,7 @@ impl EmulatorState {
     fn set_item(&mut self, item: Item, num: f64) {
         match item {
             Item::Counter(c) => self.counters[c as usize] = num as i32,
-            Item::Timer(t) => self.timers[t as usize] = num as f32,
+            Item::Timer(t) => self.timers[t as usize] = (num as f32),
             Item::Attempts | Item::MainTime => {}
             Item::Points => self.points = num as f32,
         }
@@ -162,7 +163,8 @@ impl Emulator {
             running: true,
             init_instrs,
             displays,
-            hz: 240.0,
+            paused: true,
+            hz: TICKS_PER_SECOND,
             ..Default::default()
         }
     }
@@ -344,7 +346,7 @@ impl Emulator {
             }
             KeyCode::Char('-') => self.hz /= HZ_SCALE,
             KeyCode::Char('=') => self.hz *= HZ_SCALE,
-            KeyCode::Char('0') => self.hz = 240.0,
+            KeyCode::Char('0') => self.hz = TICKS_PER_SECOND,
             // kc @ (_) => {
             //     self.add_log(format!("Key {kc:?} is not yet supported."));
             // }
@@ -426,7 +428,7 @@ impl Emulator {
     }
 
     fn add_log(&mut self, log: String) {
-        self.logbox.push(log);
+        self.logbox.push(format!("[{}] {log}", self.ticks));
     }
 
     fn exec_instr(&mut self, instr: &Instruction) {
@@ -498,7 +500,7 @@ pub fn get_time(instr: &Instruction) -> i32 {
         InstrIdent::SPAWN => 1,
         InstrIdent::NOP => 1,
         InstrIdent::WAIT => instr.args[0].to_int().unwrap(),
-        InstrIdent::WAITS => (instr.args[0].to_float().unwrap() * 240.0) as i32,
+        InstrIdent::WAITS => (instr.args[0].to_float().unwrap() * TICKS_PER_SECOND) as i32,
         InstrIdent::ADD => 1,
         InstrIdent::SUB => 1,
         InstrIdent::ADDM => 1,
@@ -552,7 +554,7 @@ impl Emulator {
         }
     }
 
-    pub fn read_mem(&mut self, addr: i16) -> f64 {
+    pub fn read_mem(&self, addr: i16) -> f64 {
         match self.tasm.mem_info {
             None => 0.0,
             Some(ref mem) => {

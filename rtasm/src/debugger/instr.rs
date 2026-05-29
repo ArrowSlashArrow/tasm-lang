@@ -45,6 +45,7 @@ impl Emulator {
     /* Instruction handlers */
 
     pub fn breakpoint(&mut self, _args: &Instruction) {
+        self.add_log("Hit breakpoint".into());
         self.paused = true;
     }
 
@@ -256,10 +257,19 @@ impl Emulator {
 
     pub fn lmptr(&mut self, args: &Instruction) {
         let move_amount = args.args[0].to_int().unwrap();
-        let mem = self.tasm.mem_info.as_ref().unwrap();
-        let ctr_id = mem.ptrpos.to_counter_id().unwrap();
+
+        let ptrpos = Item::Counter(
+            self.tasm
+                .mem_info
+                .as_ref()
+                .unwrap()
+                .ptrpos
+                .to_counter_id()
+                .unwrap(),
+        );
+        let prev_ptrpos = self.state.get_num(ptrpos);
         self.state
-            .set_item(Item::Counter(ctr_id), move_amount as f64);
+            .set_item(ptrpos, move_amount as f64 + prev_ptrpos);
     }
 
     pub fn lmread(&mut self, _args: &Instruction) {
@@ -270,7 +280,7 @@ impl Emulator {
     }
 
     /// Returns addr and if it is in valid range
-    fn get_ptrpos_value(&self) -> (i32, bool) {
+    pub fn get_ptrpos_value(&self) -> (i32, bool) {
         let mem = self.tasm.mem_info.as_ref().unwrap();
         let addr = self.state.get_num(mem.ptrpos.to_item().unwrap()) as i32;
         if addr < 0 || addr >= mem.size as i32 {

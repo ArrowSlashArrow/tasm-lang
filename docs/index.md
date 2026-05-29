@@ -103,6 +103,10 @@ Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are 
 - FLDIV: division, and the result it rounded down (floored).
 - MOV: assignment
 > \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+
+> [!WARNING]
+> When writing to a timer with an ItemEdit trigger (used by all arithmetic instructions), any write such that `|value| > 9,999,999.00` fails, resulting in the timer storing 9,999,999.00 or -9,999,999.00, depending on the sign of the previous (correct) value.  
+> It is not preferable to use timers to store large floating-point numbers. 
 ##### 3.1.2.1.2. Add/Subtract with modifier
 These instructions are utility instructions included to shorten common expressions.
 ###### `ADDM`
@@ -698,7 +702,7 @@ As of TASM v0.2.6, the aliases that exist are:
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
-**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
+**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.** To bypass this, wrap the string in double quotes: `value -> "value"`
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 

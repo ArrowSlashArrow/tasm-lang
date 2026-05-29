@@ -3,7 +3,7 @@ from deserialiser import *
 from serialiser import *
 from parser import *
 from rich import traceback as tb, console as cns
-import sys, time, tasm_parser, pygetwindow, gdobj, json, subprocess, signal, win32gui
+import sys, time, tasm_parser, pygetwindow, gdobj, json, subprocess, signal
 
 console = cns.Console()
 argv = sys.argv
@@ -139,15 +139,15 @@ def main():
         # wait for gd window to be closed
         count = 1
         
-        while True:
-            result = pygetwindow.getWindowsWithTitle("Geometry Dash")
-            if not any(result):
-                break
-            # show the title of the window (because sometimes it isn't GD)
-            windows_str = ", ".join([win32gui.GetWindowText(r._hWnd) for r in result])
-            print(f"\x1b[KPlease close {windows_str}." + "." * (count % 3), end="\r")
-            time.sleep(1 / 3)
-            count += 1
+        # while True:
+        #     result = pygetwindow.getWindowsWithTitle("Geometry Dash")
+        #     if not any(result):
+        #         break
+        #     # show the title of the window (because sometimes it isn't GD)
+        #     windows_str = ", ".join([win32gui.GetWindowText(r._hWnd) for r in result])
+        #     print(f"\x1b[KPlease close {windows_str}." + "." * (count % 3), end="\r")
+        #     time.sleep(1 / 3)
+        #     count += 1
             
         del count
         print()

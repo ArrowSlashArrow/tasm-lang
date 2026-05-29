@@ -410,7 +410,7 @@ pub struct Aliases {
     pub memsize: i16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MemType {
     Float,
     Int,

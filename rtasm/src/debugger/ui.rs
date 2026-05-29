@@ -1,13 +1,18 @@
 use ratatui::{
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Spacing},
     prelude::{Buffer, Rect},
-    style::Stylize,
-    symbols::border,
+    style::{Color, Stylize},
+    symbols::{border, merge::MergeStrategy},
     text::{Line, Text},
     widgets::{Block, Paragraph, Widget},
 };
 
-use crate::debugger::{Emulator, RunningRoutine};
+use std::fmt::Write;
+
+use crate::{
+    core::structs::MemType,
+    debugger::{Emulator, RunningRoutine, TICKS_PER_SECOND},
+};
 
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
@@ -36,7 +41,18 @@ const KEYBINDS: &[(&str, &str)] = &[
     //  - previous instruction processed
     //  - waiting time (if waiting) // is paused
     //  - is toggled
+    /* snapshot controls */
+    // s: save snapshot
+    // d: discard snapshot
+    // a: revert to previous snapshot
+    /* state query controls */
+    // q: query a counter
+    //  - this doesn't impede searching ability since `q` is irrelevant to item ids
+    // e: exit query
+    // w: watch counter
 ];
+
+const KEY_AREA_HEIGHT: u16 = 15;
 
 impl Widget for &Emulator {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
@@ -79,8 +95,11 @@ impl Widget for &Emulator {
             Layout::horizontal(vec![Constraint::Length(32), Constraint::Min(1)])
                 .split(vbottomleft_layout[0]);
 
-        let vright_layout =
-            Layout::vertical(vec![Constraint::Min(1), Constraint::Length(12)]).split(h_layout[1]);
+        let vright_layout = Layout::vertical(vec![
+            Constraint::Min(1), // note to future self: we don't need all that space just for memory
+            Constraint::Length(KEY_AREA_HEIGHT),
+        ])
+        .split(h_layout[1]);
 
         let logbox_area = htopleft_layout[0];
         let display_area = htopleft_layout[1];
@@ -203,9 +222,9 @@ impl Emulator {
             .iter()
             .map(|(key, bind)| {
                 Line::from(vec![
-                    "<".blue(),
-                    key.blue().bold(),
-                    "> ".blue(),
+                    "<".cyan(),
+                    key.cyan().bold(),
+                    "> ".cyan(),
                     (*bind).into(),
                 ])
             })
@@ -218,7 +237,7 @@ impl Emulator {
 
         for line in keylines {
             curr_column.push(line);
-            if curr_column.len() == 10 {
+            if curr_column.len() + 2 == KEY_AREA_HEIGHT as usize {
                 // get max length for layout reasons
                 let max_width = curr_column.iter().map(|l| l.width()).max().unwrap();
                 columns.push(curr_column);
@@ -244,15 +263,132 @@ impl Emulator {
     }
 
     fn render_memory(&self, memory_area: Rect, buf: &mut Buffer) {
-        display_centered_message(
-            "// todo",
-            Block::bordered()
-                .border_set(border::PLAIN)
-                .title(" Memory cells ".blue().into_centered_line()),
-            memory_area,
-            buf,
+        if let None = self.tasm.mem_info {
+            display_centered_message(
+                "<No memory>",
+                Block::bordered()
+                    .border_set(border::PLAIN)
+                    .title(" Memory cells ".blue().into_centered_line()),
+                memory_area,
+                buf,
+            );
+            return;
+        }
+
+        // sections: title, body, metadata/info
+        let split = Layout::vertical(vec![
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(7),
+        ])
+        .split(memory_area);
+
+        // render title
+        Block::new()
+            .title(Line::from("Memory cells").centered())
+            .render(split[0], buf);
+
+        // for padding on the left side
+        let split2 =
+            Layout::horizontal(vec![Constraint::Length(1), Constraint::Min(1)]).split(split[1]);
+
+        let mut cols_area = split2[1];
+        let mem = self.tasm.mem_info.as_ref().unwrap();
+
+        // memory cell
+        // ---------------
+        // 034: 0000001234
+        // ---------------
+        // length: 2 (padding) + 1 (margin) + log10(memsize) (address) + 2 (": ") + 12 (number)
+        // = 17 + log10(memsize)
+
+        // set up preliminary size vars
+        let col_width = 18.0 + f64::log10(mem.size as f64);
+        let max_cols = ((cols_area.width - 1) as f64 / col_width) as u16;
+        let col_height = u16::min(
+            cols_area.height - 2,
+            (mem.size as u16 + max_cols) / max_cols,
         );
-        // todo
+
+        cols_area.height = col_height;
+
+        let cols_division = Layout::horizontal(
+            std::iter::repeat(Constraint::Fill(col_width as u16 + 2)).take(max_cols as usize),
+        )
+        .spacing(Spacing::Overlap(1))
+        .split(cols_area);
+
+        let highlight = Color::Rgb(255, 115, 15);
+        let highlight_bg = Color::Rgb(60, 60, 60);
+        let accent = Color::Rgb(255, 230, 115);
+
+        // now, build all of the lines for each column
+        let number_width = 11usize;
+        let mut cols = vec![];
+        let mut idx = 0;
+
+        while cols.len() < max_cols as usize && idx < mem.size {
+            let mut curr_col = vec![];
+            while curr_col.len() < col_height as usize && idx < mem.size {
+                let num = self.read_mem(idx);
+                let neg = num.is_sign_negative();
+
+                let is_selected = self.get_ptrpos_value().0 == idx as i32;
+
+                let mut line_segments = vec![
+                    " ".into(),
+                    if is_selected {
+                        "  >".fg(highlight)
+                    } else {
+                        format!("{idx:0>3}").fg(accent)
+                    },
+                    if is_selected {
+                        "  ".into()
+                    } else {
+                        ": ".into()
+                    },
+                    if neg { "-" } else { " " }.into(),
+                ];
+
+                // fill in the leading zeros with gray zeros
+                let mut num_str = if mem._type == MemType::Int || mem._type == MemType::LegacyInt {
+                    (num as i32).abs().to_string()
+                } else {
+                    format!("{:.2}", num.abs())
+                };
+
+                if num_str.len() > number_width {
+                    num_str.truncate(number_width);
+                } else if num_str.len() < number_width {
+                    line_segments.push("0".repeat(number_width - num_str.len()).fg(highlight_bg));
+                }
+
+                line_segments.push(num_str.fg(match is_selected {
+                    false => accent,
+                    true => highlight,
+                }));
+
+                line_segments.push(" ".into());
+
+                let mut line = Line::from(line_segments).centered();
+                if is_selected {
+                    line = line.bg(highlight_bg)
+                }
+
+                curr_col.push(line);
+                idx += 1;
+            }
+
+            cols.push(curr_col);
+        }
+
+        for (i, col) in cols.into_iter().enumerate() {
+            Paragraph::new(Text::from(col))
+                .block(Block::bordered().merge_borders(MergeStrategy::Exact))
+                .render(cols_division[i], buf);
+        }
+
+        // todo: render memory metadata
     }
 
     fn render_ioblocks(&self, ioblocks_area: Rect, buf: &mut Buffer) {
@@ -378,12 +514,13 @@ impl Emulator {
                 },
             ]),
             format!(
-                "Tick {} [{}]",
+                "Tick {} [{}] // {}",
                 self.ticks,
                 match self.paused {
                     true => "Paused",
                     false => "Running",
                 },
+                display_time(self.ticks as f64 / TICKS_PER_SECOND)
             )
             .into(),
             format!(
@@ -459,4 +596,26 @@ fn display_centered_message<'a, L: Into<Line<'a>>>(
 
     block.render(area, buf);
     Paragraph::new(Text::from(message.into().centered())).render(area_split[1], buf);
+}
+
+fn display_time(secs: f64) -> String {
+    let mut time_str = String::with_capacity(32);
+
+    let ms = (secs * 1000.0 % 1000.0).floor() as i32;
+    let seconds = secs as i32 % 60;
+    let minutes = (secs / 60.0).floor() as i32 % 60;
+    let hours = (secs / 3600.0).floor() as i32 % 24;
+    let days = (secs / 86400.0).floor() as i32;
+
+    if days > 0 {
+        write!(time_str, "{days:0>2}:").unwrap();
+    }
+
+    if hours > 0 || days > 0 {
+        write!(time_str, "{hours:0>2}:").unwrap();
+    }
+
+    write!(time_str, "{minutes:0>2}:{seconds:0>2}.{ms:0>3}").unwrap();
+
+    time_str
 }
