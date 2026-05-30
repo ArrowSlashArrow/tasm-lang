@@ -96,7 +96,7 @@ fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
         objects_str
     );
 
-    socket.send(Message::Text(payload.into()))?;
+    socket.send(Message::Text(payload))?;
     let _ = socket.close(None);
 
     Ok(())
@@ -117,7 +117,7 @@ fn get_local_levels_path() -> Option<PathBuf> {
 }
 
 fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
-    if let None = get_local_levels_path() {
+    if get_local_levels_path().is_none() {
         log!(
             logs_enabled,
             "Unable to find savefile. Please pass --gmd or --emulate."

@@ -4,11 +4,8 @@
 
 ## emulator
 - concurrent instructions
-- handlers for all instructions
 - flags
-- snapshot controls
 - tutorial
-- state browser/query
 - snapshot system
     - take a snapshot
     - go back

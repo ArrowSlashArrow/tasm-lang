@@ -3,6 +3,7 @@
 target/
 pytasm/namespace.json
 *.gmd
+profile*
 # docs stuff
 .retype/
 retype.manifest

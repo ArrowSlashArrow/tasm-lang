@@ -1,21 +1,24 @@
-use std::{
-    time::{Duration, Instant},
-    vec,
-};
+use alloc::vec;
+use core::time::Duration;
+use std::time::Instant;
 
-use crate::core::{
-    consts::INIT_ROUTINE,
-    resolve_aliases,
-    structs::{InstrIdent, InstrType, Instruction, Routine, Tasm},
+use crate::{
+    core::{
+        consts::INIT_ROUTINE,
+        resolve_aliases,
+        structs::{InstrIdent, InstrType, Instruction, Routine, Tasm},
+    },
+    debugger::layout::PrecomputedLayout,
 };
 
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use core::mem::take;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, poll};
 use gdlib::gdobj::Item;
 use ratatui::{self, Frame};
-use std::mem::take;
 
 pub mod instr;
+pub mod layout;
 pub mod ui;
 
 const TOGGLE_KEYS: &[KeyCode] = &[KeyCode::Tab];
@@ -24,7 +27,7 @@ const TOGGLE_KEYS: &[KeyCode] = &[KeyCode::Tab];
 // using f(5) here
 const HZ_SCALE: f64 = 1.148698355;
 // seconds in a tick
-const TICK_LENGTH: f32 = 0.00416666667;
+const TICK_LENGTH: f32 = 0.004_166_667;
 const TICKS_PER_SECOND: f64 = 240.0;
 
 pub fn emulate(tasm: Tasm) {
@@ -96,15 +99,10 @@ pub struct Emulator {
     paused: bool,                          // happens when tripping a breakpoint
     running_routines: Vec<RunningRoutine>, // all current running routines
     ioblocks: Vec<usize>,                  // idxs to self.tasm.routines
-    ioblock_idx: usize,                    // index into ioblocks
-    peeking_ioblock: bool, // whether to peek the selected ioblock (see instructions of that routine)
-    displays: Vec<Item>,
+    ui_state: UIState,
     init_instrs: Vec<Instruction>,     // executed every reset
-    ticks: u32,                        // tick counter
+    ticks: u64,                        // tick counter
     hz: f64,                           // ticks per second
-    lagging: bool,                     // whether the emulator is lagging behind
-    last_tick_time: Duration,          // how long the previous tick took to run
-    logbox: Vec<String>,               // box of messages from the emulator
     ticking_timers: Vec<TickingTimer>, // list of timers that are currently ticking
     started_timers: Vec<i16>,          // list of timer ids that have been initailized
     // list of groups that are toggled off
@@ -113,6 +111,21 @@ pub struct Emulator {
     toggled_groups: Vec<i16>,
     /// Tracks what mode the memory is in right now
     legacy_memstate: LegacyMemstate,
+}
+
+#[derive(Debug, Default)]
+pub struct UIState {
+    displays: Vec<Item>,
+    peeking_ioblock: bool, // whether to peek the selected ioblock (see instructions of that routine)
+    ioblock_idx: usize,    // index into ioblocks
+    lagging: bool,         // whether the emulator is lagging behind
+    last_tick_time: Duration, // how long the previous tick took to run
+    logbox: Vec<String>,   // box of messages from the emulator
+    selected_routine: usize, // Emulator.running_routines[idx + 1]
+    passed_ticks: f64,     // amount of ticks that have passed since the last ui update.
+    layout: PrecomputedLayout,
+    tpf: f64,          // cached value for ticks per frame
+    tick_ns: Duration, // cached value for nanoseconds per tick
 }
 
 #[derive(Debug, Default)]
@@ -162,11 +175,21 @@ impl Emulator {
             tasm,
             running: true,
             init_instrs,
-            displays,
+            ui_state: UIState {
+                displays,
+                layout: PrecomputedLayout::new(),
+                ..Default::default()
+            },
             paused: true,
             hz: TICKS_PER_SECOND,
             ..Default::default()
         }
+    }
+
+    fn update_ticks_per_frame(&mut self) {
+        // return x such that ticks per second / x = 60
+        self.ui_state.tpf = self.hz / 60.0;
+        self.ui_state.tick_ns = Duration::from_nanos((1_000_000_000.0 / self.hz) as u64);
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -178,28 +201,41 @@ impl Emulator {
         let mut next_tick_time;
         while self.running {
             next_tick_time = Instant::now();
-            terminal.draw(|frame| self.draw(frame))?;
+            // todo: cap rendering at 60fps
+            if self.ui_state.passed_ticks > self.ui_state.tpf {
+                terminal.draw(|frame| {
+                    if self.ui_state.layout.is_dirty {
+                        self.ui_state.layout.compute(frame.area());
+                    }
+                    self.draw(frame)
+                })?;
+                self.ui_state.passed_ticks -= self.ui_state.tpf;
+            }
+
             if !self.paused {
                 self.tick();
             }
 
-            if let Ok(c) = crossterm::event::poll(Duration::from_millis(0))
+            if let Ok(c) = poll(Duration::from_millis(0))
                 && c
             {
                 self.handle_key();
             }
 
+            self.ui_state.passed_ticks += 1.0;
+
             // hold specified timing
-            self.last_tick_time = next_tick_time.elapsed();
-            next_tick_time += Duration::from_nanos((1_000_000_000.0 / self.hz) as u64);
-            if Instant::now() > next_tick_time {
-                self.lagging = true;
-                continue;
+            let now = Instant::now();
+            self.ui_state.last_tick_time = next_tick_time.elapsed();
+            next_tick_time += self.ui_state.tick_ns;
+
+            if now > next_tick_time {
+                self.ui_state.lagging = true;
             } else {
-                self.lagging = false;
-            }
-            while Instant::now() < next_tick_time {
-                std::hint::spin_loop();
+                self.ui_state.lagging = false;
+                while Instant::now() < next_tick_time {
+                    core::hint::spin_loop();
+                }
             }
         }
 
@@ -247,7 +283,7 @@ impl Emulator {
                 }
             }
         }
-        if ioblocks.len() == 0 {
+        if ioblocks.is_empty() {
             ioblocks.push(usize::MAX)
         }
 
@@ -264,47 +300,47 @@ impl Emulator {
             Err(_) => return,
         };
 
-        match event {
-            Event::Key(k) => {
-                if TOGGLE_KEYS.contains(&k.code) {
-                    self.handle_toggle_key(k);
-                    return;
-                }
-
-                // filter release
-                if k.is_release() {
-                    return;
-                }
-
-                if k.modifiers.contains(KeyModifiers::CONTROL) {
-                    if let KeyCode::Char('c') = k.code {
-                        self.running = false;
-                    }
-                    return;
-                }
-
-                self.handle_keypress(k);
+        if let Event::Key(k) = event {
+            if TOGGLE_KEYS.contains(&k.code) {
+                self.handle_toggle_key(k);
+                return;
             }
-            _ => {}
+
+            // filter release
+            if k.is_release() {
+                return;
+            }
+
+            if k.modifiers.contains(KeyModifiers::CONTROL) {
+                if let KeyCode::Char('c') = k.code {
+                    self.running = false;
+                }
+                return;
+            }
+
+            self.handle_keypress(k);
+        }
+
+        if let Event::Resize(_, _) = event {
+            // mark layout as dirty; redraw
+            self.ui_state.layout.is_dirty = true;
         }
     }
 
     fn handle_toggle_key(&mut self, k: KeyEvent) {
         match k.kind {
             // on state
-            KeyEventKind::Press => match k.code {
-                KeyCode::Tab => {
-                    self.peeking_ioblock = true;
+            KeyEventKind::Press => {
+                if k.code == KeyCode::Tab {
+                    self.ui_state.peeking_ioblock = true;
                 }
-                _ => {}
-            },
+            }
             // off state
-            KeyEventKind::Release => match k.code {
-                KeyCode::Tab => {
-                    self.peeking_ioblock = false;
+            KeyEventKind::Release => {
+                if k.code == KeyCode::Tab {
+                    self.ui_state.peeking_ioblock = false;
                 }
-                _ => {}
-            },
+            }
             KeyEventKind::Repeat => {}
         }
     }
@@ -313,20 +349,16 @@ impl Emulator {
         match k.code {
             KeyCode::Esc => self.running = false,
             KeyCode::Char(' ') => self.paused = !self.paused,
-            KeyCode::Up => {
-                if self.ioblock_idx > 0 {
-                    self.ioblock_idx -= 1;
-                }
+            KeyCode::Up if self.ui_state.ioblock_idx > 0 => {
+                self.ui_state.ioblock_idx -= 1;
             }
-            KeyCode::Down => {
-                if self.ioblock_idx < self.ioblocks.len() - 1 {
-                    self.ioblock_idx += 1;
-                }
+            KeyCode::Down if self.ui_state.ioblock_idx < self.ioblocks.len() - 1 => {
+                self.ui_state.ioblock_idx += 1;
             }
-            KeyCode::PageUp => self.ioblock_idx = 0,
-            KeyCode::PageDown => self.ioblock_idx = self.ioblocks.len() - 1,
+            KeyCode::PageUp => self.ui_state.ioblock_idx = 0,
+            KeyCode::PageDown => self.ui_state.ioblock_idx = self.ioblocks.len() - 1,
             KeyCode::Enter => {
-                let routine_idx = self.ioblocks[self.ioblock_idx];
+                let routine_idx = self.ioblocks[self.ui_state.ioblock_idx];
                 // happens if there are no ioblocks
                 if routine_idx == usize::MAX {
                     return;
@@ -334,19 +366,26 @@ impl Emulator {
                 let routine = self.tasm.routines[routine_idx].clone();
                 self.add_running_routine(routine);
             }
-            KeyCode::Char('.') => {
-                if self.paused {
-                    self.tick();
-                }
+            KeyCode::Char('.') if self.paused => {
+                self.tick();
             }
-            KeyCode::Char('c') => self.logbox.clear(),
+            KeyCode::Char('c') => self.ui_state.logbox.clear(),
             KeyCode::Char('r') => {
                 self.reset_state();
                 self.setup();
             }
-            KeyCode::Char('-') => self.hz /= HZ_SCALE,
-            KeyCode::Char('=') => self.hz *= HZ_SCALE,
-            KeyCode::Char('0') => self.hz = TICKS_PER_SECOND,
+            KeyCode::Char('-') => {
+                self.hz /= HZ_SCALE;
+                self.update_ticks_per_frame();
+            }
+            KeyCode::Char('=') => {
+                self.hz *= HZ_SCALE;
+                self.update_ticks_per_frame();
+            }
+            KeyCode::Char('0') => {
+                self.hz = TICKS_PER_SECOND;
+                self.update_ticks_per_frame();
+            }
             // kc @ (_) => {
             //     self.add_log(format!("Key {kc:?} is not yet supported."));
             // }
@@ -416,6 +455,10 @@ impl Emulator {
             self.ticking_timers.retain(|t| t.id != id);
         }
 
+        if self.ui_state.selected_routine > self.running_routines.len() {
+            self.ui_state.selected_routine = self.running_routines.len()
+        }
+
         self.ticks += 1;
     }
 
@@ -426,11 +469,11 @@ impl Emulator {
     }
 
     fn add_log(&mut self, log: String) {
-        self.logbox.push(format!("[{}] {log}", self.ticks));
+        self.ui_state.logbox.push(format!("[{}] {log}", self.ticks));
     }
 
     fn exec_instr(&mut self, instr: &mut Instruction) {
-        let resolved_args = resolve_aliases(&instr, &self.tasm.aliases);
+        let resolved_args = resolve_aliases(instr, &self.tasm.aliases);
         instr.args = resolved_args.to_vec();
         (instr.handler_fn_emu)(self, instr);
     }
@@ -487,6 +530,7 @@ pub fn get_time(instr: &Instruction) -> i32 {
         InstrIdent::IOBLOCK => 0,
         InstrIdent::LMALLOC => 0,
         InstrIdent::LFMALLOC => 0,
+        InstrIdent::RAW => 0,
         /* execution time in ticks */
         InstrIdent::LMFUNC => 2,
         InstrIdent::LMREAD => 1,
@@ -532,14 +576,13 @@ pub fn get_time(instr: &Instruction) -> i32 {
         InstrIdent::KILL => 1,
         InstrIdent::TOGGLEON => 1,
         InstrIdent::TOGGLEOFF => 1,
-        InstrIdent::RAW => 0,
     }
 }
 
 impl Emulator {
     pub fn write_mem(&mut self, addr: i16, value: f64) {
         match self.tasm.mem_info {
-            None => return,
+            None => (),
             Some(ref mem) => {
                 // get true counter
                 let true_addr = match mem.is_int() {

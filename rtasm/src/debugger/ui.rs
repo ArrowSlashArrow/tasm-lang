@@ -7,9 +7,11 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget},
 };
 
-use std::fmt::Write;
+use core::fmt::Write;
 
-use crate::debugger::{Emulator, LegacyMemstate, RunningRoutine, TICKS_PER_SECOND};
+use crate::debugger::{
+    Emulator, LegacyMemstate, RunningRoutine, TICKS_PER_SECOND, layout::KEY_AREA_HEIGHT,
+};
 
 const KEYBINDS: &[(&str, &str)] = &[
     ("Esc", "Exit the emulator"),
@@ -50,12 +52,8 @@ const KEYBINDS: &[(&str, &str)] = &[
     /* memory scrolling */
     // [: scroll left
     // ]: scroll right
-
-    /* ui todos */
-    // add highlight at the top of each memory column to briefly show the addresses (e.g. [000-020] )
+    // g: goto pointer position
 ];
-
-const KEY_AREA_HEIGHT: u16 = 15;
 
 const MEM_HIGHLIGHT: Color = Color::Rgb(255, 115, 15);
 const MEM_HIGHLIGHT_BG: Color = Color::Rgb(60, 60, 60);
@@ -71,100 +69,49 @@ impl Widget for &Emulator {
             .border_set(border::ROUNDED)
             .render(area, buf);
 
-        let middle_h_temp = Layout::horizontal(vec![
-            Constraint::Length(2),
-            Constraint::Min(1),
-            Constraint::Length(2),
-        ])
-        .split(area);
+        self.render_logbox(buf);
+        self.render_displays(buf);
+        self.render_keys(buf);
+        self.render_memory(buf);
+        self.render_memory_info(buf);
+        self.render_ioblocks(buf);
+        self.render_info(buf);
 
-        let workable_area = Layout::vertical(vec![
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
-        .split(middle_h_temp[1])[1];
-
-        /* setup areas */
-        let h_layout = Layout::horizontal(vec![Constraint::Percentage(50), Constraint::Min(1)])
-            .split(workable_area);
-
-        let vleft_layout =
-            Layout::vertical(vec![Constraint::Min(1), Constraint::Min(1)]).split(h_layout[0]);
-
-        let htopleft_layout = Layout::horizontal(vec![
-            Constraint::Min(1),
-            Constraint::Length(1),
-            Constraint::Length(32),
-        ])
-        .split(vleft_layout[0]);
-
-        let vbottomleft_layout = Layout::vertical(vec![Constraint::Length(7), Constraint::Min(1)])
-            .split(vleft_layout[1]);
-
-        let hbottomleft_layout =
-            Layout::horizontal(vec![Constraint::Length(32), Constraint::Min(1)])
-                .split(vbottomleft_layout[0]);
-
-        let vright_layout = Layout::vertical(vec![
-            Constraint::Percentage(50), // aligned to be in the same vertical area as logs and items; looks better
-            Constraint::Min(1),
-            Constraint::Length(KEY_AREA_HEIGHT),
-        ])
-        .split(h_layout[1]);
-
-        let logbox_area = htopleft_layout[0];
-        let display_area = htopleft_layout[2];
-        let ioblocks_area = hbottomleft_layout[0];
-        let info_area = hbottomleft_layout[1];
-        let routines_area = vbottomleft_layout[1];
-        let memory_cells_area = vright_layout[0];
-        let memory_info_area = vright_layout[1];
-        let keys_area = vright_layout[2];
-
-        self.render_logbox(logbox_area, buf);
-        self.render_displays(display_area, buf);
-        self.render_keys(keys_area, buf);
-        self.render_memory(memory_cells_area, buf);
-        self.render_memory_info(memory_info_area, buf);
-        self.render_ioblocks(ioblocks_area, buf);
-        self.render_info(info_area, buf);
-
-        if self.peeking_ioblock {
+        if self.ui_state.peeking_ioblock {
             let bottom_left_layout =
                 Layout::horizontal(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .split(routines_area);
+                    .split(self.ui_state.layout.routines_area);
             self.render_routines(bottom_left_layout[0], buf);
             self.render_ioblock_peek(bottom_left_layout[1], buf);
         } else {
-            self.render_routines(routines_area, buf);
+            self.render_routines(self.ui_state.layout.routines_area, buf);
         }
     }
 }
 
 impl Emulator {
-    fn render_logbox(&self, logbox_area: Rect, buf: &mut Buffer) {
-        let logbox_height = (logbox_area.height - 2) as usize;
-        let logs = if self.logbox.len() > logbox_height {
-            &self.logbox[(&self.logbox.len() - logbox_height)..]
+    fn render_logbox(&self, buf: &mut Buffer) {
+        let logbox_height = (self.ui_state.layout.logbox_area.height - 2) as usize;
+        let logs = if self.ui_state.logbox.len() > logbox_height {
+            &self.ui_state.logbox[(self.ui_state.logbox.len() - logbox_height)..]
         } else {
-            &self.logbox[..]
+            &self.ui_state.logbox[..]
         };
 
         // -2: 1 char padding on each side
-        let max_log_length = (logbox_area.width - 2) as usize;
+        let max_log_length = (self.ui_state.layout.logbox_area.width - 2) as usize;
 
         Paragraph::new(Text::from(
             logs.iter()
                 .map(|reflog| {
                     let mut log = reflog.clone();
-                    let truncated;
-                    if log.len() > max_log_length {
+                    let truncated = if log.len() > max_log_length {
                         log.truncate(max_log_length - 5);
-                        truncated = true;
+                        true
                     } else {
-                        truncated = false;
-                    }
+                        false
+                    };
+
                     Line::from(vec![
                         " ".into(),
                         log.into(),
@@ -181,15 +128,15 @@ impl Emulator {
                 .border_set(border::PLAIN)
                 .title(" Emulator logs ".yellow()),
         )
-        .render(logbox_area, buf);
+        .render(self.ui_state.layout.logbox_area, buf);
     }
 
-    fn render_displays(&self, display_area: Rect, buf: &mut Buffer) {
-        let displays_height = display_area.height as usize;
-        let displays = if self.displays.len() > displays_height {
-            &self.displays[..displays_height]
+    fn render_displays(&self, buf: &mut Buffer) {
+        let displays_height = self.ui_state.layout.display_area.height as usize;
+        let displays = if self.ui_state.displays.len() > displays_height {
+            &self.ui_state.displays[..displays_height]
         } else {
-            &self.displays[..]
+            &self.ui_state.displays[..]
         };
 
         Paragraph::new(Text::from(
@@ -209,21 +156,21 @@ impl Emulator {
                 .border_set(border::PLAIN)
                 .title(" Displayed items ".green().into_centered_line()),
         )
-        .render(display_area, buf);
+        .render(self.ui_state.layout.display_area, buf);
     }
 
-    fn render_keys(&self, keys_area: Rect, buf: &mut Buffer) {
+    fn render_keys(&self, buf: &mut Buffer) {
         Block::bordered()
             .border_set(border::EMPTY)
             .title(" Keys".bold())
-            .render(keys_area, buf);
+            .render(self.ui_state.layout.keys_area, buf);
 
         let middle_h_temp = Layout::horizontal(vec![
             Constraint::Length(2),
             Constraint::Min(1),
             Constraint::Length(2),
         ])
-        .split(keys_area);
+        .split(self.ui_state.layout.keys_area);
 
         let workable_area = Layout::vertical(vec![
             Constraint::Length(1),
@@ -260,7 +207,7 @@ impl Emulator {
             }
         }
 
-        if curr_column.len() > 0 {
+        if !curr_column.is_empty() {
             columns.push(curr_column);
             widths.push(Constraint::Min(1));
         } else {
@@ -277,22 +224,22 @@ impl Emulator {
     }
 
     // renders only the memory cells, not the state or any metadata
-    fn render_memory(&self, memory_area: Rect, buf: &mut Buffer) {
-        if let None = self.tasm.mem_info {
+    fn render_memory(&self, buf: &mut Buffer) {
+        if self.tasm.mem_info.is_none() {
             display_centered_message(
                 "<No memory>",
                 Block::bordered()
                     .border_set(border::PLAIN)
                     .title(" Memory cells ".blue().into_centered_line()),
-                memory_area,
+                self.ui_state.layout.memory_cells_area,
                 buf,
             );
             return;
         }
 
         // sections: title, body, metadata/info
-        let split =
-            Layout::vertical(vec![Constraint::Length(1), Constraint::Min(1)]).split(memory_area);
+        let split = Layout::vertical(vec![Constraint::Length(1), Constraint::Min(1)])
+            .split(self.ui_state.layout.memory_cells_area);
 
         // render title
         Block::new()
@@ -324,9 +271,10 @@ impl Emulator {
 
         cols_area.height = col_height + 2;
 
-        let cols_division = Layout::horizontal(
-            std::iter::repeat(Constraint::Fill((col_width + 2) as u16)).take(max_cols as usize),
-        )
+        let cols_division = Layout::horizontal(core::iter::repeat_n(
+            Constraint::Fill((col_width + 2) as u16),
+            max_cols as usize,
+        ))
         .spacing(Spacing::Overlap(1))
         .split(cols_area);
 
@@ -336,6 +284,7 @@ impl Emulator {
 
         while cols.len() < max_cols as usize && idx < mem.size {
             let mut curr_col = vec![];
+            let start_idx = idx;
             while curr_col.len() < col_height as usize && idx < mem.size {
                 let num = self.read_mem(idx);
 
@@ -367,20 +316,31 @@ impl Emulator {
                 curr_col.push(line);
                 idx += 1;
             }
+            let end_idx = idx;
 
-            cols.push(curr_col);
+            cols.push((curr_col, start_idx, end_idx));
         }
 
-        for (i, col) in cols.into_iter().enumerate() {
+        let ptrpos = self.get_ptrpos_value().0 as i16;
+
+        for (i, (col, start, end)) in cols.into_iter().enumerate() {
+            let is_ptr_here = start <= ptrpos && ptrpos <= end;
             Paragraph::new(Text::from(col))
-                .block(Block::bordered().merge_borders(MergeStrategy::Exact))
+                .block(
+                    Block::bordered().merge_borders(MergeStrategy::Exact).title(
+                        format!("[{start:0>idx_width$} - {end:0>idx_width$}]")
+                            .fg(match is_ptr_here {
+                                true => MEM_HIGHLIGHT,
+                                false => MEM_ACCENT,
+                            })
+                            .into_centered_line(),
+                    ),
+                )
                 .render(cols_division[i], buf);
         }
-
-        // todo: render memory metadata
     }
 
-    fn render_memory_info(&self, memory_info_area: Rect, buf: &mut Buffer) {
+    fn render_memory_info(&self, buf: &mut Buffer) {
         let mut lines = match self.tasm.mem_info {
             Some(ref mem) => {
                 let mut memreg_line_segments = vec![Span::from("Register: ")];
@@ -401,13 +361,10 @@ impl Emulator {
                     Line::from(memreg_line_segments),
                     Line::from(ptrpos_line_segments),
                     format!(
-                        "Memory: {}",
-                        format!(
-                            "[{:?}] {} - {}",
-                            mem.get_type(),
-                            mem.start_counter_id,
-                            mem.start_counter_id + mem.size - 1,
-                        )
+                        "Memory: [{:?}] {} - {}",
+                        mem.get_type(),
+                        mem.start_counter_id,
+                        mem.start_counter_id + mem.size - 1,
                     )
                     .into(),
                     format!("Size: {}", mem.size).into(),
@@ -444,10 +401,10 @@ impl Emulator {
                     .border_set(border::EMPTY)
                     .title(" Memory State".bold().fg(MEM_ACCENT)),
             )
-            .render(memory_info_area, buf);
+            .render(self.ui_state.layout.memory_info_area, buf);
     }
 
-    fn render_ioblocks(&self, ioblocks_area: Rect, buf: &mut Buffer) {
+    fn render_ioblocks(&self, buf: &mut Buffer) {
         let lines = self
             .ioblocks
             .iter()
@@ -456,7 +413,7 @@ impl Emulator {
                 Line::from(
                     vec![
                         " ".bold(),
-                        if ioblock_idx == self.ioblock_idx {
+                        if ioblock_idx == self.ui_state.ioblock_idx {
                             "> ".green() // MEM_HIGHLIGHT
                         } else {
                             "".into()
@@ -471,7 +428,7 @@ impl Emulator {
                     ]
                     .into_iter()
                     .map(|line| {
-                        if ioblock_idx == self.ioblock_idx {
+                        if ioblock_idx == self.ui_state.ioblock_idx {
                             line.bold()
                         } else {
                             line
@@ -482,16 +439,16 @@ impl Emulator {
             })
             .collect::<Vec<Line<'_>>>();
 
-        let displayed_lines = if self.ioblock_idx < 5 {
+        let displayed_lines = if self.ui_state.ioblock_idx < 5 {
             &lines[..]
         } else {
-            &lines[(self.ioblock_idx - 4)..]
+            &lines[(self.ui_state.ioblock_idx - 4)..]
         }
         .to_vec();
 
         let more_lines = match lines.len() > 5 {
             true => {
-                let lines_left = lines.len() - self.ioblock_idx - 1;
+                let lines_left = lines.len() - self.ui_state.ioblock_idx - 1;
                 match lines_left > 0 {
                     // use one of these: ↓⌄
                     true => Some(format!(" {lines_left} more ↓ ")),
@@ -511,22 +468,27 @@ impl Emulator {
 
         Paragraph::new(Text::from(displayed_lines))
             .block(pg_block)
-            .render(ioblocks_area, buf);
+            .render(self.ui_state.layout.ioblocks_area, buf);
     }
 
     fn render_routines(&self, routines_area: Rect, buf: &mut Buffer) {
-        Paragraph::new(Text::from(
-            self.running_routines
-                .iter()
-                .map(|rtn| Line::from(vec![" ".bold(), self.get_state(rtn).into()]))
-                .collect::<Vec<Line<'_>>>(),
-        ))
-        .block(
-            Block::bordered()
-                .border_set(border::PLAIN)
-                .title(" Active routines ".magenta().into_centered_line()),
-        )
-        .render(routines_area, buf);
+        let mut lines = vec![];
+
+        for rtn in self.running_routines.iter() {
+            let s = self.get_state(rtn);
+
+            lines.push(Line::from(vec![
+                " ".bold(),
+                if !rtn.toggled { s.italic() } else { s.into() },
+            ]))
+        }
+        Paragraph::new(Text::from(lines))
+            .block(
+                Block::bordered()
+                    .border_set(border::PLAIN)
+                    .title(" Active routines ".light_green().into_centered_line()),
+            )
+            .render(routines_area, buf);
     }
 
     fn get_instr_line(&self, line: usize) -> String {
@@ -535,35 +497,37 @@ impl Emulator {
 
     fn get_state(&self, rtn: &RunningRoutine) -> String {
         if rtn.done {
-            return format!("{}: done", rtn.routine.ident);
-        }
-        if rtn.waiting > 0 {
-            return format!(
-                "{}: [{}] {} (waiting {} ticks)",
-                rtn.routine.ident,
-                rtn.instr_ptr,
-                self.get_instr_line(rtn.get_line()),
-                rtn.waiting
-            );
+            format!("{}: done", rtn.routine.ident)
         } else {
-            return format!(
-                "{}: [{}] {}",
-                rtn.routine.ident,
-                rtn.instr_ptr,
-                self.get_instr_line(rtn.get_line())
-            );
+            let waiting_ticks = rtn.waiting - 1;
+            if waiting_ticks > 0 {
+                format!(
+                    "{}: [{}] {} (waiting {} ticks)",
+                    rtn.routine.ident,
+                    rtn.instr_ptr,
+                    self.get_instr_line(rtn.get_line()),
+                    waiting_ticks
+                )
+            } else {
+                format!(
+                    "{}: [{}] {}",
+                    rtn.routine.ident,
+                    rtn.instr_ptr,
+                    self.get_instr_line(rtn.get_line())
+                )
+            }
         }
     }
 
-    fn render_info(&self, info_area: Rect, buf: &mut Buffer) {
+    fn render_info(&self, buf: &mut Buffer) {
         Paragraph::new(Text::from(vec![
             self.tasm.fname.clone().into(),
             Line::from(vec![
                 format!("Speed: {:.2}Hz // {:.2}x speed ", self.hz, self.hz / 240.0).into(),
-                match self.lagging {
+                match self.ui_state.lagging {
                     true => format!(
                         " Lag! Last tick: {:.3}ms",
-                        self.last_tick_time.as_nanos() as f64 / 1_000_000.0 // scale to ms with dp precision
+                        self.ui_state.last_tick_time.as_nanos() as f64 / 1_000_000.0 // scale to ms with dp precision
                     )
                     .red(),
                     false => "".into(),
@@ -585,11 +549,11 @@ impl Emulator {
                 .border_set(border::EMPTY)
                 .title(" Info".bold()),
         )
-        .render(info_area, buf);
+        .render(self.ui_state.layout.info_area, buf);
     }
 
     fn render_ioblock_peek(&self, peek_area: Rect, buf: &mut Buffer) {
-        let rtn_ident = &self.tasm.routines[self.ioblocks[self.ioblock_idx]]
+        let rtn_ident = &self.tasm.routines[self.ioblocks[self.ui_state.ioblock_idx]]
             .ident
             .as_str();
         let block = Block::bordered().border_set(border::EMPTY).title(

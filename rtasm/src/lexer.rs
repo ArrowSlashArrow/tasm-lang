@@ -138,7 +138,7 @@ impl Tasm {
         // 2. is the _init routine
 
         let init_exists =
-            self.routines.len() > 0 && self.routines[0].ident.as_str() == INIT_ROUTINE;
+            !self.routines.is_empty() && self.routines[0].ident.as_str() == INIT_ROUTINE;
 
         if !init_exists {
             // create the routine if it does not exist
@@ -157,10 +157,10 @@ impl Tasm {
         // therefore searching for it is not necessary
         if let Some(init) = self.routines.first_mut() {
             // add the ioblock for _start if it wasn't already added
-            if let None = init.instructions.iter().find(|instr| {
+            if init.instructions.iter().find(|instr| {
                 instr.ident == InstrIdent::IOBLOCK
-                    && instr.args.get(0) == Some(&TasmValue::Group(entry_point))
-            }) {
+                    && instr.args.first() == Some(&TasmValue::Group(entry_point))
+            }).is_none() {
                 init.prepend_instr(start_ioblock_instruction);
             }
         }

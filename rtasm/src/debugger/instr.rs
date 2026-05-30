@@ -50,7 +50,7 @@ impl Emulator {
     }
 
     pub fn spawn_group(&mut self, group: i16) {
-        if let Some(_) = self.toggled_groups.iter().find(|&g| *g == group) {
+        if self.toggled_groups.iter().find(|&g| *g == group).is_some() {
             return; // don't spawn if this group is toggled off
         }
         match self.tasm.routines.iter().find(|&rtn| rtn.group == group) {
