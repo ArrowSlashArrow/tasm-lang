@@ -1,0 +1,9 @@
+; This should not fork bomb in GD
+_start:
+    spawn fork
+    wait 20
+    breakpoint
+
+fork:
+    spawn fork
+    spawn fork

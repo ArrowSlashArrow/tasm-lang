@@ -28,6 +28,7 @@ const KEYBINDS: &[(&str, &str)] = &[
     ("-", "Slow down"),
     ("+", "Speed up"),
     ("0", "Reset speed"),
+    ("u", "Toggle unlimited speed"),
     /* todos */
     /* active routine controls */
     // left: select next process
@@ -264,10 +265,7 @@ impl Emulator {
         let idx_width = f64::log10(mem.size as f64).ceil() as usize;
         let col_width = 18 + idx_width;
         let max_cols = ((cols_area.width - 1) as f64 / col_width as f64) as u16;
-        let col_height = u16::min(
-            cols_area.height - 2,
-            (mem.size as u16 + max_cols) / max_cols,
-        );
+        let col_height = cols_area.height - 2;
 
         cols_area.height = col_height + 2;
 
@@ -522,17 +520,37 @@ impl Emulator {
     fn render_info(&self, buf: &mut Buffer) {
         Paragraph::new(Text::from(vec![
             self.tasm.fname.clone().into(),
-            Line::from(vec![
-                format!("Speed: {:.2}Hz // {:.2}x speed ", self.hz, self.hz / 240.0).into(),
-                match self.ui_state.lagging {
-                    true => format!(
-                        " Lag! Last tick: {:.3}ms",
-                        self.ui_state.last_tick_time.as_nanos() as f64 / 1_000_000.0 // scale to ms with dp precision
+            Line::from(if self.ui_state.unlimited_speed {
+                vec![
+                    "Speed: ".into(),
+                    "Unlimited".bold().fg(Color::Rgb(0, 255, 255)),
+                    " // ".into(),
+                    format!(
+                        "Running at {:.2}Hz",
+                        // ticks in an interval: interval / ticks
+                        self.ui_state.elapsed_ticks as f64
+                            / (self.ui_state.struct_field_0xe.as_nanos() as f64 / 1_000_000_000.0)
                     )
-                    .red(),
-                    false => "".into(),
-                },
-            ]),
+                    .into(),
+                ]
+            } else {
+                vec![
+                    format!("Speed: {:.2}Hz // {:.2}x speed ", self.hz, self.hz / 240.0).into(),
+                    match self.ui_state.lagging {
+                        true => {
+                            let tick_time =
+                                self.ui_state.last_tick_time.as_nanos() as f64 / 1_000_000.0;
+                            if tick_time > 0.01 {
+                                format!(" Lag! Last tick: {tick_time:.3}ms",)
+                            } else {
+                                format!(" Lag! Last tick: {:.3}μs", tick_time * 1000.0)
+                            }
+                        }
+                        .red(),
+                        false => "".into(),
+                    },
+                ]
+            }),
             format!(
                 "Tick {} [{}] // {}",
                 self.ticks,

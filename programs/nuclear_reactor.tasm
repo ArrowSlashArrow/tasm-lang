@@ -149,7 +149,7 @@ tick_continue1:
     LMRESET
     LMPTR 10
     MOV C2001, 0
-    BREAKPOINT
+    ; BREAKPOINT
     SPAWN cell_iter_heat_propagate
 
 cell_iter_heat_propagate:
@@ -336,7 +336,7 @@ tick_continue2:
     LMRESET
     LMPTR 10
     MOV C2001, 0
-    BREAKPOINT
+    ; BREAKPOINT
     SPAWN cell_iter_attr_mgr
 
 cell_iter_attr_mgr:

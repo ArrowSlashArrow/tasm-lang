@@ -1,6 +1,14 @@
 use alloc::vec;
 use core::time::Duration;
-use std::time::Instant;
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::Receiver,
+    },
+    thread::JoinHandle,
+    time::Instant,
+};
 
 use crate::{
     core::{
@@ -29,6 +37,9 @@ const HZ_SCALE: f64 = 1.148698355;
 // seconds in a tick
 const TICK_LENGTH: f32 = 0.004_166_667;
 const TICKS_PER_SECOND: f64 = 240.0;
+
+// how many ticks to run before getting time and computing average tick time
+const POLL_INTERVAL: u64 = 1_000_000;
 
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
@@ -111,6 +122,7 @@ pub struct Emulator {
     toggled_groups: Vec<i16>,
     /// Tracks what mode the memory is in right now
     legacy_memstate: LegacyMemstate,
+    eventh: Option<EventHandler>,
 }
 
 #[derive(Debug, Default)]
@@ -122,10 +134,23 @@ pub struct UIState {
     last_tick_time: Duration, // how long the previous tick took to run
     logbox: Vec<String>,   // box of messages from the emulator
     selected_routine: usize, // Emulator.running_routines[idx + 1]
-    passed_ticks: f64,     // amount of ticks that have passed since the last ui update.
+    true_tick_count: u64, // keeps track of ALL ticks that have passed since the start of the program
+    passed_ticks: f64,    // amount of ticks that have passed since the last ui update.
     layout: PrecomputedLayout,
     tpf: f64,          // cached value for ticks per frame
     tick_ns: Duration, // cached value for nanoseconds per tick
+    unlimited_speed: bool,
+    last_ui_update: Option<Instant>,
+    struct_field_0xe: Duration,
+    last_seen_ticks: u64,
+    elapsed_ticks: u64,
+}
+
+#[derive(Debug)]
+pub struct EventHandler {
+    rx: Receiver<Event>,
+    thread_handle: JoinHandle<()>,
+    stop_flag: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Default)]
@@ -178,6 +203,7 @@ impl Emulator {
             ui_state: UIState {
                 displays,
                 layout: PrecomputedLayout::new(),
+                last_ui_update: Some(Instant::now()),
                 ..Default::default()
             },
             paused: true,
@@ -187,22 +213,33 @@ impl Emulator {
     }
 
     fn update_ticks_per_frame(&mut self) {
-        // return x such that ticks per second / x = 60
         self.ui_state.tpf = self.hz / 60.0;
         self.ui_state.tick_ns = Duration::from_nanos((1_000_000_000.0 / self.hz) as u64);
+    }
+
+    fn next_tick(&self) -> bool {
+        if self.ui_state.unlimited_speed {
+            self.ui_state.true_tick_count % POLL_INTERVAL == 0
+        } else {
+            self.ui_state.passed_ticks > self.ui_state.tpf
+        }
     }
 
     pub fn run(&mut self) -> Result<()> {
         self.reset_state();
         self.setup();
+        self.start_event_polling();
+        self.update_ticks_per_frame();
 
         let mut terminal = ratatui::init();
 
-        let mut next_tick_time;
+        let mut next_tick_time = Instant::now();
         while self.running {
-            next_tick_time = Instant::now();
-            // todo: cap rendering at 60fps
-            if self.ui_state.passed_ticks > self.ui_state.tpf {
+            if !self.ui_state.unlimited_speed {
+                next_tick_time = Instant::now();
+            }
+
+            if self.next_tick() {
                 terminal.draw(|frame| {
                     if self.ui_state.layout.is_dirty {
                         self.ui_state.layout.compute(frame.area());
@@ -210,19 +247,33 @@ impl Emulator {
                     self.draw(frame)
                 })?;
                 self.ui_state.passed_ticks -= self.ui_state.tpf;
+                let elapsed = self.ui_state.last_ui_update.unwrap().elapsed();
+                if elapsed > Duration::from_millis(1000) {
+                    self.ui_state.struct_field_0xe = elapsed;
+                    self.ui_state.elapsed_ticks =
+                        self.ui_state.true_tick_count - self.ui_state.last_seen_ticks;
+                    self.ui_state.last_ui_update = Some(Instant::now());
+                    self.ui_state.last_seen_ticks = self.ui_state.true_tick_count;
+                }
             }
 
             if !self.paused {
                 self.tick();
             }
 
-            if let Ok(c) = poll(Duration::from_millis(0))
-                && c
-            {
-                self.handle_key();
+            if let Ok(event) = self.eventh.as_ref().unwrap().rx.try_recv() {
+                self.handle_event(event);
             }
 
             self.ui_state.passed_ticks += 1.0;
+            self.ui_state.true_tick_count += 1;
+
+            if self.ui_state.unlimited_speed {
+                // at 2MHz, timing the next tick becomes counter-productive because
+                // std::time::Instant::now() takes ~50ns itself
+                // therefore, skip it
+                continue;
+            }
 
             // hold specified timing
             let now = Instant::now();
@@ -239,7 +290,39 @@ impl Emulator {
             }
         }
 
+        let handle = self.eventh.take().unwrap();
+        handle.stop_flag.store(true, Ordering::Relaxed);
+        let _ = handle.thread_handle.join();
+
         Ok(())
+    }
+
+    fn start_event_polling(&mut self) {
+        let (tx, rx) = std::sync::mpsc::channel::<Event>();
+
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let stop_clone = stop_flag.clone();
+
+        let thread = std::thread::spawn(move || {
+            loop {
+                if stop_clone.load(Ordering::Relaxed) {
+                    break;
+                }
+                if let Ok(c) = poll(Duration::from_millis(1000))
+                    && c
+                {
+                    if let Err(_) = tx.send(crossterm::event::read().unwrap()) {
+                        break;
+                    }
+                }
+            }
+        });
+
+        self.eventh = Some(EventHandler {
+            rx,
+            thread_handle: thread,
+            stop_flag,
+        })
     }
 
     fn setup(&mut self) {
@@ -294,12 +377,7 @@ impl Emulator {
         frame.render_widget(self, frame.area())
     }
 
-    pub fn handle_key(&mut self) {
-        let event = match crossterm::event::read() {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-
+    pub fn handle_event(&mut self, event: Event) {
         if let Event::Key(k) = event {
             if TOGGLE_KEYS.contains(&k.code) {
                 self.handle_toggle_key(k);
@@ -386,6 +464,7 @@ impl Emulator {
                 self.hz = TICKS_PER_SECOND;
                 self.update_ticks_per_frame();
             }
+            KeyCode::Char('u') => self.ui_state.unlimited_speed = !self.ui_state.unlimited_speed,
             // kc @ (_) => {
             //     self.add_log(format!("Key {kc:?} is not yet supported."));
             // }
@@ -395,6 +474,11 @@ impl Emulator {
 
     pub fn tick(&mut self) {
         self.running_routines.retain(|r| !r.done);
+
+        /* ************************ */
+        // TODO: redo the whole function
+        // currently, the logic is broken surrounding the execution instructions
+
         let mut instrs_todo = vec![];
         let mut waits_todo = vec![];
         for (rtn_idx, routine) in self.running_routines.iter_mut().enumerate() {
@@ -429,14 +513,16 @@ impl Emulator {
             }
         }
 
+        for (parent, wait) in waits_todo {
+            self.wait_ticks(parent, wait);
+        }
+
         for (parent, instr) in instrs_todo.iter_mut() {
             instr.parent_running_routine_idx = *parent;
             self.exec_instr(instr);
         }
 
-        for (parent, wait) in waits_todo {
-            self.wait_ticks(parent, wait);
-        }
+        /* ************************ */
 
         let mut spawns_todo = vec![];
         for timer in self.ticking_timers.iter() {
