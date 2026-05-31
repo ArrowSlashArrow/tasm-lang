@@ -480,10 +480,10 @@ pub struct Instruction {
     pub handler_fn: HandlerFn,
     pub handler_fn_emu: EmulatorHandler,
     pub is_concurrent: bool,
-    // this is an emulator-only field
-    // used to identify parent routine
-    // leave blank when instantiating this struct
-    pub parent_running_routine_idx: usize,
+    /// True if this instruction has at least one alias. good for quick lookup
+    pub has_alias: bool,
+    /// Constant except in the case of WAIT and WAITS
+    pub time: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -147,7 +147,7 @@ impl Emulator {
                     Line::from(format!(
                         " {:<13} : {:>12} ",
                         format!("{item:?}"),
-                        self.state.get_item_value_str(*item)
+                        self.state.counter_state.get_item_value_str(*item)
                     ))
                 })
                 .collect::<Vec<Line<'_>>>(),
@@ -284,9 +284,9 @@ impl Emulator {
             let mut curr_col = vec![];
             let start_idx = idx;
             while curr_col.len() < col_height as usize && idx < mem.size {
-                let num = self.read_mem(idx);
+                let num = self.state.read_mem(idx);
 
-                let is_selected = self.get_ptrpos_value().0 == idx as i32;
+                let is_selected = self.state.get_ptrpos_value().0 == idx as i32;
 
                 let mut line_segments = vec![
                     " ".into(),
@@ -319,7 +319,7 @@ impl Emulator {
             cols.push((curr_col, start_idx, end_idx));
         }
 
-        let ptrpos = self.get_ptrpos_value().0 as i16;
+        let ptrpos = self.state.get_ptrpos_value().0 as i16;
 
         for (i, (col, start, end)) in cols.into_iter().enumerate() {
             let is_ptr_here = start <= ptrpos && ptrpos <= end;
@@ -344,14 +344,16 @@ impl Emulator {
                 let mut memreg_line_segments = vec![Span::from("Register: ")];
                 render_number(
                     &mut memreg_line_segments,
-                    self.state.get_num(mem.memreg.to_item().unwrap()),
+                    self.state
+                        .counter_state
+                        .get_num(mem.memreg.to_item().unwrap()),
                     mem.is_int(),
                     false,
                 );
                 let mut ptrpos_line_segments = vec![Span::from("Position: ")];
                 render_number(
                     &mut ptrpos_line_segments,
-                    self.get_ptrpos_value().0 as f64,
+                    self.state.get_ptrpos_value().0 as f64,
                     true,
                     false,
                 );
@@ -373,7 +375,7 @@ impl Emulator {
             )],
         };
 
-        match self.legacy_memstate {
+        match self.state.legacy_memstate {
             LegacyMemstate::None => {
                 // check that legacy memory is being used here
                 if let Some(ref mem) = self.tasm.mem_info
@@ -495,23 +497,23 @@ impl Emulator {
 
     fn get_state(&self, rtn: &RunningRoutine) -> String {
         if rtn.done {
-            format!("{}: done", rtn.routine.ident)
+            format!("{}: done", self.get_routine_ref(rtn).ident)
         } else {
-            let waiting_ticks = rtn.waiting - 1;
+            let waiting_ticks = rtn.waiting;
             if waiting_ticks > 0 {
                 format!(
                     "{}: [{}] {} (waiting {} ticks)",
-                    rtn.routine.ident,
+                    self.get_routine_ref(rtn).ident,
                     rtn.instr_ptr,
-                    self.get_instr_line(rtn.get_line()),
+                    self.get_instr_line(self.get_routine_instr_ref(rtn).line_number),
                     waiting_ticks
                 )
             } else {
                 format!(
                     "{}: [{}] {}",
-                    rtn.routine.ident,
+                    self.get_routine_ref(rtn).ident,
                     rtn.instr_ptr,
-                    self.get_instr_line(rtn.get_line())
+                    self.get_instr_line(self.get_routine_instr_ref(rtn).line_number)
                 )
             }
         }

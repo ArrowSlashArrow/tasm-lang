@@ -345,7 +345,7 @@ pub fn verify_assign(instr: &Instruction, args: &[TasmValue]) -> Result<(), Stri
 }
 
 pub fn resolve_aliases<'a>(instr: &'a Instruction, aliases: &Aliases) -> Cow<'a, [TasmValue]> {
-    if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
+    if instr.has_alias {
         let mut resolved = instr.args.clone();
         for v in &mut resolved {
             if let TasmValue::Alias(alias) = v {

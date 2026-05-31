@@ -10,11 +10,10 @@ use crate::{
         HandlerFn,
         flags::FlagValue,
         structs::{
-            HandlerArgs, InstrIdent, InstrType, Instruction, TasmPrimitive, TasmValue,
-            TasmValueType,
+            HandlerArgs, InstrIdent, InstrType, Routine, TasmPrimitive, TasmValue, TasmValueType,
         },
     },
-    debugger::Emulator,
+    debugger::{EmulatorState, ResolvedInstruction},
     instr::{fns::*, mem::*},
 };
 
@@ -28,26 +27,25 @@ macro_rules! argset {
     // **TEMP FIX**
     // TODO: REMOVE WHEN WE HAVE HANDLERS FOR ALL INSTRUCTIONS!!!!
     (($($arg:ident),*) => $fn:ident) => {
-        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn, Emulator::not_implemented)
+        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn, EmulatorState::not_implemented)
     };
 
     (($($arg:ident),*) => $fn:ident, $emu_fn:ident) => {
-        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn, Emulator::$emu_fn)
+        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn, EmulatorState::$emu_fn)
     };
 
     // THIS IS ALSO A TEMP FIX!!
     ([$argtype:ident] => $fn:ident) => {
-        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn, Emulator::not_implemented)
+        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn, EmulatorState::not_implemented)
     };
 
     // use this for list args
     ([$argtype:ident] => $fn:ident, $emu_fn:ident) => {
-        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn, Emulator::$emu_fn)
+        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn, EmulatorState::$emu_fn)
     }
 }
 
-pub type EmulatorArgs<'a> = &'a Instruction;
-pub type EmulatorHandler = fn(&mut Emulator, EmulatorArgs) -> ();
+pub type EmulatorHandler = fn(&mut EmulatorState, ResolvedInstruction, &Vec<Routine>) -> ();
 pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn, EmulatorHandler);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrIdent)> = phf_map! {

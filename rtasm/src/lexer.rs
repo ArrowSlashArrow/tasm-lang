@@ -127,9 +127,10 @@ impl Tasm {
             ],
             flags: vec![],
             handler_fn: crate::instr::fns::ioblock,
-            handler_fn_emu: crate::debugger::Emulator::unreachable,
+            handler_fn_emu: crate::debugger::EmulatorState::unreachable,
             is_concurrent: false,
-            parent_running_routine_idx: 0,
+            has_alias: false,
+            time: 0,
         };
 
         // by now, the _init routine has been moved to the front of the array
@@ -157,10 +158,15 @@ impl Tasm {
         // therefore searching for it is not necessary
         if let Some(init) = self.routines.first_mut() {
             // add the ioblock for _start if it wasn't already added
-            if init.instructions.iter().find(|instr| {
-                instr.ident == InstrIdent::IOBLOCK
-                    && instr.args.first() == Some(&TasmValue::Group(entry_point))
-            }).is_none() {
+            if init
+                .instructions
+                .iter()
+                .find(|instr| {
+                    instr.ident == InstrIdent::IOBLOCK
+                        && instr.args.first() == Some(&TasmValue::Group(entry_point))
+                })
+                .is_none()
+            {
                 init.prepend_instr(start_ioblock_instruction);
             }
         }
@@ -485,12 +491,19 @@ impl Tasm {
                     ident: *instr_ident,
                     itype: *itype,
                     line_number: curr_line,
+                    has_alias: args.iter().any(|a| {
+                        if let TasmValue::Alias(_) = a {
+                            true
+                        } else {
+                            false
+                        }
+                    }),
                     args,
                     flags,
                     handler_fn: gmd_handler,
                     handler_fn_emu: emu_handler,
                     is_concurrent,
-                    parent_running_routine_idx: 0,
+                    time: get_time(*instr_ident),
                 });
             }
             None => {
@@ -823,5 +836,68 @@ pub fn parse_file<T: AsRef<str>>(
             }
         }
         Err(tasm.errors)
+    }
+}
+
+// this function exists solely for the emulator
+pub fn get_time(ident: InstrIdent) -> i32 {
+    match ident {
+        /* inits */
+        InstrIdent::MALLOC => 0,
+        InstrIdent::FMALLOC => 0,
+        InstrIdent::INITMEM => 0,
+        InstrIdent::PERS => 0,
+        InstrIdent::DISPLAY => 0,
+        InstrIdent::IOBLOCK => 0,
+        InstrIdent::LMALLOC => 0,
+        InstrIdent::LFMALLOC => 0,
+        // this one is a bit of an exception
+        InstrIdent::RAW => 0,
+        /* execution time in ticks */
+        InstrIdent::LMFUNC => 2,
+        InstrIdent::LMREAD => 1,
+        InstrIdent::LMWRITE => 1,
+        InstrIdent::LMPTR => 1,
+        InstrIdent::LMRESET => 1,
+        InstrIdent::MOV => 1,
+        InstrIdent::MSET => 4,
+        InstrIdent::MGET => 4,
+        InstrIdent::BREAKPOINT => 1,
+        InstrIdent::SPAWN => 1,
+        InstrIdent::NOP => 1,
+        // -1: dynamic case
+        InstrIdent::WAIT => -1,
+        InstrIdent::WAITS => -1,
+        InstrIdent::ADD => 1,
+        InstrIdent::SUB => 1,
+        InstrIdent::ADDM => 1,
+        InstrIdent::SUBM => 1,
+        InstrIdent::ADDD => 1,
+        InstrIdent::SUBD => 1,
+        InstrIdent::MUL => 1,
+        InstrIdent::DIV => 1,
+        InstrIdent::FLDIV => 1,
+        InstrIdent::SE => 2,
+        InstrIdent::SNE => 2,
+        InstrIdent::SL => 2,
+        InstrIdent::SLE => 2,
+        InstrIdent::SG => 2,
+        InstrIdent::SGE => 2,
+        InstrIdent::FE => 2,
+        InstrIdent::FNE => 2,
+        InstrIdent::FL => 2,
+        InstrIdent::FLE => 2,
+        InstrIdent::FG => 2,
+        InstrIdent::FGE => 2,
+        InstrIdent::SRAND => 2,
+        InstrIdent::FRAND => 2,
+        InstrIdent::TSPAWN => 1,
+        InstrIdent::TSTART => 1,
+        InstrIdent::TSTOP => 1,
+        InstrIdent::PAUSE => 1,
+        InstrIdent::RESUME => 1,
+        InstrIdent::KILL => 1,
+        InstrIdent::TOGGLEON => 1,
+        InstrIdent::TOGGLEOFF => 1,
     }
 }

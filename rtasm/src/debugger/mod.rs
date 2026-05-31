@@ -1,6 +1,7 @@
 use alloc::vec;
 use core::time::Duration;
 use std::{
+    borrow::Cow,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -13,10 +14,11 @@ use std::{
 use crate::{
     core::{
         consts::INIT_ROUTINE,
+        flags::Flag,
         resolve_aliases,
-        structs::{InstrIdent, InstrType, Instruction, Routine, Tasm},
+        structs::{Aliases, InstrIdent, InstrType, Instruction, MemInfo, Routine, Tasm, TasmValue},
     },
-    debugger::layout::PrecomputedLayout,
+    debugger::{RoutineCommand::Spawn, layout::PrecomputedLayout},
 };
 
 use anyhow::Result;
@@ -38,9 +40,6 @@ const HZ_SCALE: f64 = 1.148698355;
 const TICK_LENGTH: f32 = 0.004_166_667;
 const TICKS_PER_SECOND: f64 = 240.0;
 
-// how many ticks to run before getting time and computing average tick time
-const POLL_INTERVAL: u64 = 1_000_000;
-
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
         println!("Emulator failed to run: {e}")
@@ -50,7 +49,7 @@ pub fn emulate(tasm: Tasm) {
 }
 
 #[derive(Debug)]
-pub struct EmulatorState {
+pub struct CounterState {
     counters: [i32; 10_000],
     timers: [f32; 10_000],
     attempts: i32,
@@ -58,7 +57,7 @@ pub struct EmulatorState {
     maintime: f32,
 }
 
-impl Default for EmulatorState {
+impl Default for CounterState {
     fn default() -> Self {
         Self {
             counters: [0; 10_000],
@@ -70,7 +69,7 @@ impl Default for EmulatorState {
     }
 }
 
-impl EmulatorState {
+impl CounterState {
     // returns the given item value as a string
     fn get_item_value_str(&self, item: Item) -> String {
         match item {
@@ -104,25 +103,18 @@ impl EmulatorState {
 
 #[derive(Debug, Default)]
 pub struct Emulator {
+    tasm: Tasm, // original compiled tasm. should **NEVER** be mutated.
     running: bool,
-    state: EmulatorState,                  // counter state
-    tasm: Tasm,                            // original compiled tasm
-    paused: bool,                          // happens when tripping a breakpoint
-    running_routines: Vec<RunningRoutine>, // all current running routines
-    ioblocks: Vec<usize>,                  // idxs to self.tasm.routines
+    paused: bool, // happens when tripping a breakpoint
+    /// The active, changing state
+    state: EmulatorState, // counter state
+    ioblocks: Vec<usize>, // idxs to self.tasm.routines
     ui_state: UIState,
-    init_instrs: Vec<Instruction>,     // executed every reset
-    ticks: u64,                        // tick counter
-    hz: f64,                           // ticks per second
-    ticking_timers: Vec<TickingTimer>, // list of timers that are currently ticking
-    started_timers: Vec<i16>,          // list of timer ids that have been initailized
-    // list of groups that are toggled off
-    // before spawning a group, check that it isn't in here
-    // if there *is* an active process with this group, toggle it off
-    toggled_groups: Vec<i16>,
-    /// Tracks what mode the memory is in right now
-    legacy_memstate: LegacyMemstate,
+    ticks: u64, // tick counter
+    hz: f64,    // ticks per second
     eventh: Option<EventHandler>,
+    // not in self.state for optimization reasons
+    running_routines: Vec<RunningRoutine>, // all current running routines
 }
 
 #[derive(Debug, Default)]
@@ -144,6 +136,31 @@ pub struct UIState {
     struct_field_0xe: Duration,
     last_seen_ticks: u64,
     elapsed_ticks: u64,
+    poll_interval: u64,
+}
+
+#[derive(Debug, Default)]
+pub struct EmulatorState {
+    ticking_timers: Vec<TickingTimer>, // list of timers that are currently ticking
+    started_timers: Vec<i16>,          // list of timer ids that have been initailized
+    init_instrs: Vec<Instruction>,     // executed every reset
+    // list of groups that are toggled off
+    // before spawning a group, check that it isn't in here
+    // if there *is* an active process with this group, toggle it off
+    toggled_groups: Vec<i16>,
+    timer_spawns_todo: Vec<(i16, i16)>,
+    counter_state: CounterState,
+    mem_info: Option<MemInfo>,
+    /// Tracks what mode the memory is in right now
+    legacy_memstate: LegacyMemstate,
+    /// This field exists to allow for `self::add_running_routine`
+    routine_groups: Vec<i16>,
+    /// Temporary container for logs created from instructions that will be forwarded to the master struct
+    temp_logbox: Vec<String>,
+    /// Temporary container for `Emulator.paused`
+    temp_paused: bool,
+    /// Stores all routine commands that were committed this tick
+    temp_routine_commands: Vec<RoutineCommand>,
 }
 
 #[derive(Debug)]
@@ -161,9 +178,19 @@ pub enum LegacyMemstate {
     Write,
 }
 
+#[derive(Debug)]
+pub enum RoutineCommand {
+    Spawn(usize),
+    Pause(i16),
+    Resume(i16),
+    Kill(i16),
+    ToggleOff(i16),
+    ToggleOn(i16),
+}
+
 impl Emulator {
     fn reset_state(&mut self) {
-        self.state = EmulatorState::default();
+        self.state.counter_state = CounterState::default();
         self.running_routines.clear();
         self.ticks = 0;
     }
@@ -196,14 +223,19 @@ impl Emulator {
             };
 
         Self {
-            state: EmulatorState::default(),
-            tasm,
             running: true,
-            init_instrs,
+            state: EmulatorState {
+                init_instrs,
+                mem_info: tasm.mem_info.clone(),
+                routine_groups: tasm.routines.iter().map(|r| r.group).collect::<Vec<_>>(),
+                ..Default::default()
+            },
+            tasm,
             ui_state: UIState {
                 displays,
                 layout: PrecomputedLayout::new(),
                 last_ui_update: Some(Instant::now()),
+                poll_interval: 1000000,
                 ..Default::default()
             },
             paused: true,
@@ -218,10 +250,11 @@ impl Emulator {
     }
 
     fn next_tick(&self) -> bool {
-        if self.ui_state.unlimited_speed {
-            self.ui_state.true_tick_count % POLL_INTERVAL == 0
+        let ui = &self.ui_state;
+        if ui.unlimited_speed {
+            ui.true_tick_count % ui.poll_interval == 0
         } else {
-            self.ui_state.passed_ticks > self.ui_state.tpf
+            ui.passed_ticks > ui.tpf
         }
     }
 
@@ -244,11 +277,19 @@ impl Emulator {
                     if self.ui_state.layout.is_dirty {
                         self.ui_state.layout.compute(frame.area());
                     }
+                    let logbox_height = (self.ui_state.layout.logbox_area.height - 2) as usize;
+
+                    if self.ui_state.logbox.len() > logbox_height {
+                        self.ui_state
+                            .logbox
+                            .drain(..self.ui_state.logbox.len() - logbox_height);
+                    }
+
                     self.draw(frame)
                 })?;
                 self.ui_state.passed_ticks -= self.ui_state.tpf;
                 let elapsed = self.ui_state.last_ui_update.unwrap().elapsed();
-                if elapsed > Duration::from_millis(1000) {
+                if elapsed > Duration::from_millis(500) {
                     self.ui_state.struct_field_0xe = elapsed;
                     self.ui_state.elapsed_ticks =
                         self.ui_state.true_tick_count - self.ui_state.last_seen_ticks;
@@ -330,13 +371,15 @@ impl Emulator {
         // for stuff like running _init
 
         self.load_ioblocks();
-        let instrs = take(&mut self.init_instrs);
 
-        for instr in instrs.clone().iter_mut() {
-            self.exec_instr(instr);
+        let instrs = take(&mut self.state.init_instrs);
+
+        for instr in instrs.iter() {
+            self.state
+                .exec_instr(&instr, &self.tasm.aliases, &self.tasm.routines);
         }
 
-        self.init_instrs = instrs;
+        self.state.init_instrs = instrs;
     }
 
     fn load_ioblocks(&mut self) {
@@ -441,8 +484,7 @@ impl Emulator {
                 if routine_idx == usize::MAX {
                     return;
                 }
-                let routine = self.tasm.routines[routine_idx].clone();
-                self.add_running_routine(routine);
+                self.add_running_routine(routine_idx);
             }
             KeyCode::Char('.') if self.paused => {
                 self.tick();
@@ -472,73 +514,109 @@ impl Emulator {
         }
     }
 
+    fn handle_routine(emu_state: &mut EmulatorState, rtn: &mut RunningRoutine, tasm: &Tasm) {
+        if rtn.paused {
+            return;
+        }
+
+        if rtn.waiting > 0 {
+            rtn.waiting -= 1;
+            return;
+        }
+
+        let instrs = &tasm.routines[rtn.index].instructions;
+        let wait_time = get_time(&instrs[rtn.instr_ptr]) - 1;
+
+        if rtn.toggled {
+            emu_state.exec_instr(
+                // this is safe *ONLY IF* the emulator handler never mutates self.tasm
+                // it doesn't, so we're good
+                unsafe { &*(&instrs[rtn.instr_ptr] as *const Instruction) },
+                &tasm.aliases,
+                &tasm.routines,
+            );
+        }
+
+        rtn.waiting = wait_time;
+
+        rtn.instr_ptr += 1;
+        if rtn.instr_ptr >= instrs.len() {
+            rtn.done = true;
+        }
+    }
+
     pub fn tick(&mut self) {
+        for routine in self.running_routines.iter_mut() {
+            // emulator state was separated to struct due to borrowing issues
+            Self::handle_routine(&mut self.state, routine, &self.tasm);
+        }
+
+        for cmd in self.state.temp_routine_commands.iter() {
+            match cmd {
+                RoutineCommand::ToggleOn(g) => self.running_routines.iter_mut().for_each(|r| {
+                    if r.group == *g {
+                        r.toggled = true
+                    }
+                }),
+                RoutineCommand::ToggleOff(g) => self.running_routines.iter_mut().for_each(|r| {
+                    if r.group == *g {
+                        r.toggled = false
+                    }
+                }),
+                RoutineCommand::Kill(g) => self.running_routines.iter_mut().for_each(|r| {
+                    if r.group == *g {
+                        r.done = true
+                    }
+                }),
+                RoutineCommand::Pause(g) => self.running_routines.iter_mut().for_each(|r| {
+                    if r.group == *g {
+                        r.paused = true
+                    }
+                }),
+                RoutineCommand::Resume(g) => self.running_routines.iter_mut().for_each(|r| {
+                    if r.group == *g {
+                        r.paused = false
+                    }
+                }),
+                RoutineCommand::Spawn(idx) => self
+                    .running_routines
+                    .push(RunningRoutine::new(*idx, self.state.routine_groups[*idx])),
+            }
+        }
+        self.state.temp_routine_commands.clear();
+
         self.running_routines.retain(|r| !r.done);
-
-        /* ************************ */
-        // TODO: redo the whole function
-        // currently, the logic is broken surrounding the execution instructions
-
-        let mut instrs_todo = vec![];
-        let mut waits_todo = vec![];
-        for (rtn_idx, routine) in self.running_routines.iter_mut().enumerate() {
-            if routine.paused {
-                continue;
-            }
-            if routine.waiting > 0 {
-                routine.waiting -= 1;
-                if routine.waiting > 0 {
-                    continue;
-                }
-            }
-
-            // otherwise, increment instruction ptr
-            if routine.instr_ptr < routine.routine.instructions.len() {
-                // todo: figure out concurrent instructions
-                if routine.toggled {
-                    instrs_todo.push((
-                        rtn_idx,
-                        routine.routine.instructions[routine.instr_ptr].clone(),
-                    ));
-                }
-                // progression still happens even if routine is not toggled
-                let instr = &routine.routine.instructions[routine.instr_ptr];
-                let wait_time = get_time(instr);
-                waits_todo.push((instr.parent_running_routine_idx, wait_time));
-                routine.instr_ptr += 1;
-            }
-            if routine.instr_ptr == routine.routine.instructions.len() {
-                // end routine
-                routine.done = true;
-            }
+        // update self fields from self.state
+        if self.state.temp_logbox.len() > 0 {
+            // take gets the logs and clears them out at the same time
+            self.ui_state
+                .logbox
+                .extend(take(&mut self.state.temp_logbox));
         }
+        self.paused = self.state.temp_paused;
+        self.state.temp_paused = false;
 
-        for (parent, wait) in waits_todo {
-            self.wait_ticks(parent, wait);
-        }
-
-        for (parent, instr) in instrs_todo.iter_mut() {
-            instr.parent_running_routine_idx = *parent;
-            self.exec_instr(instr);
-        }
-
-        /* ************************ */
-
-        let mut spawns_todo = vec![];
-        for timer in self.ticking_timers.iter() {
+        self.state.timer_spawns_todo.clear();
+        for timer in self.state.ticking_timers.iter() {
             if timer.paused {
                 continue;
             }
-            let time = self.state.timers.get_mut(timer.id as usize).unwrap();
+            let time = self
+                .state
+                .counter_state
+                .timers
+                .get_mut(timer.id as usize)
+                .unwrap();
             *time += TICK_LENGTH;
             if *time >= timer.target_time {
-                spawns_todo.push((timer.group, timer.id));
+                self.state.timer_spawns_todo.push((timer.group, timer.id));
             }
         }
 
-        for (sp, id) in spawns_todo {
-            self.spawn_group(sp);
-            self.ticking_timers.retain(|t| t.id != id);
+        for i in 0..self.state.timer_spawns_todo.len() {
+            let (sp, id) = self.state.timer_spawns_todo[i];
+            self.state.spawn_group(sp, &self.tasm.routines);
+            self.state.ticking_timers.retain(|t| t.id != id);
         }
 
         if self.ui_state.selected_routine > self.running_routines.len() {
@@ -548,31 +626,65 @@ impl Emulator {
         self.ticks += 1;
     }
 
-    fn wait_ticks(&mut self, rtn_idx: usize, ticks: i32) {
-        if let Some(rtn) = self.running_routines.get_mut(rtn_idx) {
-            rtn.waiting = ticks;
-        }
+    fn add_running_routine(&mut self, routine: usize) {
+        self.running_routines.push(RunningRoutine::new(
+            routine,
+            self.tasm.routines[routine].group,
+        ));
     }
 
-    fn add_log(&mut self, log: String) {
-        self.ui_state.logbox.push(format!("[{}] {log}", self.ticks));
+    fn get_routine_instr_ref(&self, routine: &RunningRoutine) -> &Instruction {
+        &self.tasm.routines[routine.index].instructions[routine.instr_ptr]
     }
 
-    fn exec_instr(&mut self, instr: &mut Instruction) {
-        let resolved_args = resolve_aliases(instr, &self.tasm.aliases);
-        instr.args = resolved_args.to_vec();
-        (instr.handler_fn_emu)(self, instr);
+    fn get_routine_ref(&self, routine: &RunningRoutine) -> &Routine {
+        &self.tasm.routines[routine.index]
+    }
+}
+
+impl EmulatorState {
+    pub fn exec_instr(
+        &mut self,
+        real_instr: &Instruction,
+        aliases: &Aliases,
+        routines: &Vec<Routine>,
+    ) {
+        let (handler_fn, resolved) = {
+            let resolved_args = resolve_aliases(real_instr, aliases);
+            let resolved_instr = ResolvedInstruction {
+                ident: real_instr.ident,
+                line_number: real_instr.line_number,
+                args: resolved_args,
+                _flags: &real_instr.flags[..],
+            };
+
+            (real_instr.handler_fn_emu, resolved_instr)
+        };
+
+        (handler_fn)(self, resolved, routines);
     }
 
-    fn add_running_routine(&mut self, routine: Routine) {
-        self.add_log(format!("Spawned routine {}", routine.ident));
-        self.running_routines.push(RunningRoutine::new(routine));
+    pub fn add_running_routine(&mut self, routine: usize) {
+        self.temp_routine_commands.push(Spawn(routine));
     }
+
+    pub fn add_log(&mut self, log: String) {
+        self.temp_logbox.push(log)
+    }
+}
+
+pub struct ResolvedInstruction<'a> {
+    ident: InstrIdent,
+    line_number: usize,
+    args: Cow<'a, [TasmValue]>,
+    _flags: &'a [Flag], // unused for now
 }
 
 #[derive(Debug, Default)]
 pub struct RunningRoutine {
-    routine: Routine,
+    /// Index to Emulator.tasm.routines
+    index: usize,
+    group: i16,
     instr_ptr: usize,
     waiting: i32, // how many ticks it is waiting
     done: bool,
@@ -581,19 +693,16 @@ pub struct RunningRoutine {
 }
 
 impl RunningRoutine {
-    pub fn new(routine: Routine) -> Self {
+    pub fn new(index: usize, group: i16) -> Self {
         Self {
-            routine,
+            index,
+            group,
             instr_ptr: 0,
             waiting: 0,
             done: false,
             paused: false,
             toggled: true,
         }
-    }
-
-    pub fn get_line(&self) -> usize {
-        self.routine.instructions[self.instr_ptr].line_number
     }
 }
 
@@ -606,68 +715,20 @@ pub struct TickingTimer {
 }
 
 pub fn get_time(instr: &Instruction) -> i32 {
-    match instr.ident {
-        /* never executed */
-        InstrIdent::MALLOC => 0,
-        InstrIdent::FMALLOC => 0,
-        InstrIdent::INITMEM => 0,
-        InstrIdent::PERS => 0,
-        InstrIdent::DISPLAY => 0,
-        InstrIdent::IOBLOCK => 0,
-        InstrIdent::LMALLOC => 0,
-        InstrIdent::LFMALLOC => 0,
-        InstrIdent::RAW => 0,
-        /* execution time in ticks */
-        InstrIdent::LMFUNC => 2,
-        InstrIdent::LMREAD => 1,
-        InstrIdent::LMWRITE => 1,
-        InstrIdent::LMPTR => 1,
-        InstrIdent::LMRESET => 1,
-        InstrIdent::MOV => 1,
-        InstrIdent::MSET => 4,
-        InstrIdent::MGET => 4,
-        InstrIdent::BREAKPOINT => 1,
-        InstrIdent::SPAWN => 1,
-        InstrIdent::NOP => 1,
-        InstrIdent::WAIT => instr.args[0].to_int().unwrap(),
-        InstrIdent::WAITS => (instr.args[0].to_float().unwrap() * TICKS_PER_SECOND) as i32,
-        InstrIdent::ADD => 1,
-        InstrIdent::SUB => 1,
-        InstrIdent::ADDM => 1,
-        InstrIdent::SUBM => 1,
-        InstrIdent::ADDD => 1,
-        InstrIdent::SUBD => 1,
-        InstrIdent::MUL => 1,
-        InstrIdent::DIV => 1,
-        InstrIdent::FLDIV => 1,
-        InstrIdent::SE => 2,
-        InstrIdent::SNE => 2,
-        InstrIdent::SL => 2,
-        InstrIdent::SLE => 2,
-        InstrIdent::SG => 2,
-        InstrIdent::SGE => 2,
-        InstrIdent::FE => 2,
-        InstrIdent::FNE => 2,
-        InstrIdent::FL => 2,
-        InstrIdent::FLE => 2,
-        InstrIdent::FG => 2,
-        InstrIdent::FGE => 2,
-        InstrIdent::SRAND => 2,
-        InstrIdent::FRAND => 2,
-        InstrIdent::TSPAWN => 1,
-        InstrIdent::TSTART => 1,
-        InstrIdent::TSTOP => 1,
-        InstrIdent::PAUSE => 1,
-        InstrIdent::RESUME => 1,
-        InstrIdent::KILL => 1,
-        InstrIdent::TOGGLEON => 1,
-        InstrIdent::TOGGLEOFF => 1,
+    if instr.time == -1 {
+        match instr.ident {
+            InstrIdent::WAIT => instr.args[0].to_int().unwrap(),
+            InstrIdent::WAITS => (instr.args[0].to_float().unwrap() * TICKS_PER_SECOND) as i32,
+            _ => unreachable!(),
+        }
+    } else {
+        instr.time
     }
 }
 
-impl Emulator {
+impl EmulatorState {
     pub fn write_mem(&mut self, addr: i16, value: f64) {
-        match self.tasm.mem_info {
+        match self.mem_info {
             None => (),
             Some(ref mem) => {
                 // get true counter
@@ -676,13 +737,13 @@ impl Emulator {
                     false => Item::Timer(mem.start_counter_id + addr),
                 };
 
-                self.state.set_item(true_addr, value);
+                self.counter_state.set_item(true_addr, value);
             }
         }
     }
 
     pub fn read_mem(&self, addr: i16) -> f64 {
-        match self.tasm.mem_info {
+        match self.mem_info {
             None => 0.0,
             Some(ref mem) => {
                 // get true counter
@@ -691,7 +752,7 @@ impl Emulator {
                     false => Item::Timer(mem.start_counter_id + addr),
                 };
 
-                self.state.get_num(true_addr)
+                self.counter_state.get_num(true_addr)
             }
         }
     }
