@@ -1,7 +1,6 @@
 use alloc::vec;
 use core::time::Duration;
 use std::{
-    borrow::Cow,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -15,7 +14,6 @@ use crate::{
     core::{
         consts::INIT_ROUTINE,
         flags::Flag,
-        resolve_aliases,
         structs::{Aliases, InstrIdent, InstrType, Instruction, MemInfo, Routine, Tasm, TasmValue},
     },
     debugger::{RoutineCommand::Spawn, layout::PrecomputedLayout},
@@ -39,6 +37,9 @@ const HZ_SCALE: f64 = 1.148698355;
 // seconds in a tick
 const TICK_LENGTH: f32 = 0.004_166_667;
 const TICKS_PER_SECOND: f64 = 240.0;
+
+// event polling is relatively inexpensive so it can be done at a high rate
+const EVENT_POLLING_RATE: u64 = 1000;
 
 pub fn emulate(tasm: Tasm) {
     if let Err(e) = Emulator::new(tasm).run() {
@@ -136,6 +137,7 @@ pub struct UIState {
     struct_field_0xe: Duration,
     last_seen_ticks: u64,
     elapsed_ticks: u64,
+    /// This interval must be a power of 2 for self.next_tick to work
     poll_interval: u64,
 }
 
@@ -150,6 +152,7 @@ pub struct EmulatorState {
     toggled_groups: Vec<i16>,
     timer_spawns_todo: Vec<(i16, i16)>,
     counter_state: CounterState,
+    aliases: Aliases,
     mem_info: Option<MemInfo>,
     /// Tracks what mode the memory is in right now
     legacy_memstate: LegacyMemstate,
@@ -190,7 +193,6 @@ pub enum RoutineCommand {
 
 impl Emulator {
     fn reset_state(&mut self) {
-        self.state.counter_state = CounterState::default();
         self.running_routines.clear();
         self.ticks = 0;
     }
@@ -227,6 +229,7 @@ impl Emulator {
             state: EmulatorState {
                 init_instrs,
                 mem_info: tasm.mem_info.clone(),
+                aliases: tasm.aliases.clone(),
                 routine_groups: tasm.routines.iter().map(|r| r.group).collect::<Vec<_>>(),
                 ..Default::default()
             },
@@ -235,7 +238,7 @@ impl Emulator {
                 displays,
                 layout: PrecomputedLayout::new(),
                 last_ui_update: Some(Instant::now()),
-                poll_interval: 1000000,
+                poll_interval: 1 << 21,
                 ..Default::default()
             },
             paused: true,
@@ -249,10 +252,11 @@ impl Emulator {
         self.ui_state.tick_ns = Duration::from_nanos((1_000_000_000.0 / self.hz) as u64);
     }
 
+    #[inline(always)]
     fn next_tick(&self) -> bool {
         let ui = &self.ui_state;
         if ui.unlimited_speed {
-            ui.true_tick_count % ui.poll_interval == 0
+            ui.true_tick_count & (ui.poll_interval - 1) == 0
         } else {
             ui.passed_ticks > ui.tpf
         }
@@ -302,8 +306,12 @@ impl Emulator {
                 self.tick();
             }
 
-            if let Ok(event) = self.eventh.as_ref().unwrap().rx.try_recv() {
-                self.handle_event(event);
+            if !self.ui_state.unlimited_speed
+                || self.ui_state.true_tick_count % EVENT_POLLING_RATE == 0
+            {
+                if let Ok(event) = self.eventh.as_ref().unwrap().rx.try_recv() {
+                    self.handle_event(event);
+                }
             }
 
             self.ui_state.passed_ticks += 1.0;
@@ -351,10 +359,9 @@ impl Emulator {
                 }
                 if let Ok(c) = poll(Duration::from_millis(1000))
                     && c
+                    && tx.send(crossterm::event::read().unwrap()).is_err()
                 {
-                    if let Err(_) = tx.send(crossterm::event::read().unwrap()) {
-                        break;
-                    }
+                    break;
                 }
             }
         });
@@ -375,8 +382,7 @@ impl Emulator {
         let instrs = take(&mut self.state.init_instrs);
 
         for instr in instrs.iter() {
-            self.state
-                .exec_instr(&instr, &self.tasm.aliases, &self.tasm.routines);
+            self.state.exec_instr(&instr, &self.tasm.routines);
         }
 
         self.state.init_instrs = instrs;
@@ -532,7 +538,6 @@ impl Emulator {
                 // this is safe *ONLY IF* the emulator handler never mutates self.tasm
                 // it doesn't, so we're good
                 unsafe { &*(&instrs[rtn.instr_ptr] as *const Instruction) },
-                &tasm.aliases,
                 &tasm.routines,
             );
         }
@@ -587,7 +592,7 @@ impl Emulator {
 
         self.running_routines.retain(|r| !r.done);
         // update self fields from self.state
-        if self.state.temp_logbox.len() > 0 {
+        if self.state.temp_logbox.is_empty() {
             // take gets the logs and clears them out at the same time
             self.ui_state
                 .logbox
@@ -643,25 +648,17 @@ impl Emulator {
 }
 
 impl EmulatorState {
-    pub fn exec_instr(
-        &mut self,
-        real_instr: &Instruction,
-        aliases: &Aliases,
-        routines: &Vec<Routine>,
-    ) {
-        let (handler_fn, resolved) = {
-            let resolved_args = resolve_aliases(real_instr, aliases);
-            let resolved_instr = ResolvedInstruction {
+    pub fn exec_instr(&mut self, real_instr: &Instruction, routines: &[Routine]) {
+        (real_instr.handler_fn_emu)(
+            self,
+            ResolvedInstruction {
                 ident: real_instr.ident,
                 line_number: real_instr.line_number,
-                args: resolved_args,
+                routines,
+                args: &real_instr.args[..],
                 _flags: &real_instr.flags[..],
-            };
-
-            (real_instr.handler_fn_emu, resolved_instr)
-        };
-
-        (handler_fn)(self, resolved, routines);
+            },
+        );
     }
 
     pub fn add_running_routine(&mut self, routine: usize) {
@@ -676,7 +673,8 @@ impl EmulatorState {
 pub struct ResolvedInstruction<'a> {
     ident: InstrIdent,
     line_number: usize,
-    args: Cow<'a, [TasmValue]>,
+    routines: &'a [Routine],
+    args: &'a [TasmValue],
     _flags: &'a [Flag], // unused for now
 }
 

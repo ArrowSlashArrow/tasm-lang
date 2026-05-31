@@ -491,13 +491,7 @@ impl Tasm {
                     ident: *instr_ident,
                     itype: *itype,
                     line_number: curr_line,
-                    has_alias: args.iter().any(|a| {
-                        if let TasmValue::Alias(_) = a {
-                            true
-                        } else {
-                            false
-                        }
-                    }),
+                    has_alias: args.iter().any(|a| matches!(a, TasmValue::Alias(_))),
                     args,
                     flags,
                     handler_fn: gmd_handler,

@@ -9,9 +9,7 @@ use crate::{
     core::{
         HandlerFn,
         flags::FlagValue,
-        structs::{
-            HandlerArgs, InstrIdent, InstrType, Routine, TasmPrimitive, TasmValue, TasmValueType,
-        },
+        structs::{HandlerArgs, InstrIdent, InstrType, TasmPrimitive, TasmValue, TasmValueType},
     },
     debugger::{EmulatorState, ResolvedInstruction},
     instr::{fns::*, mem::*},
@@ -45,7 +43,7 @@ macro_rules! argset {
     }
 }
 
-pub type EmulatorHandler = fn(&mut EmulatorState, ResolvedInstruction, &Vec<Routine>) -> ();
+pub type EmulatorHandler = fn(&mut EmulatorState, ResolvedInstruction) -> ();
 pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn, EmulatorHandler);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, InstrIdent)> = phf_map! {
