@@ -73,6 +73,7 @@ INSTRUCTION argument1, argument2
 NOARGS
 ```
 
+Instructions are identified regardless of case. `mov`, `MOV`, `mOV`, `MoV` are all recognized as the MOV instruction.  
 It is important to know that instruction arguments (argsets) are typed to ensure differentiation between different functions of an instruction.
 For example, the `SE` instruction is used as a branch instruction. It allows both the comparison of an item to a number and two items to each other:
 ```

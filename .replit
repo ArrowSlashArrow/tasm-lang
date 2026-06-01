@@ -1,7 +1,0 @@
-modules = ["rust-stable", "python-3.12", "bash"]
-[agent]
-expertMode = true
-stack = "BEST_EFFORT_FALLBACK"
-
-[nix]
-channel = "stable-25_05"

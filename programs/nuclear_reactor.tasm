@@ -507,3 +507,4 @@ tick_continue3:
     LMRESET
     LMPTR 10
     MOV C2020, 0
+    spawn _start

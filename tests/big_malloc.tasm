@@ -1,10 +1,10 @@
 _init:
-    malloc 1, 9973
+    malloc 1, 9999
     mov PTRPOS, 1
 
 _start:
     ; some arbitrary pointer movement
-    add PTRPOS, 10
+    add PTRPOS, 1
     fldiv C1, PTRPOS, MEMSIZE
     mul C1, MEMSIZE
     sub PTRPOS, C1

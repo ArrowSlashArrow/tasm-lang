@@ -598,7 +598,9 @@ impl Emulator {
                 .logbox
                 .extend(take(&mut self.state.temp_logbox));
         }
-        self.paused = self.state.temp_paused;
+        if !self.paused {
+            self.paused = self.state.temp_paused
+        };
         self.state.temp_paused = false;
 
         self.state.timer_spawns_todo.clear();
