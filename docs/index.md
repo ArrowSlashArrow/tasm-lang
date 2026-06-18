@@ -670,7 +670,11 @@ This is dangerous, because the GD runtime does not specify a call stack. Therefo
 ### 3.3.1. Number literals
 A number literal is any string that may be parsed as a float. Unless specified to be strictly an integer, all numbers are parsed as double-precision floats (f64).  
 It is important to make the distinction between number literals and numbers stored in items. While both are numbers, number literals are used more as specific values, while items represent containers for values in the actual program/level.  
-It is also important to recognize that all floats in GD are 32 bits floats. This means that any integer values above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself.
+It is also important to recognize that all floats in GD are 32-bit floats. This means that any integer values above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself.
+
+#### 3.3.1.2. Hex literals
+A hexadecimal integer literal may be written starting with the prefix `0x`, followed by a number that will fit into a 32-bit signed integer. Any value that starts with `0x` will be parsed as a hexadecimal literal, and will emit an error if it is not parsed instead of falling back to being parsed as a different type of value.
+If a value starts with `0x` is intended to be a string, prefix it instead with `\`. 
 ### 3.3.2. Item literals
 An item literal represents a GD item, most commonly a counter or timer item. It is denoted as such:
 - Counter: `CXXXX`, where `XXXX` represents the ID of the counter. Example: `C123` represents the counter with ID 123.
@@ -699,15 +703,16 @@ Aliases act as substitutions for other values, namely, other items. They are use
 
 <!-- Version number -->
 As of TASM v0.2.6, the aliases that exist are:
-- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
+- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998` for legacy memory, but may change according to compiler arguments.
 - `PTRPOS`: counter that stores the current pointer position (0-indexed).
 - `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
 - `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
 ### 3.3.5. Strings
+A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, `\g123` will compile into the string literal `"g123"`.   
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
-**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
+**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group if not escaped.**
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 

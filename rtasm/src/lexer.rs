@@ -238,6 +238,7 @@ impl Tasm {
                         ParseErrorType::BadID => TasmErrorType::BadID,
                         ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
                         ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
+                        ParseErrorType::BadHexLiteral => TasmErrorType::BadHexLiteral,
                     },
                     curr_line,
                     routine.to_string(),

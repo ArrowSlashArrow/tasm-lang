@@ -1,5 +1,5 @@
 use alloc::borrow::Cow;
-use std::collections::HashMap;
+use std::{collections::HashMap, hint::unreachable_unchecked};
 
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
@@ -149,8 +149,11 @@ impl TasmValue {
         };
         let remaining_i16 = iter.collect::<String>().parse::<i16>();
 
-        // aliases are parsed before anything
-        if let Some(a) = BuiltinAlias::from_ident(s) {
+        // string escapes are checked first
+        if pref == '\\' {
+            Ok(Self::String(s[1..].to_string()))
+        } else if let Some(a) = BuiltinAlias::from_ident(s) {
+            // then aliases are parsed
             // since values are parsed as lexing stage, only builtin ones are available
             // user-defined aliases are determined at semantic analysis
             Ok(Self::Alias(a))
@@ -168,7 +171,10 @@ impl TasmValue {
                 'T' => Ok(Self::Timer(id)),
                 'C' => Ok(Self::Counter(id)),
                 'g' => Ok(Self::Group(id)),
-                _ => unreachable!(),
+                _ => unsafe {
+                    // this is guaranteed to never trigger
+                    unreachable_unchecked()
+                },
             }
         } else if let Ok(n) = s.parse::<f64>() {
             // sanity checks
@@ -182,6 +188,16 @@ impl TasmValue {
             }
 
             Ok(Self::Number(n))
+        } else if s.len() > 2 && s.starts_with("0x") {
+            // check for hex int literal
+            if let Ok(h) = i32::from_str_radix(&s[2..], 16) {
+                Ok(Self::Number(h as f64))
+            } else {
+                Err((
+                    ParseErrorType::BadHexLiteral,
+                    "Could not parse hexadecimal number.".into(),
+                ))
+            }
         } else {
             Ok(Self::String(s.into()))
         }
