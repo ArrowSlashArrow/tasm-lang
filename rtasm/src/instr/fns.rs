@@ -109,7 +109,7 @@ pub fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
     flag_override(&mut resmode, "resmode", &args);
     let mut finmode = (
         if round_res {
-            RoundMode::Nearest
+            RoundMode::Floor
         } else {
             RoundMode::None
         },
@@ -141,16 +141,16 @@ pub fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
 
     let mut modifier = 1.0;
     flag_override(&mut modifier, "itemmod", &args);
-    let mut resmode = (RoundMode::None, SignMode::None);
-    flag_override(&mut resmode, "resmode", &args);
-    let mut finmode = (
+    let mut resmode = (
         if round_res {
-            RoundMode::Nearest
+            RoundMode::Floor
         } else {
             RoundMode::None
         },
         SignMode::None,
     );
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
 
     vec![item_edit(
@@ -179,7 +179,7 @@ pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GD
     flag_override(&mut resmode, "resmode", &args);
     let mut finmode = (
         if round_res {
-            RoundMode::Nearest
+            RoundMode::Floor
         } else {
             RoundMode::None
         },
@@ -209,16 +209,16 @@ pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let mut modifier = args.args[2].to_float().unwrap();
     flag_override(&mut modifier, "itemmod", &args);
-    let mut resmode = (RoundMode::None, SignMode::None);
-    flag_override(&mut resmode, "resmode", &args);
-    let mut finmode = (
+    let mut resmode = (
         if round_res {
-            RoundMode::Nearest
+            RoundMode::Floor
         } else {
             RoundMode::None
         },
         SignMode::None,
     );
+    flag_override(&mut resmode, "resmode", &args);
+    let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
     vec![item_edit(
         &args.cfg,
@@ -244,7 +244,7 @@ handlers!((add, sub, mul, div) => arithmetic_3items);
 handlers!((add, sub, mul, div, mov) => arithmetic_item_num);
 handlers!((mul, div) => arithmetic_2items_num);
 
-pub fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+pub fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
 
@@ -255,7 +255,7 @@ pub fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> G
     let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
 
-    item_edit(
+    vec![item_edit(
         &args.cfg,
         Some(op1),
         None,
@@ -270,9 +270,9 @@ pub fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> G
         finmode.0,
         resmode.1,
         finmode.1,
-    )
+    )]
 }
-pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> GDObject {
+pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
     let op2 = get_item_spec(&args.args[2]).unwrap();
@@ -284,7 +284,7 @@ pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> G
     let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
 
-    item_edit(
+    vec![item_edit(
         &args.cfg,
         Some(op1),
         Some(op2),
@@ -300,48 +300,32 @@ pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> G
         RoundMode::None,
         SignMode::None,
         SignMode::None,
-    )
+    )]
 }
 
 pub fn add_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_2items_num(args, Op::Add, true),
-    ]))
+    wrap_objs!(arithmetic_with_mod_2items_num(args, Op::Add, true))
 }
 pub fn add_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_3items_num(args, Op::Add, true),
-    ]))
+    wrap_objs!(arithmetic_with_mod_3items_num(args, Op::Add, true))
 }
 pub fn sub_mod_2items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_2items_num(args, Op::Sub, true),
-    ]))
+    wrap_objs!(arithmetic_with_mod_2items_num(args, Op::Sub, true))
 }
 pub fn sub_mod_3items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_3items_num(args, Op::Sub, true),
-    ]))
+    wrap_objs!(arithmetic_with_mod_3items_num(args, Op::Sub, true))
 }
 pub fn add_div_2items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_2items_num(args, Op::Add, false),
-    ]))
+    wrap_objs!(arithmetic_with_mod_2items_num(args, Op::Add, false))
 }
 pub fn add_div_3items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_3items_num(args, Op::Add, false),
-    ]))
+    wrap_objs!(arithmetic_with_mod_3items_num(args, Op::Add, false))
 }
 pub fn sub_div_2items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_2items_num(args, Op::Sub, false),
-    ]))
+    wrap_objs!(arithmetic_with_mod_2items_num(args, Op::Sub, false))
 }
 pub fn sub_div_3items_num(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![
-        arithmetic_with_mod_3items_num(args, Op::Sub, false),
-    ]))
+    wrap_objs!(arithmetic_with_mod_3items_num(args, Op::Sub, false))
 }
 
 // fldiv instructions are not supported in the macro, so they are defined here.

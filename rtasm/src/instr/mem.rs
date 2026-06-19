@@ -1,21 +1,12 @@
 use core::iter;
 
 use gdlib::gdobj::{
-    GDObjConfig, GDObject, GDValue, Group, Item,
-    ids::{
-        objects::TRIGGER_ITEM_COMPARE,
-        properties::{
-            COMPARE_OPERATOR, FIRST_ITEM_TYPE, INPUT_ITEM_1, INPUT_ITEM_2, LEFT_OPERATOR,
-            LEFT_ROUND_MODE, LEFT_SIGN_MODE, MODIFIER, RIGHT_OPERATOR, RIGHT_ROUND_MODE,
-            RIGHT_SIGN_MODE, SECOND_ITEM_TYPE, SECOND_MODIFIER, TARGET_ITEM, TARGET_ITEM_2,
-            TOLERANCE,
-        },
-    },
+    GDObjConfig, Group, Item,
     misc::{default_block, text},
     triggers::{
         ColliderConfig, CompareOp, CompareOperand, DefaultMove, ItemAlign, MoveMode, MoveTarget,
         Op, RoundMode, SignMode, TargetMove, collision_block, collision_trigger, counter_object,
-        item_edit, move_trigger, spawn_trigger, toggle_trigger,
+        item_compare, item_edit, move_trigger, spawn_trigger, toggle_trigger,
     },
 };
 
@@ -24,50 +15,6 @@ use crate::core::{
     error::{TasmError, TasmErrorType},
     structs::{HandlerArgs, HandlerData, MemInfo, MemType, TasmValue},
 };
-
-// TODO: get rid for this when the gdlib maintainer fixes his crate
-pub fn item_compare(
-    config: &GDObjConfig,
-    true_id: i16,
-    false_id: i16,
-    lhs: CompareOperand,
-    rhs: CompareOperand,
-    compare_op: CompareOp,
-    tolerance: f64,
-) -> GDObject {
-    let properties = vec![
-        (TARGET_ITEM, GDValue::Item(true_id)),
-        (TARGET_ITEM_2, GDValue::Item(false_id)),
-        // ids
-        (INPUT_ITEM_1, GDValue::Item(lhs.operand_item.id())),
-        (INPUT_ITEM_2, GDValue::Item(rhs.operand_item.id())),
-        // types
-        (
-            FIRST_ITEM_TYPE,
-            GDValue::Int(lhs.operand_item.get_type_as_i32()),
-        ),
-        (
-            SECOND_ITEM_TYPE,
-            GDValue::Int(rhs.operand_item.get_type_as_i32()),
-        ),
-        // modifiers
-        (MODIFIER, GDValue::Float(lhs.modifier)),
-        (SECOND_MODIFIER, GDValue::Float(rhs.modifier)),
-        // modifiers ops
-        (LEFT_OPERATOR, GDValue::Int(lhs.mod_op as i32)),
-        (RIGHT_OPERATOR, GDValue::Int(rhs.mod_op as i32)),
-        (COMPARE_OPERATOR, GDValue::Int(compare_op as i32)),
-        (TOLERANCE, GDValue::Float(tolerance)),
-        // round modes
-        (LEFT_ROUND_MODE, GDValue::Int(lhs.rounding as i32)),
-        (RIGHT_ROUND_MODE, GDValue::Int(rhs.rounding as i32)),
-        // sign modes
-        (LEFT_SIGN_MODE, GDValue::Int(lhs.sign as i32)),
-        (RIGHT_SIGN_MODE, GDValue::Int(rhs.sign as i32)),
-    ];
-
-    GDObject::new(TRIGGER_ITEM_COMPARE, config, properties)
-}
 
 pub fn legacy_malloc_inner(args: HandlerArgs, float_mem: bool) -> HandlerData {
     let (mem_x, mem_y) = (45.0, 165.0 + args.routine_count as f64 * 30.0);
