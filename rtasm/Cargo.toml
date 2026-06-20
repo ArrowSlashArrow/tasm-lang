@@ -1,6 +1,6 @@
 [package]
 name = "tasmc"
-rust-version = "1.90"
+rust-version = "1.88"
 version = "0.2.6"
 edition = "2024"
 
