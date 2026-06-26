@@ -17,6 +17,7 @@ use crate::{
 pub mod fns;
 pub mod mem;
 
+/// Length of 1 game tick in seconds.
 pub const GROUP_SPAWN_DELAY: f64 = 0.0044;
 
 // convert a list of type identifiers into a slice
@@ -36,11 +37,17 @@ pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
     // if an instruction can only go in the _init routine, it **MUST** be designated that.
+    /// Allocate integer memory in a specified range.
+    /// * Allocates memory on counter IDs [a, b].
     "MALLOC" => (
         true,
-        &[argset!((Int, Int) => malloc)],
-        InstrType::Init,
-    ),
+        &[
+            argset!((Int, Int) => malloc)
+            ],
+            InstrType::Init,
+        ),
+    /// Allocate float memory in a specified range.
+    /// * Allocates memory on timer IDs [a, b].
     "FMALLOC" => (
         true,
         &[argset!((Int, Int) => fmalloc)],
@@ -316,6 +323,112 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         &[argset!((Group, Group, Number) => fork_random)],
         InstrType::Process,
     ),
+    "ISE" => (
+        false,
+        &[
+            argset!((Group, Item, Item) => instant_spawn_item_item_eq),
+            argset!((Group, Item, Number) => instant_spawn_item_num_eq),
+        ],
+        InstrType::Process,
+    ),
+    "ISNE" => (
+        false,
+        &[
+            argset!((Group, Item, Item) => instant_spawn_item_item_ne),
+            argset!((Group, Item, Number) => instant_spawn_item_num_ne),
+        ],
+        InstrType::Process,
+    ),
+    "ISL" => (
+        false,
+        &[
+            argset!((Group, Item, Item) => instant_spawn_item_item_le),
+            argset!((Group, Item, Number) => instant_spawn_item_num_le),
+        ],
+        InstrType::Process,
+    ),
+    "ISLE" => (
+        false,
+        &[
+            argset!((Group, Item, Item) => instant_spawn_item_item_leq),
+            argset!((Group, Item, Number) => instant_spawn_item_num_leq),
+        ],
+        InstrType::Process,
+    ),
+    "ISG" => (
+        false,
+        &[
+            argset!((Group, Item, Item) => instant_spawn_item_item_ge),
+            argset!((Group, Item, Number) => instant_spawn_item_num_ge),
+        ],
+        InstrType::Process,
+    ),
+    "ISGE" => (
+        false,
+        &[
+            argset!((Group, Item, Item) => instant_spawn_item_item_geq),
+            argset!((Group, Item, Number) => instant_spawn_item_num_geq),
+        ],
+        InstrType::Process,
+    ),
+    "IFE" => (
+        false,
+        &[
+            argset!((Group, Group, Item, Item) => instant_fork_item_item_eq),
+            argset!((Group, Group, Item, Number) => instant_fork_item_num_eq),
+        ],
+        InstrType::Process,
+    ),
+    "IFNE" => (
+        false,
+        &[
+            argset!((Group, Group, Item, Item) => instant_fork_item_item_ne),
+            argset!((Group, Group, Item, Number) => instant_fork_item_num_ne),
+        ],
+        InstrType::Process,
+    ),
+    "IFL" => (
+        false,
+        &[
+            argset!((Group, Group, Item, Item) => instant_fork_item_item_le),
+            argset!((Group, Group, Item, Number) => instant_fork_item_num_le),
+        ],
+        InstrType::Process,
+    ),
+    "IFLE" => (
+        false,
+        &[
+            argset!((Group, Group, Item, Item) => instant_fork_item_item_leq),
+            argset!((Group, Group, Item, Number) => instant_fork_item_num_leq),
+        ],
+        InstrType::Process,
+    ),
+    "IFG" => (
+        false,
+        &[
+            argset!((Group, Group, Item, Item) => instant_fork_item_item_ge),
+            argset!((Group, Group, Item, Number) => instant_fork_item_num_ge),
+        ],
+        InstrType::Process,
+    ),
+    "IFGE" => (
+        false,
+        &[
+            argset!((Group, Group, Item, Item) => instant_fork_item_item_geq),
+            argset!((Group, Group, Item, Number) => instant_fork_item_num_geq),
+        ],
+        InstrType::Process,
+    ),
+    "ISRAND" => (
+        false,
+        &[argset!((Group, Number) => instant_spawn_random)],
+        InstrType::Process,
+    ),
+    "IFRAND" => (
+        false,
+        &[argset!((Group, Group, Number) => instant_fork_random)],
+        InstrType::Process,
+    ),
     "TSPAWN" => (
         false,
         &[argset!((Timer, Number, Number, Group) => tspawn)],
@@ -379,6 +492,7 @@ pub fn get_item_spec(item: &TasmValue) -> Option<Item> {
     }
 }
 
+/// Returns the value of the flag if it was given as a flag argument. Returns the `default` value if it was not passed.
 fn get_flag_value(args: &HandlerArgs, ident: &str, default: FlagValue) -> FlagValue {
     match args.flag_by_ident.get(ident) {
         Some(flag) => flag.value.clone(),

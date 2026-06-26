@@ -89,7 +89,7 @@ By convention, the counter that stores the result of an arithmetic operation is 
 
 | Argset                   | Result (in the example case of division) | Commands that use it           |
 | ------------------------ | ---------------------------------------- | ------------------------------ |
-| `<item> <number>`        | `item = item / number`                   | ADD, SUB, MUL, DIV, FLDIV, MOV |
+| `<item> <number>`        | `item = item / number`                   | ADD, SUB, MUL, DIV, FLDIV, MOV\* |
 | `<item> <item>`          | `1st item = 1st item / 2nd item`         | ADD, SUB, MUL, DIV, FLDIV, MOV\* |
 | `<item> <item> <number>` | `1st item = 2nd item / number`           | MUL, DIV, FLDIV                |
 | `<item> <item> <item>`   | `1st item = 2nd item / 3rd item`         | MUL, DIV, FLDIV, ADD, SUB      |
@@ -102,7 +102,7 @@ Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are 
 - DIV: division
 - FLDIV: division, and the result it rounded down (floored).
 - MOV: assignment
-> \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+> \* MOV simply assigns the 2nd argument to the 1st item in this case. Data is not transformed when MOV is used.
 ##### 3.1.2.1.2. Add/Subtract with modifier
 These instructions are utility instructions included to shorten common expressions.
 ###### `ADDM`
@@ -122,15 +122,21 @@ These instruction accept the same arguments and do the same thing as their `ADDM
 Useful for shortening expression which follow the form of:
 - for `ADDD`, `result = result + operand / modifier`
 - for `SUBD`, `result = result - (operand / modifier)`
+
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
-Execution timeline:
+
+Execution timeline (base compares):
 - Tick n: the compare trigger is called
 - Tick n + 1: 
-	- the compare trigger calls the group spawner trigger if it should be called
+	- the compare trigger calls the intermediate group spawner trigger if it should be called
 	- the parent group executes the next instruction.
 - Tick n + 2: the spawned group starts execution
+
+Execution timeline (instant compares):
+- Tick n: the compare trigger is called
+- Tick n + 1: the spawned group starts execution
 ##### Spawn if
 `SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`
 
@@ -157,6 +163,17 @@ The first routine is spawned if the two arguments meet the condition. Otherwise,
 
 > Here, a and b refer to the first and second operands respectively.
 
+##### Instant compares
+"Instant" compares can be accessed by prefixing a compare instruction with `I`. These instructions directly spawn the target groups instead of using any intermediate triggers.
+This means that spawned groups will not be spawned with spawn ordered or will be able to be paused/stopped. This feature is intended for fast execution of utility groups. Note that remaps are still carried through any instant compares.
+
+All available instant compare instructions:
+- ISE, ISNE, ISL, ISLE, ISG, ISGE
+- IFE, IFNE, IFL, IFLE, IFG, IFGE
+- ISRAND, IFRAND
+
+All instant compare instructions take the same arguments as their base counterparts.
+
 ##### Random Spawns
 `SRAND <routine> <number>`
 
@@ -180,53 +197,39 @@ The routine `do_stuff` has a 42.8% chance of being spawned.
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
 > This memory structure is still usable, however it is considered deprecated and much less group-efficient than the structure used by the new memory instructions.
 
-##### MALLOC
-Arguments: `MALLOC <int>, <int>`
+<!-- not done yet -->
+<!-- 
 
-Creates a memory block that is able to write to and read from the first counter ID to the second counter ID inclusively. Uses counters (ints).  
-Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+##### BMALLOC
+Arguments: `BMALLOC <int>`
 
-##### FMALLOC
-Arguments: `FMALLOC <int>, <int>`
+Allocates a given number of bits to memory. An argument of 10 would allocate 10 bits of memory addresses, or 2^10 = 1024 addresses to be accessible by `READ` and `WRITE`. This instruction allocates
+Only allowed in `_init` routine.
 
-Creates a memory block that is able to write to and read from the first counter ID to the second counter ID inclusively. Uses timers (floats).  
-Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+##### READ
+Arguments: `READ`
 
-##### MSET
-Arguments: `MSET`
+This instruction reads the address stored in `PTRPOS` into `MEMREG`.  
+Execution time: 1 tick.
 
-Sets the value of the item at the `PTRPOS` to the value of the `MEMREG`.  
-The address of the item must have already been set in the `PTRPOS` counter.
+##### WRITE
+Arguments: `WRITE`
 
-Execution time: 4 ticks
+This instruction writes the value stored in `MEMREG` to the address stored in `PTRPOS`.  
+Execution time: 1 tick. -->
 
-##### MGET
-Arguments: `MGET`
-
-Reads the value of the item at the `PTRPOS` into the `MEMREG`.  
-The address of the item must have already been set in the `PTRPOS` counter.
-
-Execution time: 4 ticks
-
-##### INITMEM
-Arguments: `INITMEM <numbers>`
-
-Assigns the numbers to memory in order, starting at address 0. Must be done after MALLOC. Numbers must be separated by commas, and should match the type of the memory (i.e. no floats in integer memory).  
-Only allowed `_init` routine.
 ##### LMALLOC
 Arguments: `LMALLOC <positive int>`
 
 Allocates a specified amount of counters to memory. 
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in `_init` routine.
 ##### LFMALLOC
 Arguments: `LFMALLOC <positive int>`
 
 Allocates a specified amount of timers (floats) to memory. 
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in `_init` routine.
 ##### LMFUNC
 Arguments: `LMFUNC`
 
@@ -503,6 +506,7 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 		- There must be no spacing between the keys/values and the colon separator.
 		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
 		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
+		- Currently, the only supported values are 16-bit signed integers for both keys and their values. Other accepted values are routine identifiers or aliases for either ints or routines. When passed as either a key or a value, a routine identifier will be coerced to an int, which is its group ID.
 
 > [!NOTE]
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
@@ -521,6 +525,8 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |
 | delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |
 | remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
+| ordered | Use spawn ordered true, don't use spawn ordered if false.                                             | `SPAWN`      | Boolean    |
+| noremap | Enables `reset remap` option in the trigger if true.                                                  | `SPAWN`      | Boolean    |
 | tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
 | tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |

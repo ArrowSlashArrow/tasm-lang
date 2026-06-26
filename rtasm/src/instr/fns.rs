@@ -1,5 +1,6 @@
 use gdlib::gdobj::{
-    GDObjConfig, GDObject, Group, ItemType, ZLayer,
+    GDObjConfig, GDObject, GDValue, Group, ItemType, ZLayer,
+    ids::properties::{TARGET_ITEM, TARGET_ITEM_2},
     misc::{default_block, text},
     triggers::{
         CompareOp, CompareOperand, ItemAlign, Op, RoundMode, SignMode, StopMode, TimeTriggerConfig,
@@ -43,8 +44,13 @@ macro_rules! handlers {
             paste! {
                 pub fn [<$inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
                     Ok(
-                        HandlerData::from_objects($inner_fn(args, (LowerCompOp::$var).to_op()))
+                        HandlerData::from_objects($inner_fn(args, (LowerCompOp::$var).to_op(), false))
                             .extra_groups($extra_groups),
+                    )
+                }
+                pub fn [<instant _ $inner_fn _ $var>](args: HandlerArgs) -> HandlerReturn {
+                    Ok(
+                        HandlerData::from_objects($inner_fn(args, (LowerCompOp::$var).to_op(), true)),
                     )
                 }
             }
@@ -357,12 +363,29 @@ pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
     )
 }
 
-pub fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
+pub fn spawn_compare(
+    args: HandlerArgs,
+    op: CompareOp,
+    instant: bool,
+    num_2nd_arg: bool,
+) -> Vec<GDObject> {
     let cfg = args.cfg;
-    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
+    let scale = match instant {
+        false => 0.5,
+        true => 1.0,
+    };
+    let compare_cfg = cfg
+        .clone()
+        .pos(cfg.pos.0, cfg.pos.1 - 7.5)
+        .scale(scale, scale);
 
     let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[1]).unwrap();
+    let rhs = if num_2nd_arg {
+        CompareOperand::number_literal(iargs[2].to_float().unwrap())
+    } else {
+        get_item_spec(&iargs[2]).unwrap().into()
+    };
 
     let spawning_group = iargs[0].to_group_id().unwrap();
     let spawn_cfg = cfg
@@ -371,60 +394,55 @@ pub fn spawn_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         .scale(0.5, 0.5)
         .groups([args.curr_group])
         .set_control_id(spawning_group); // use auxiliary group for spawn trigger
-    // SX rtn, I1, 42
-    // args: [Group(n), ]
 
-    vec![
-        item_compare(
-            &compare_cfg,
-            args.curr_group, // spawn auxiliary group (spawn trigger)
-            0,
-            lhs.into(),
-            CompareOperand::number_literal(iargs[2].to_float().unwrap()),
-            op,
-            0.0,
-        ),
-        spawn_trg(&spawn_cfg, spawning_group),
-    ]
+    let mut compare = item_compare(
+        &compare_cfg,
+        args.curr_group, // spawn auxiliary group (spawn trigger)
+        0,
+        lhs.into(),
+        rhs,
+        op,
+        0.0,
+    );
+
+    if instant {
+        // override spawn group
+        compare.set_property(TARGET_ITEM, GDValue::Group(spawning_group));
+        // don't use any intermediate triggers if spawning instantly
+        vec![compare]
+    } else {
+        vec![compare, spawn_trg(&spawn_cfg, spawning_group)]
+    }
 }
-pub fn spawn_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
-    let cfg = args.cfg;
-    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
 
-    let iargs = args.args.as_ref();
-    let lhs = get_item_spec(&iargs[1]).unwrap();
-    let rhs = get_item_spec(&iargs[2]).unwrap();
-    let spawning_group = iargs[0].to_group_id().unwrap();
-    let spawn_cfg = cfg
-        .clone()
-        .pos(cfg.pos.0, cfg.pos.1 + 7.5)
-        .scale(0.5, 0.5)
-        .groups([args.curr_group])
-        .set_control_id(spawning_group); // use auxiliary group for spawn trigger
-    // SX rtn, I1, 42
-    // args: [Group(n), ]
-
-    vec![
-        item_compare(
-            &compare_cfg,
-            args.curr_group, // spawn auxiliary group (spawn trigger)
-            0,
-            lhs.into(),
-            rhs.into(),
-            op,
-            0.0,
-        ),
-        spawn_trg(&spawn_cfg, spawning_group),
-    ]
+pub fn spawn_item_item(args: HandlerArgs, op: CompareOp, instant: bool) -> Vec<GDObject> {
+    spawn_compare(args, op, instant, false)
 }
-pub fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
-    // below
+pub fn spawn_item_num(args: HandlerArgs, op: CompareOp, instant: bool) -> Vec<GDObject> {
+    spawn_compare(args, op, instant, true)
+}
+
+pub fn fork_compare(
+    args: HandlerArgs,
+    op: CompareOp,
+    instant: bool,
+    num_2nd_arg: bool,
+) -> Vec<GDObject> {
+    // args for a fork compare: true, false, lhs, rhs
     let cfg = args.cfg;
-    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
+    let scale = match instant {
+        false => 0.33,
+        true => 1.0,
+    };
+    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(scale, scale);
 
     let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[2]).unwrap();
-    let num = iargs[3].to_float().unwrap();
+    let rhs = if num_2nd_arg {
+        CompareOperand::number_literal(iargs[3].to_float().unwrap())
+    } else {
+        get_item_spec(&iargs[3]).unwrap().into()
+    };
 
     let spawning_true = iargs[0].to_group_id().unwrap();
     let spawning_false = iargs[1].to_group_id().unwrap();
@@ -441,63 +459,37 @@ pub fn fork_item_num(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
         .scale(0.33, 0.33)
         .groups([args.curr_group + 1])
         .set_control_id(spawning_false); // use auxiliary group for spawn trigger
-    // FX rtn, rtn2, I1, 42
-    // args: [Group(n), Group(n), Item, Number]
 
-    vec![
-        item_compare(
-            &compare_cfg,
-            args.curr_group,     // spawn auxiliary group (true trigger)
-            args.curr_group + 1, // spawn 2nd aux group (false trigger)
-            lhs.into(),
-            CompareOperand::number_literal(num),
-            op,
-            0.0,
-        ),
-        spawn_trg(&spawn_true_cfg, spawning_true),
-        spawn_trg(&spawn_false_cfg, spawning_false),
-    ]
+    let mut compare = item_compare(
+        &compare_cfg,
+        args.curr_group,     // spawn auxiliary group (true trigger)
+        args.curr_group + 1, // spawn 2nd aux group (false trigger)
+        lhs.into(),
+        rhs,
+        op,
+        0.0,
+    );
+
+    if instant {
+        // override spawn group
+        compare.set_property(TARGET_ITEM, GDValue::Group(spawning_true));
+        compare.set_property(TARGET_ITEM_2, GDValue::Group(spawning_false));
+        // don't use any intermediate triggers if spawning instantly
+        vec![compare]
+    } else {
+        vec![
+            compare,
+            spawn_trg(&spawn_true_cfg, spawning_true),
+            spawn_trg(&spawn_false_cfg, spawning_false),
+        ]
+    }
 }
-pub fn fork_item_item(args: HandlerArgs, op: CompareOp) -> Vec<GDObject> {
-    // below
-    let cfg = args.cfg;
-    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(0.33, 0.33);
 
-    let iargs = args.args.as_ref();
-    let lhs = get_item_spec(&iargs[2]).unwrap();
-    let rhs = get_item_spec(&iargs[3]).unwrap();
-
-    let spawning_true = iargs[0].to_group_id().unwrap();
-    let spawning_false = iargs[1].to_group_id().unwrap();
-    let spawn_true_cfg = cfg
-        .clone()
-        .pos(cfg.pos.0, cfg.pos.1 + 10.0)
-        .scale(0.33, 0.33)
-        .groups([args.curr_group])
-        .set_control_id(spawning_true); // use auxiliary group for spawn trigger
-
-    let spawn_false_cfg = cfg
-        .clone()
-        .pos(cfg.pos.0, cfg.pos.1 - 10.0)
-        .scale(0.33, 0.33)
-        .groups([args.curr_group + 1])
-        .set_control_id(spawning_false); // use auxiliary group for spawn trigger
-    // FX rtn, rtn2, I1, 42
-    // args: [Group(n), Group(n), Item, Item]
-
-    vec![
-        item_compare(
-            &compare_cfg,
-            args.curr_group,     // spawn auxiliary group (true trigger)
-            args.curr_group + 1, // spawn 2nd aux group (false trigger)
-            lhs.into(),
-            rhs.into(),
-            op,
-            0.0,
-        ),
-        spawn_trg(&spawn_true_cfg, spawning_true),
-        spawn_trg(&spawn_false_cfg, spawning_false),
-    ]
+pub fn fork_item_num(args: HandlerArgs, op: CompareOp, instant: bool) -> Vec<GDObject> {
+    fork_compare(args, op, instant, true)
+}
+pub fn fork_item_item(args: HandlerArgs, op: CompareOp, instant: bool) -> Vec<GDObject> {
+    fork_compare(args, op, instant, false)
 }
 
 handlers!([eq, ne, le, leq, ge, geq] + 1 => spawn_item_num);
@@ -562,6 +554,39 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
     .extra_groups(2))
 }
 
+pub fn instant_spawn_random(args: HandlerArgs) -> HandlerReturn {
+    let cfg = args.cfg;
+    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5);
+
+    let iargs = args.args.as_ref();
+    let spawning_group = iargs[0].to_group_id().unwrap();
+    let chance = iargs[1].to_float().unwrap();
+
+    Ok(HandlerData::from_objects(vec![random_trigger(
+        &random_cfg,
+        chance,
+        spawning_group,
+        0,
+    )]))
+}
+
+pub fn instant_fork_random(args: HandlerArgs) -> HandlerReturn {
+    let cfg = args.cfg;
+    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5);
+
+    let iargs = args.args.as_ref();
+    let spawning_group1 = iargs[0].to_group_id().unwrap();
+    let spawning_group2 = iargs[1].to_group_id().unwrap();
+    let chance = iargs[2].to_float().unwrap();
+
+    Ok(HandlerData::from_objects(vec![random_trigger(
+        &random_cfg,
+        chance,
+        spawning_group1,
+        spawning_group2,
+    )]))
+}
+
 /* PROCESS */
 
 pub fn spawn(args: HandlerArgs) -> HandlerReturn {
@@ -572,8 +597,8 @@ pub fn spawn(args: HandlerArgs) -> HandlerReturn {
         spawning_group,
         get_flag_value(&args, "delay", FlagValue::Float(GROUP_SPAWN_DELAY)).into(),
         0.0,
-        false,
-        true,
+        get_flag_value(&args, "noremap", FlagValue::Bool(false)).into(),
+        get_flag_value(&args, "ordered", FlagValue::Bool(true)).into(),
         false,
         get_flag_value(&args, "remap", FlagValue::Dict(vec![])).into()
     )])
