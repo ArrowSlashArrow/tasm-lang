@@ -84,12 +84,14 @@ impl Tasm {
                 self.start_rtn_group = routine.group;
             }
 
-            // routine marker
-            level.add_object(text(
-                &GDObjConfig::new().pos(0.0, rtn_ypos).scale(0.6, 0.6),
-                format!("{}: {}", routine.group, routine.ident),
-                0,
-            ));
+            if routine.ident != INIT_ROUTINE {
+                // routine marker
+                level.add_object(text(
+                    &GDObjConfig::new().pos(0.0, rtn_ypos).scale(0.6, 0.6),
+                    format!("{}: {}", routine.group, routine.ident),
+                    0,
+                ));
+            }
 
             let mut previous_spacing_amount = 0.0;
 

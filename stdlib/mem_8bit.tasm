@@ -1,3 +1,37 @@
+; This file contains the standard implementation for the memory controller, which allows the programmer to dynamically access any counter/timer they wish to given any address.
+; This program supports all addresses from 1 - 256 inclusive. Using this program to try to access counters higher than that range may lead to undefined behaviour.
+; This file contains five exports:
+; - `mem`; the routine that is used to access the address in memory.
+; - `_std_mem_cread`, `_std_mem_cwrite`, `_std_mem_tread`, `_std_mem_twrite`; the four basic functions of this memory: reading/writing to a timer/counter
+; - `_std_mem_end`; placeholder routine that is remapped to a function that will be called
+
+; To use this program, paste the whole thing into your file. Combine the _init routines to ensure that your file can compile. 
+; Many items here are internal to this file, but will be exposed when this file's contents are pasted. 
+; To prevent name collisions, all such items are prefixed with `_std_mem_`. 
+
+; The routines in this file must be compiled with a minimum group offest of 256 to prevent group and remap collisions. Not doing so may lead to undefined behaviour.
+
+; ---- Aliases ----
+; Paste these into your `_init` routine when using this file. These aliases are necessary for this file to work.
+; The values of these aliases may be freely changed, so long as they are all unique. 
+; 
+; Each alias is documented below:
+_init:
+    ; Temporary counter used to evaluate the address stored in `ptrpos`.
+    alias _std_mem_temp, C259
+    ; Stores the address that is going to be accessed.
+    alias _std_mem_ptrpos, C257
+    ; Temporary counter for storing the result of reading from memory (if we are reading from a counter)
+    alias _std_mem_cmemreg, C258
+    ; Temporary timer for storing the result of reading from memory (if we are reading from a timer)
+    alias _std_mem_tmemreg, T258
+
+; `mem` should be called with this exact syntax always:
+;   SPAWN mem   | ordered:false remap: {_std_mem_end: function}
+; where `function` is one of the four memory functions provided: `cread`, `cwrite`, `tread`, `twrite`
+; For example, to read a counter's value (cread), use the following:
+;   SPAWN mem   | ordered:false remap: {_std_mem_end: _std_mem_cread}
+
 mem:
     ; copy ptrpos to temporary mutable counter
     ; it is necessary to clone it as the algorithm mutates this
@@ -76,69 +110,3 @@ _std_mem_twrite: ; write memreg to timer at address
     mov T8200, _std_mem_tmemreg
 _std_mem_tread:  ; write timer at address to memreg
     mov _std_mem_tmemreg, T8200
-
-_init:
-    ; Temporary counter used to evaluate the address stored in `ptrpos`.
-    alias _std_mem_temp, C259
-    ; Stores the address that is going to be accessed.
-    alias _std_mem_ptrpos, C257
-    ; Temporary counter for storing the result of reading from memory (if we are reading from a counter)
-    alias _std_mem_cmemreg, C258
-    ; Temporary timer for storing the result of reading from memory (if we are reading from a timer)
-    alias _std_mem_tmemreg, T258
-    ; initialise a list starting from address 20
-
-    ; load list
-    mov C30, 1
-    mov C31, 2
-    mov C32, 3
-    mov C33, 5
-    mov C34, 9
-    mov C35, 2
-    mov C36, 5
-    mov C37, 1
-    mov C38, 56
-    mov C39, 2
-    mov C40, 6
-    mov C41, 3
-    mov C42, 4
-    mov C43, 16
-    mov C44, 23
-    mov C45, 59
-    mov C46, 20
-    mov C47, 10
-    display C4
-    display _std_mem_ptrpos
-    display _std_mem_cmemreg
-
-_start:
-    ; setup params
-    mov C1, 20  ; list start
-    mov C2, 18  ; list length
-    mov C3, 5   ; target number
-    mov C4, -1  ; return variable
-
-    ; setup temp vars
-    add C5, C1, C2  ; end addr of list
-    mov C5, 50
-    mov _std_mem_ptrpos, C1
-    spawn search_iter
-
-search_iter:
-    ; mget
-    SPAWN mem   | ordered:false remap: {_std_mem_end: _std_mem_cread}
-    ise found, _std_mem_cmemreg, C3    ; end if number is found
-    add _std_mem_ptrpos, 1
-
-    ; goto not_found if ptrpos > end list addr
-    fle search_iter, not_found, _std_mem_ptrpos, C5
-
-found:
-    ; due to the timing caused by iterating over this group with the last instruction of search_iter,
-    ; the first kill instruction does not work. the second actually terminates that process.
-    kill search_iter
-    kill search_iter
-    mov C4, 1
-
-not_found:
-    mov C4, 0
