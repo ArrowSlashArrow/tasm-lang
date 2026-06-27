@@ -131,6 +131,24 @@ impl FlagValue {
             },
             FlagValueType::Dict => {
                 let mut invalid_dict = false;
+                let resolve_int = |s: &str| -> Option<i16> {
+                    if s.starts_with("0x") {
+                        i16::from_str_radix(&s[2..], 16)
+                    } else {
+                        s.parse::<i16>()
+                    }
+                    .ok()
+                    .or_else(|| group_map.get(s).copied())
+                };
+
+                let parse_int = |s: &str, invalid_dict: &mut bool| -> i16 {
+                    resolve_int(s)
+                        .or_else(|| aliases.get(s).and_then(|a| resolve_int(a)))
+                        .unwrap_or_else(|| {
+                            *invalid_dict = true;
+                            0
+                        })
+                };
                 let kv_pairs: Vec<(i16, i16)> = value[1..value.len() - 1]
                     .split(',')
                     .map(|kv| {

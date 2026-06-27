@@ -1,0 +1,5 @@
+_init:
+    alias abc, 10
+
+_start:
+    spawn g123  | remap: {abc: 0x42}

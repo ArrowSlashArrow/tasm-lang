@@ -20,9 +20,10 @@ _start:
     spawn search_iter
 
 search_iter:
-    mget
-    se found, MEMREG, C3    ; end if number is found
-    add PTRPOS, 1
+    ; mget
+    SPAWN mem   | ordered:false remap: {_std_mem_end: _std_mem_cread}
+    se found, _std_mem_cmemreg, C3    ; end if number is found
+    add _std_mem_ptrpos, 1
 
     ; goto not_found if ptrpos > end list addr
     fle search_iter, not_found, PTRPOS, C5
