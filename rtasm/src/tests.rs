@@ -156,7 +156,6 @@ macro_rules! tasm_test {
 
 tasm_test!("fetch", example_no_entry_point);
 tasm_test!("fib_in_memory", example);
-tasm_test!("fib_in_new_memory", example);
 tasm_test!("incrementer", example);
 tasm_test!("is_c1_prime", example);
 tasm_test!("list_search", example);
@@ -181,7 +180,6 @@ tasm_test!("flags", true);
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
 tasm_test!("lowercase", true);
-tasm_test!("memory", true);
 tasm_test!("multiple_mem", false, compile);
 tasm_test!("multiple_routines", false);
 tasm_test!("negative_ids", false);

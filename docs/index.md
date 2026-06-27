@@ -197,26 +197,9 @@ The routine `do_stuff` has a 42.8% chance of being spawned.
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
 > This memory structure is still usable, however it is considered deprecated and much less group-efficient than the structure used by the new memory instructions.
 
-<!-- not done yet -->
-<!-- 
-
-##### BMALLOC
-Arguments: `BMALLOC <int>`
-
-Allocates a given number of bits to memory. An argument of 10 would allocate 10 bits of memory addresses, or 2^10 = 1024 addresses to be accessible by `READ` and `WRITE`. This instruction allocates
-Only allowed in `_init` routine.
-
-##### READ
-Arguments: `READ`
-
-This instruction reads the address stored in `PTRPOS` into `MEMREG`.  
-Execution time: 1 tick.
-
-##### WRITE
-Arguments: `WRITE`
-
-This instruction writes the value stored in `MEMREG` to the address stored in `PTRPOS`.  
-Execution time: 1 tick. -->
+> [!NOTE]
+> As of v0.3.0, memory instructions are no longer part of the TASM ISA. Memory is now handled through the standard library instead of dedicated instructions.  
+> Aliases `PTRPOS`, `MEMREG` and `MEMSIZE` are now all deprecated too. All new aliases are defined in any file that uses them.
 
 ##### LMALLOC
 Arguments: `LMALLOC <positive int>`

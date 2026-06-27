@@ -9,6 +9,8 @@
 ; Many items here are internal to this file, but will be exposed when this file's contents are pasted. 
 ; To prevent name collisions, all such items are prefixed with `_std_mem_`. 
 
+; The routines in this file must be compiled with a minimum group offest of 256 to prevent group and remap collisions. Not doing so may lead to undefined behaviour.
+
 ; ---- Aliases ----
 ; Paste these into your `_init` routine when using this file. These aliases are necessary for this file to work.
 ; The values of these aliases may be freely changed, so long as they are all unique. 

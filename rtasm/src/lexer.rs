@@ -750,7 +750,7 @@ pub fn parse_file<T: AsRef<str>>(
     tasm.logs_enabled = verbose_logs;
     tasm.group_offset = group_offset;
     tasm.fname = fname;
-    tasm.parse(group_offset, disable_entry_point_check);
+    tasm.parse(group_offset + 1, disable_entry_point_check);
 
     if tasm.errors.is_empty() {
         Ok(tasm)
