@@ -133,6 +133,25 @@ macro_rules! tasm_test {
             }
         }
     };
+
+    // tests stdlib stuff located in `stdlib/{ident}.tasm`. these should *always* work.
+    ($file:literal, stdlib) => {
+        paste! {
+            #[test]
+            fn [<stdlib _ $file>]() {
+                let mut res = lexer::parse_file(
+                    fs::read_to_string(format!("../stdlib/{}.tasm", $file)).unwrap(),
+                    format!("testfile {}", $file),
+                    9999,
+                    0,
+                    true,
+                    true,
+                    true // no entry point in stdlib files
+                ).unwrap();
+                assert!(res.handle_routines("").is_ok())
+            }
+        }
+    };
 }
 
 tasm_test!("fetch", example_no_entry_point);
@@ -155,7 +174,8 @@ tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
 tasm_test!("concurrent", true);
 tasm_test!("correct", true);
-tasm_test!("empty", true);
+tasm_test!("division", true);
+tasm_test!("empty", false);
 tasm_test!("flags", true);
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
@@ -166,6 +186,7 @@ tasm_test!("negative_ids", false);
 tasm_test!("no_entry_point", false);
 tasm_test!("no_memory", false, compile);
 tasm_test!("recursive", true);
+tasm_test!("remap_alias", true);
 tasm_test!("tab_spacing", true);
 tasm_test!("timer_not_counter", false);
 tasm_test!("timerops", true);
@@ -175,6 +196,9 @@ tasm_test!("values", true);
 tasm_test!("swap", compdef);
 tasm_test!("min", compdef);
 tasm_test!("max", compdef);
+// stdlib
+tasm_test!("mem_8bit", stdlib);
+tasm_test!("mem_14bit", stdlib);
 
 #[test]
 fn int_detection() {

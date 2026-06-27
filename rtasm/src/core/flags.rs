@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
 
 #[derive(Debug, Clone)]
@@ -8,11 +10,15 @@ pub struct Flag {
 }
 
 impl Flag {
-    pub fn from(ident: String, val: &str, t: FlagValueType) -> Option<Self> {
-        let value = FlagValue::try_from(val, &t)?;
-
+    pub fn from(
+        ident: String,
+        val: &str,
+        t: FlagValueType,
+        gm: &HashMap<String, i16>,
+        aliases: &HashMap<String, String>,
+    ) -> Option<Self> {
         Some(Self {
-            value,
+            value: FlagValue::try_from(val, &t, gm, aliases)?,
             ident,
             ftype: t,
         })
@@ -109,7 +115,12 @@ impl From<FlagValue> for (RoundMode, SignMode) {
 }
 
 impl FlagValue {
-    fn try_from(value: &str, t: &FlagValueType) -> Option<Self> {
+    fn try_from(
+        value: &str,
+        t: &FlagValueType,
+        group_map: &HashMap<String, i16>,
+        aliases: &HashMap<String, String>,
+    ) -> Option<Self> {
         match t {
             FlagValueType::RoundSign => Some(string_to_roundsign(value)),
             FlagValueType::Float => match value.parse::<f64>() {
@@ -153,26 +164,16 @@ impl FlagValue {
                     .split(',')
                     .map(|kv| {
                         let mut split = kv.trim().split(':');
-                        let key = match split.next().unwrap().parse::<i16>() {
-                            Ok(n) => n,
-                            Err(_) => {
-                                invalid_dict = true;
-                                0
-                            }
-                        };
+
+                        let key = parse_int(split.next().unwrap(), &mut invalid_dict);
                         let value = match split.next() {
-                            Some(v) => match v.parse::<i16>() {
-                                Ok(n) => n,
-                                Err(_) => {
-                                    invalid_dict = true;
-                                    0
-                                }
-                            },
+                            Some(v) => parse_int(v, &mut invalid_dict),
                             None => {
                                 invalid_dict = true;
                                 0
                             }
                         };
+
                         (key, value)
                     })
                     .collect::<Vec<_>>();
@@ -255,6 +256,8 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "op" => FlagValueType::Op,
         "delay" => FlagValueType::Float,
         "remap" => FlagValueType::Dict,
+        "ordered" => FlagValueType::Bool,
+        "noremap" => FlagValueType::Bool,
         "tpaused" => FlagValueType::Bool,
         "tmod" => FlagValueType::Float,
         "tstop" => FlagValueType::Bool,

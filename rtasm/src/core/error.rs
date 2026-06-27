@@ -30,6 +30,7 @@ pub enum TasmErrorType {
     BadToken,
     BadAlias,
     BadFlag,
+    BadHexLiteral,
     NoEntryPoint,
     InvalidNumber,
     InvalidGroup,
@@ -75,4 +76,5 @@ pub(crate) enum ParseErrorType {
     BadID,
     TrailingComma,
     InvalidNumber,
+    BadHexLiteral,
 }

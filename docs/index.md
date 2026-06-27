@@ -48,7 +48,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of May 13, 2026 is **v0.2.6**. 
+The current version, as of June 26, 2026 is **v0.3.0**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -89,7 +89,7 @@ By convention, the counter that stores the result of an arithmetic operation is 
 
 | Argset                   | Result (in the example case of division) | Commands that use it           |
 | ------------------------ | ---------------------------------------- | ------------------------------ |
-| `<item> <number>`        | `item = item / number`                   | ADD, SUB, MUL, DIV, FLDIV, MOV |
+| `<item> <number>`        | `item = item / number`                   | ADD, SUB, MUL, DIV, FLDIV, MOV\* |
 | `<item> <item>`          | `1st item = 1st item / 2nd item`         | ADD, SUB, MUL, DIV, FLDIV, MOV\* |
 | `<item> <item> <number>` | `1st item = 2nd item / number`           | MUL, DIV, FLDIV                |
 | `<item> <item> <item>`   | `1st item = 2nd item / 3rd item`         | MUL, DIV, FLDIV, ADD, SUB      |
@@ -102,7 +102,7 @@ Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are 
 - DIV: division
 - FLDIV: division, and the result it rounded down (floored).
 - MOV: assignment
-> \* MOV simply assigns the 2nd item to the 1st item in this case. Data is not transformed when MOV is used.
+> \* MOV simply assigns the 2nd argument to the 1st item in this case. Data is not transformed when MOV is used.
 ##### 3.1.2.1.2. Add/Subtract with modifier
 These instructions are utility instructions included to shorten common expressions.
 ###### `ADDM`
@@ -122,15 +122,21 @@ These instruction accept the same arguments and do the same thing as their `ADDM
 Useful for shortening expression which follow the form of:
 - for `ADDD`, `result = result + operand / modifier`
 - for `SUBD`, `result = result - (operand / modifier)`
+
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
-Execution timeline:
+
+Execution timeline (base compares):
 - Tick n: the compare trigger is called
 - Tick n + 1: 
-	- the compare trigger calls the group spawner trigger if it should be called
+	- the compare trigger calls the intermediate group spawner trigger if it should be called
 	- the parent group executes the next instruction.
 - Tick n + 2: the spawned group starts execution
+
+Execution timeline (instant compares):
+- Tick n: the compare trigger is called
+- Tick n + 1: the spawned group starts execution
 ##### Spawn if
 `SE`, `SNE`, `SL`, `SLE`, `SG`, `SGE` all accept: `<routine> <item> <number>`, `<routine> <item> <item>`
 
@@ -157,6 +163,17 @@ The first routine is spawned if the two arguments meet the condition. Otherwise,
 
 > Here, a and b refer to the first and second operands respectively.
 
+##### Instant compares
+"Instant" compares can be accessed by prefixing a compare instruction with `I`. These instructions directly spawn the target groups instead of using any intermediate triggers.
+This means that spawned groups will not be spawned with spawn ordered or will be able to be paused/stopped. This feature is intended for fast execution of utility groups. Note that remaps are still carried through any instant compares.
+
+All available instant compare instructions:
+- ISE, ISNE, ISL, ISLE, ISG, ISGE
+- IFE, IFNE, IFL, IFLE, IFG, IFGE
+- ISRAND, IFRAND
+
+All instant compare instructions take the same arguments as their base counterparts.
+
 ##### Random Spawns
 `SRAND <routine> <number>`
 
@@ -180,53 +197,22 @@ The routine `do_stuff` has a 42.8% chance of being spawned.
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
 > This memory structure is still usable, however it is considered deprecated and much less group-efficient than the structure used by the new memory instructions.
 
-##### MALLOC
-Arguments: `MALLOC <int>, <int>`
+> [!NOTE]
+> As of v0.3.0, memory instructions are no longer part of the TASM ISA. Memory is now handled through the standard library instead of dedicated instructions.  
+> Aliases `PTRPOS`, `MEMREG` and `MEMSIZE` are now all deprecated too. All new aliases are defined in any file that uses them.
 
-Creates a memory block that is able to write to and read from the first counter ID to the second counter ID inclusively. Uses counters (ints).  
-Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
-
-##### FMALLOC
-Arguments: `FMALLOC <int>, <int>`
-
-Creates a memory block that is able to write to and read from the first counter ID to the second counter ID inclusively. Uses timers (floats).  
-Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
-
-##### MSET
-Arguments: `MSET`
-
-Sets the value of the item at the `PTRPOS` to the value of the `MEMREG`.  
-The address of the item must have already been set in the `PTRPOS` counter.
-
-Execution time: 4 ticks
-
-##### MGET
-Arguments: `MGET`
-
-Reads the value of the item at the `PTRPOS` into the `MEMREG`.  
-The address of the item must have already been set in the `PTRPOS` counter.
-
-Execution time: 4 ticks
-
-##### INITMEM
-Arguments: `INITMEM <numbers>`
-
-Assigns the numbers to memory in order, starting at address 0. Must be done after MALLOC. Numbers must be separated by commas, and should match the type of the memory (i.e. no floats in integer memory).  
-Only allowed `_init` routine.
 ##### LMALLOC
 Arguments: `LMALLOC <positive int>`
 
 Allocates a specified amount of counters to memory. 
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in `_init` routine.
 ##### LFMALLOC
 Arguments: `LFMALLOC <positive int>`
 
 Allocates a specified amount of timers (floats) to memory. 
 Only one memory allocation is allowed per program.  
-Only allowed `_init` routine.
+Only allowed in `_init` routine.
 ##### LMFUNC
 Arguments: `LMFUNC`
 
@@ -414,6 +400,15 @@ One may obtain an object string by using the BetterEdit mod for Geode, and simpl
 > Please double-check and comment usages of this instruction thoroughly. Object strings are notoriously opaque and difficult to read, which makes them very prone to accidental misformatting.
 
 Execution time: 0 ticks.
+#### 3.1.2.9.1. The `RAWTRG` instruction
+Much like the `RAW` instruction, the `RAWTRG` instruction takes an object string and inserts it into the level, except that all given objects are treated as part of the routine. This has the follow implications: 
+- All given objects are placed the compiler-assigned position in the respective routine, in the respective instruction position. 
+- All given objects are appended to the group of routine
+- All given objects are made multi-spawntriggerable.
+
+This instruction is to give the programmer the option to place a trigger that is not yet supported by TASM in the usual position and have the compiler treat that object as a trigger in the routine.
+
+Execution time: 1 tick.
 #### 3.1.2.10. Excluded instructions
 Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
 It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  
@@ -494,6 +489,7 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 		- There must be no spacing between the keys/values and the colon separator.
 		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
 		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
+		- Currently, the only supported values are 16-bit signed integers for both keys and their values. Other accepted values are routine identifiers or aliases for either ints or routines. When passed as either a key or a value, a routine identifier will be coerced to an int, which is its group ID.
 
 > [!NOTE]
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
@@ -512,6 +508,8 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |
 | delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |
 | remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
+| ordered | Use spawn ordered true, don't use spawn ordered if false.                                             | `SPAWN`      | Boolean    |
+| noremap | Enables `reset remap` option in the trigger if true.                                                  | `SPAWN`      | Boolean    |
 | tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
 | tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |
@@ -661,7 +659,11 @@ This is dangerous, because the GD runtime does not specify a call stack. Therefo
 ### 3.3.1. Number literals
 A number literal is any string that may be parsed as a float. Unless specified to be strictly an integer, all numbers are parsed as double-precision floats (f64).  
 It is important to make the distinction between number literals and numbers stored in items. While both are numbers, number literals are used more as specific values, while items represent containers for values in the actual program/level.  
-It is also important to recognize that all floats in GD are 32 bits floats. This means that any integer values above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself.
+It is also important to recognize that all floats in GD are 32-bit floats. This means that any integer values above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself.
+
+#### 3.3.1.2. Hex literals
+A hexadecimal integer literal may be written starting with the prefix `0x`, followed by a number that will fit into a 32-bit signed integer. Any value that starts with `0x` will be parsed as a hexadecimal literal, and will emit an error if it is not parsed instead of falling back to being parsed as a different type of value.
+If a value starts with `0x` is intended to be a string, prefix it instead with `\`. 
 ### 3.3.2. Item literals
 An item literal represents a GD item, most commonly a counter or timer item. It is denoted as such:
 - Counter: `CXXXX`, where `XXXX` represents the ID of the counter. Example: `C123` represents the counter with ID 123.
@@ -689,16 +691,18 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.2.6, the aliases that exist are:
-- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998`, but may change according to compiler arguments.
-- `PTRPOS`: counter that stores the current pointer position (0-indexed).
-- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
+As of TASM v0.3.0, the aliases that exist are:
 - `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
+Aliases that are now used only for memory instructions and are now deprecated are:
+- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998` for legacy memory, but may change according to compiler arguments.
+- `PTRPOS`: counter that stores the current pointer position (0-indexed).
+- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
 ### 3.3.5. Strings
+A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, `\g123` will compile into the string literal `"g123"`.   
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
-**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group.**
+**Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group if not escaped.**
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 
@@ -786,7 +790,7 @@ For a memsize of more than 20, using the new system is recommended for the sake 
 
 ## 3.6. Comments
 <!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.6. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.0. 
 ## 3.7. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
@@ -795,7 +799,7 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-As of v0.2.6, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+As of v0.3.0, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
 - [Windows installer](https://tasm.mntpoint.org/install.ps1)
 - [Linux installer](https://tasm.mntpoint.org/install.sh)
 

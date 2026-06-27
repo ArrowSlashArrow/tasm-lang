@@ -69,7 +69,6 @@ impl Tasm {
             return;
         }
 
-        verbose_log!(self, "Pushing _init to front of routine data");
         // push _init routine to the start to process it before anyting else
         // important to do for alias resolution, since memtype is determined in init.
         if let Some(init_pos) = self
@@ -77,9 +76,11 @@ impl Tasm {
             .iter()
             .position(|r| r.routine_ident == INIT_ROUTINE)
         {
+            verbose_log!(self, "Pushing _init to front of routine data");
             let rtn = self.routine_data[init_pos].clone();
             self.routine_data.remove(init_pos);
             self.routine_data.insert(0, rtn);
+            verbose_log!(self, "Parsing aliases");
             self.get_aliases_from_init();
         }
 
@@ -203,6 +204,9 @@ impl Tasm {
             })
             .collect();
 
+        // can't have an immutable reference to this
+        let gm = self.routine_group_map.clone();
+
         for (lines, routine) in routines.iter_mut() {
             let prev_err_count = self.errors.len();
             for (curr_line, line) in lines {
@@ -211,8 +215,7 @@ impl Tasm {
                     continue; // skip blank line
                 }
 
-                // parse instruction and args
-                self.parse_instr_line(routine, *curr_line, trimmed_line);
+                self.parse_instr_line(routine, *curr_line, trimmed_line, &gm);
             }
             let new_err_count = self.errors.len();
             verbose_log!(
@@ -238,6 +241,7 @@ impl Tasm {
                         ParseErrorType::BadID => TasmErrorType::BadID,
                         ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
                         ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
+                        ParseErrorType::BadHexLiteral => TasmErrorType::BadHexLiteral,
                     },
                     curr_line,
                     routine.to_string(),
@@ -254,6 +258,7 @@ impl Tasm {
         curr_routine: &mut Routine,
         curr_line: usize,
         trimmed_line: &str,
+        gm: &HashMap<String, i16>,
     ) {
         // determine the arguments and the flags
         // line is structured like this:
@@ -275,14 +280,20 @@ impl Tasm {
                 if right.is_empty() {
                     (left, vec![])
                 } else {
-                    let flags_parsed =
-                        match parse_flags_str(right, curr_line, &self.fname, &curr_routine.ident) {
-                            Ok(flags) => flags,
-                            Err(e) => {
-                                self.errors.push(e);
-                                return;
-                            }
-                        };
+                    let flags_parsed = match parse_flags_str(
+                        right,
+                        curr_line,
+                        &self.fname,
+                        &curr_routine.ident,
+                        gm,
+                        &self.defined_aliases,
+                    ) {
+                        Ok(flags) => flags,
+                        Err(e) => {
+                            self.errors.push(e);
+                            return;
+                        }
+                    };
 
                     (left, flags_parsed)
                 }
@@ -388,7 +399,7 @@ impl Tasm {
                     TasmErrorType::InvalidInstruction,
                     curr_line,
                     curr_routine.ident.clone(),
-                    format!("Unrecognized instruction {instr}: "),
+                    format!("Unrecognized instruction {instr}"),
                 );
                 return;
             }
@@ -474,22 +485,23 @@ impl Tasm {
 
             if !line.starts_with(' ') {
                 // commit old data
-                // due to this being the first piece of code being ran once parsing starts,
-                // the first routine data will therefore be garbage data.
                 let routine_ident = curr_routine_data.routine_ident.clone();
                 if routine_ident == INIT_ROUTINE {
-                    curr_routine_data.group_id = INIT_PLACEHOLDER_GROUP; // init has no group, -1 serves as a unique _init marker
+                    curr_routine_data.group_id = INIT_PLACEHOLDER_GROUP;
                     self.curr_group -= 1;
                 } else {
                     self.routine_group_map
                         .insert(routine_ident.clone(), self.curr_group);
                 }
 
-                // ignore the garbage data
-                if self.routine_group_map.len() > 1 {
+                // omit handling empty routines
+                if !curr_routine_data.lines.is_empty() {
                     verbose_log!(self, "Got routine: {} on line {}", routine_ident, line_idx);
+                    self.routine_data.push(curr_routine_data.clone());
+                } else {
+                    // didn't commit empty routine, re-use its group
+                    self.curr_group -= 1;
                 }
-                self.routine_data.push(curr_routine_data.clone());
 
                 // no indent, check for routine identifier.
                 let mut strip = line.trim().to_string();
@@ -516,10 +528,9 @@ impl Tasm {
                             line_idx,
                             routine_ident.clone(),
                             format!(
-                                "
-                                Routine {} was already declared on line {}",
+                                "Routine {} was already declared on line {}",
                                 routine_ident.clone(),
-                                seen_routines.get(&routine_ident).unwrap_or(&0) + 1 // +1 to convert from 0-indexed to 1-indexed line numbers
+                                seen_routines.get(&routine_ident).unwrap_or(&0)
                             ),
                         );
                     }
@@ -557,16 +568,12 @@ impl Tasm {
         // commit last routine data
         let routine_ident = curr_routine_data.routine_ident.clone();
         if routine_ident == INIT_ROUTINE {
-            curr_routine_data.group_id = 0i16; // init has no group
+            curr_routine_data.group_id = INIT_PLACEHOLDER_GROUP; // init has no group
         } else {
             self.routine_group_map
                 .insert(routine_ident, self.curr_group);
         }
         self.routine_data.push(curr_routine_data);
-
-        verbose_log!(self, "Removing garbage routine data.");
-        // first routine was garbage data, so remove it
-        self.routine_data.remove(0);
     }
 }
 
@@ -591,6 +598,8 @@ fn parse_flags_str(
     curr_line: usize,
     file: &String,
     routine: &String,
+    gm: &HashMap<String, i16>,
+    aliases: &HashMap<String, String>,
 ) -> Result<Vec<Flag>, TasmError> {
     let raw_flags = flags_str.split_whitespace();
 
@@ -628,43 +637,37 @@ fn parse_flags_str(
                 details: format!("Bad flag: {flag_segment}"),
             },
         ) {
-            Ok((ident, value)) => {
-                match get_flag_type(ident) {
-                    Some(t) => match t {
-                        FlagValueType::Dict => {
-                            // if a dict flag is identified, it is the beginning of the dict
-                            if value.ends_with('}') {
-                                // dict is contained in one segment
-                                preprocessed.push((
-                                    ident.into(),
-                                    value.into(),
-                                    FlagValueType::Dict,
-                                ));
-                                continue;
-                            }
-
-                            // if a dict does not end with a } , it must be in multiple segments
-                            // therefore, the first char must be a { since the rest of the dict
-                            // is in other segments of the iterator.
-                            // we can set the in_dict flag to find the other segments and concatenate them
-                            in_dict = true;
-                            dict_ident = ident.into();
-                            current_dict = value.into();
+            Ok((ident, value)) => match get_flag_type(ident) {
+                Some(t) => match t {
+                    FlagValueType::Dict => {
+                        // if a dict flag is identified, it is the beginning of the dict
+                        if value.ends_with('}') {
+                            // dict is contained in one segment
+                            preprocessed.push((ident.into(), value.into(), FlagValueType::Dict));
+                            continue;
                         }
-                        t => preprocessed.push((ident.into(), value.into(), t)),
-                    },
-                    None => {
-                        return Err(TasmError {
-                            etype: TasmErrorType::BadFlag,
-                            file: file.to_owned(),
-                            routine: routine.to_owned(),
-                            error: true,
-                            line: curr_line,
-                            details: format!("Unrecognized flag {flag_segment}"),
-                        });
+
+                        // if a dict does not end with a } , it must be in multiple segments
+                        // therefore, the first char must be a { since the rest of the dict
+                        // is in other segments of the iterator.
+                        // we can set the in_dict flag to find the other segments and concatenate them
+                        in_dict = true;
+                        dict_ident = ident.into();
+                        current_dict = value.into();
                     }
+                    t => preprocessed.push((ident.into(), value.into(), t)),
+                },
+                None => {
+                    return Err(TasmError {
+                        etype: TasmErrorType::BadFlag,
+                        file: file.to_owned(),
+                        routine: routine.to_owned(),
+                        error: true,
+                        line: curr_line,
+                        details: format!("Unrecognized flag {flag_segment}"),
+                    });
                 }
-            }
+            },
             Err(e) => return Err(e),
         }
     }
@@ -672,7 +675,7 @@ fn parse_flags_str(
     let mut parsed_flags = vec![];
 
     for (ident, raw_value, t) in preprocessed {
-        match Flag::from(ident.clone(), &raw_value, t.clone()) {
+        match Flag::from(ident.clone(), &raw_value, t.clone(), gm, aliases) {
             Some(flag) => parsed_flags.push(flag),
             None => {
                 return Err(TasmError {
@@ -747,7 +750,7 @@ pub fn parse_file<T: AsRef<str>>(
     tasm.logs_enabled = verbose_logs;
     tasm.group_offset = group_offset;
     tasm.fname = fname;
-    tasm.parse(group_offset, disable_entry_point_check);
+    tasm.parse(group_offset + 1, disable_entry_point_check);
 
     if tasm.errors.is_empty() {
         Ok(tasm)
