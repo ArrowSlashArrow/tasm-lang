@@ -48,7 +48,7 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of May 13, 2026 is **v0.2.6**. 
+The current version, as of June 26, 2026 is **v0.3.0**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -691,13 +691,14 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.2.6, the aliases that exist are:
-- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998` for legacy memory, but may change according to compiler arguments.
-- `PTRPOS`: counter that stores the current pointer position (0-indexed).
-- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
+As of TASM v0.3.0, the aliases that exist are:
 - `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
+Aliases that are now used only for memory instructions and are now deprecated are:
+- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998` for legacy memory, but may change according to compiler arguments.
+- `PTRPOS`: counter that stores the current pointer position (0-indexed).
+- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
 ### 3.3.5. Strings
 A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, `\g123` will compile into the string literal `"g123"`.   
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
@@ -789,7 +790,7 @@ For a memsize of more than 20, using the new system is recommended for the sake 
 
 ## 3.6. Comments
 <!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.2.6. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.0. 
 ## 3.7. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
@@ -798,7 +799,7 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-As of v0.2.6, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+As of v0.3.0, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
 - [Windows installer](https://tasm.mntpoint.org/install.ps1)
 - [Linux installer](https://tasm.mntpoint.org/install.sh)
 
