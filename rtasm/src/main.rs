@@ -2,18 +2,19 @@
 
 extern crate alloc;
 
-use std::{env, fs, path::PathBuf};
+use std::fs;
 
 use anyhow::Error;
 use clap::Parser;
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use gdlib::{
+    core::get_local_levels_path,
     gdlevel::{Level, Levels},
     gdobj::GDObject,
 };
 use tungstenite::{Message, connect};
 
-use crate::core::print_errors;
+use crate::core::{error::ERROR_DOCS, print_errors};
 
 pub mod core;
 pub mod instr;
@@ -26,7 +27,8 @@ mod tests;
 #[command(about, version, author)]
 struct Args {
     /// Path to input file.
-    infile: String,
+    #[arg(required_unless_present = "error_help")]
+    infile: Option<String>,
 
     /// Whether or not to use release mode.
     /// Release mode optimises routines to be as fast as possible,
@@ -71,10 +73,14 @@ struct Args {
     #[arg(long)]
     no_log: bool,
 
-    /// Sends the level to the clipboard instead of a file.
+    /// Sends the level to the clipboard instead of a file. This flag only works for users on Windows.
     /// The compiled objects can be pasted in via BetterEdit.
     #[arg(long, short)]
     clipboard: bool,
+
+    /// Prints help for a specific error code.
+    #[arg(long, short, default_value_t = 0)]
+    error_help: usize,
 }
 
 fn get_obj_str(obj: &Vec<GDObject>) -> String {
@@ -108,20 +114,6 @@ fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
     Ok(())
 }
 
-// Temporary function that will be used until the next version of gdlib when this gets fixed
-// This function does not check for the linux savefile path since this version of gdlib
-// does not implement saving to that location
-fn get_local_levels_path() -> Option<PathBuf> {
-    if let Ok(local_appdata) = env::var("LOCALAPPDATA") {
-        let path = PathBuf::from(format!("{local_appdata}/GeometryDash/CCLocalLevels.dat"));
-        if path.exists() {
-            return Some(path);
-        }
-    }
-
-    None
-}
-
 fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
     if let None = get_local_levels_path() {
         log!(logs_enabled, "Unable to find savefile. Please pass --gmd.");
@@ -135,10 +127,24 @@ fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn main() -> Result<(), Error> {
+fn main() {
     let args = Args::parse();
+    if args.error_help != 0 {
+        match ERROR_DOCS.get(args.error_help) {
+            Some(s) => println!("{s}"),
+            None => println!("Invalid error code."),
+        };
+        return;
+    }
+
     log!(!args.no_log, "Parsing tasm...");
-    let file = fs::read_to_string(&args.infile)?;
+    let file = match fs::read_to_string(&args.infile.clone().unwrap()) {
+        Ok(f) => f,
+        Err(e) => {
+            println!("Couldn't read file! {e}");
+            return;
+        }
+    };
 
     let id_limit = 9999;
     if args.mem_end_counter > id_limit {
@@ -146,18 +152,18 @@ fn main() -> Result<(), Error> {
             !args.no_log,
             "You may not set the end counter beyond the ID limit of {id_limit}"
         );
-        return Ok(());
+        return;
     } else if args.mem_end_counter < 0 {
         log!(
             !args.no_log,
             "You may not set the end counter to a negative ID."
         );
-        return Ok(());
+        return;
     }
 
     let mut tasm = match lexer::parse_file(
         file,
-        args.infile.clone(),
+        args.infile.clone().unwrap(),
         args.mem_end_counter,
         args.group_offset,
         args.verbose_logs && !args.no_log,
@@ -167,9 +173,9 @@ fn main() -> Result<(), Error> {
         Ok(t) => t,
         Err(es) => {
             if !args.no_log {
-                print_errors(es, &format!("Unable to compile {}", &args.infile));
+                print_errors(es, &format!("Unable to compile {}", &args.infile.unwrap()));
             }
-            return Ok(());
+            return;
         }
     };
 
@@ -177,7 +183,7 @@ fn main() -> Result<(), Error> {
 
     let level_name = match args.level_name {
         Some(l) => l,
-        None => args.infile,
+        None => args.infile.unwrap(),
     };
 
     log!(
@@ -194,21 +200,24 @@ fn main() -> Result<(), Error> {
             if !args.no_log {
                 print_errors(e, "Unable to compile to level");
             }
-            return Ok(());
+            return;
         }
         Ok(l) => l,
     };
 
     if args.no_export {
-        return Ok(());
+        return;
     }
 
     if args.clipboard {
         let mut ctx = ClipboardContext::new().unwrap();
         let obj_str = get_obj_str(&level.get_decrypted_data().unwrap().objects);
-        ctx.set_contents(obj_str).unwrap();
-        log!(!args.no_log, "Sent to clipboard");
-        return Ok(());
+        match ctx.set_contents(obj_str) {
+            Ok(_) => log!(!args.no_log, "Sent to clipboard"),
+            Err(e) => log!(!args.no_log, "Failed to send to clipboard: {e}"),
+        };
+
+        return;
     }
 
     match args.wslive {
@@ -217,7 +226,11 @@ fn main() -> Result<(), Error> {
             Err(e) => log!(!args.no_log, "Failed to send to WSLive: {}", e),
         },
         None => match args.gmd {
-            true => level.export_to_gmd(format!("{}.gmd", level_name))?,
+            true => {
+                if let Err(e) = level.export_to_gmd(format!("{}.gmd", level_name)) {
+                    println!("Failed to export to level file: {e}");
+                }
+            }
             false => {
                 if let Err(e) = export_to_savefile(level, !args.no_log) {
                     log!(!args.no_log, "Unable to export to savefile: {e}")
@@ -225,6 +238,4 @@ fn main() -> Result<(), Error> {
             }
         },
     }
-
-    Ok(())
 }

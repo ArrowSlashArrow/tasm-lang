@@ -90,6 +90,7 @@ fn wait_internal(ticks: i32, line: usize) -> HandlerReturn {
             error: true,
             line,
             details: "Cannot wait a negative number of ticks.".to_string(),
+            errcode: 6,
         })
     }
 }

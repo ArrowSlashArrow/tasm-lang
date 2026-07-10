@@ -91,6 +91,7 @@ impl Tasm {
                 &self.fname,
                 TasmErrorType::NoEntryPoint,
                 "No entry point found in file.".into(),
+                11,
             );
         }
 
@@ -130,6 +131,7 @@ impl Tasm {
                     *line,
                     INIT_ROUTINE.into(),
                     "Instruction ALIAS must only have two arguments: [String, Any]".to_string(),
+                    12,
                 );
             }
 
@@ -145,6 +147,7 @@ impl Tasm {
                             *line,
                             INIT_ROUTINE.into(),
                             format!("Cannot override existing alias {}.", entry.key()),
+                            13,
                         );
                     }
                     hash_map::Entry::Vacant(entry) => {
@@ -156,6 +159,7 @@ impl Tasm {
                                 *line,
                                 INIT_ROUTINE.into(),
                                 format!("Cannot override default alias {}.", entry.key()),
+                                14,
                             );
                         } else {
                             entry.insert(trimmed[1].into());
@@ -171,6 +175,7 @@ impl Tasm {
                     *line,
                     INIT_ROUTINE.into(),
                     format!("Bad alias identifier: {}", trimmed[0]),
+                    15,
                 );
             };
         }
@@ -232,7 +237,7 @@ impl Tasm {
         match TasmValue::to_value(v.trim()) {
             // whitespace is stripped when parsing
             Ok(t) => self.parse_tasm_value(t, curr_line, routine),
-            Err((etype, msg)) => {
+            Err((etype, msg, errcode)) => {
                 // error if unable to parse argument value
                 push_error(
                     &mut self.errors,
@@ -246,6 +251,7 @@ impl Tasm {
                     curr_line,
                     routine.to_string(),
                     msg,
+                    errcode,
                 );
 
                 None
@@ -274,6 +280,7 @@ impl Tasm {
                 error: true,
                 line: curr_line,
                 details: "Bad flag arguments".into(),
+                errcode: 21,
             },
         ) {
             Ok((left, right)) => {
@@ -318,6 +325,7 @@ impl Tasm {
                     curr_line,
                     curr_routine.ident.clone(),
                     "Trailing commas are not allowed.".to_string(),
+                    22,
                 );
                 return;
             }
@@ -341,6 +349,7 @@ impl Tasm {
                         curr_line,
                         curr_routine.ident.clone(),
                         "Cannot define an alias outside of the init routine.".to_string(),
+                        23,
                     );
                 }
                 return;
@@ -375,6 +384,7 @@ impl Tasm {
                     curr_line,
                     curr_routine.ident.clone(),
                     "Failed to parse instruction: invalid argset".into(),
+                    24,
                 );
             }
         } else {
@@ -400,6 +410,7 @@ impl Tasm {
                     curr_line,
                     curr_routine.ident.clone(),
                     format!("Unrecognized instruction {instr}"),
+                    25,
                 );
                 return;
             }
@@ -417,6 +428,7 @@ impl Tasm {
                     "Instruction {instr} is not allowed in routine {} because it is exclusive to the initialiser routine, {INIT_ROUTINE}.",
                     curr_routine.ident
                 ),
+                26,
             );
             return;
         }
@@ -451,6 +463,7 @@ impl Tasm {
                     format!(
                         "Instruction {instr} has no argument handler for the argset {argtypes:?}"
                     ),
+                    27,
                 );
             }
         }
@@ -532,6 +545,7 @@ impl Tasm {
                                 routine_ident.clone(),
                                 seen_routines.get(&routine_ident).unwrap_or(&0)
                             ),
+                            28,
                         );
                     }
 
@@ -553,6 +567,7 @@ impl Tasm {
                         line_idx,
                         "<No routine>".to_string(),
                         "Bad token.".to_string(),
+                        29,
                     );
                 }
             } else if in_routine {
@@ -635,6 +650,7 @@ fn parse_flags_str(
                 error: true,
                 line: curr_line,
                 details: format!("Bad flag: {flag_segment}"),
+                errcode: 30,
             },
         ) {
             Ok((ident, value)) => match get_flag_type(ident) {
@@ -665,6 +681,7 @@ fn parse_flags_str(
                         error: true,
                         line: curr_line,
                         details: format!("Unrecognized flag {flag_segment}"),
+                        errcode: 31,
                     });
                 }
             },
@@ -687,6 +704,7 @@ fn parse_flags_str(
                     details: format!(
                         "Unable to parse {ident} with value of {raw_value} and type {t:?}"
                     ),
+                    errcode: 32,
                 });
             }
         }
@@ -718,6 +736,7 @@ pub fn validate_tasm_value(
                         error: true,
                         line: curr_line,
                         details: "Cannot spawn init routine.".to_string(),
+                        errcode: 33,
                     });
                     None
                 }

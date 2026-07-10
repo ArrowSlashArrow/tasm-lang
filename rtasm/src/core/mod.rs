@@ -75,6 +75,7 @@ impl Tasm {
                     &self.fname,
                     TasmErrorType::ExceedsGroupLimit,
                     format!("Program uses more than {GROUP_LIMIT} groups."),
+                    1,
                 );
                 break;
             }
@@ -176,6 +177,7 @@ impl Tasm {
                     instr.line_number,
                     INIT_ROUTINE.into(),
                     "Cannot access memory in the init routine.".to_string(),
+                    2,
                 );
                 return;
             }
@@ -187,6 +189,7 @@ impl Tasm {
                     instr.line_number,
                     routine.ident.clone(),
                     "Cannot access memory when none exists.".to_string(),
+                    3,
                 );
                 return;
             }
@@ -204,6 +207,7 @@ impl Tasm {
                     instr.line_number,
                     routine.ident.clone(),
                     format!("Cannot overwrite value of {counter_type:?}."),
+                    4,
                 );
                 return;
             }
@@ -314,6 +318,7 @@ impl Tasm {
                     instr.line_number,
                     routine.ident.clone(),
                     format!("Memory was already created on line {}.", m.line + 1),
+                    5,
                 );
                 return;
             }
@@ -346,12 +351,14 @@ pub fn push_error(
     line: usize,
     rtn: String,
     details: String,
+    errcode: i32,
 ) {
     errors.push(TasmError {
         etype,
         file: file.to_string(),
         routine: rtn,
         error: true,
+        errcode,
         line,
         details,
     })
@@ -362,12 +369,14 @@ pub fn push_error_lineless(
     file: &str,
     etype: TasmErrorType,
     details: String,
+    errcode: i32,
 ) {
     errors.push(TasmError {
         etype,
         file: file.to_string(),
         routine: String::new(),
         error: true,
+        errcode,
         line: 0,
         details,
     })

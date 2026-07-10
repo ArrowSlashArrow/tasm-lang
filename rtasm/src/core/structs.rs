@@ -135,7 +135,7 @@ impl Aliases {
 }
 
 impl TasmValue {
-    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String)> {
+    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String, i32)> {
         let mut iter = s.chars();
         let pref = match iter.next() {
             Some(c) => c,
@@ -144,6 +144,7 @@ impl TasmValue {
                 return Err((
                     ParseErrorType::TrailingComma,
                     "Got a 0-length string. Perhaps there is a trailing comma".into(),
+                    16,
                 ));
             }
         };
@@ -165,6 +166,7 @@ impl TasmValue {
                 return Err((
                     ParseErrorType::BadID,
                     format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+                    17,
                 ));
             }
             match pref {
@@ -182,9 +184,14 @@ impl TasmValue {
                 return Err((
                     ParseErrorType::InvalidNumber,
                     "Infinity is not allowed.".into(),
+                    18,
                 ));
             } else if n.is_nan() {
-                return Err((ParseErrorType::InvalidNumber, "NaN is not allowed.".into()));
+                return Err((
+                    ParseErrorType::InvalidNumber,
+                    "NaN is not allowed.".into(),
+                    19,
+                ));
             }
 
             Ok(Self::Number(n))
@@ -196,6 +203,7 @@ impl TasmValue {
                 Err((
                     ParseErrorType::BadHexLiteral,
                     "Could not parse hexadecimal number.".into(),
+                    20,
                 ))
             }
         } else {
