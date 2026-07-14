@@ -4,7 +4,7 @@ extern crate alloc;
 
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{Error, Result};
+use anyhow::{Error, Result, anyhow};
 use clap::Parser;
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use gdlib::{
@@ -29,7 +29,7 @@ mod linker;
 #[cfg(test)]
 mod tests;
 
-#[derive(Parser)]
+#[derive(Parser, Default)]
 #[command(about, version, author)]
 struct Args {
     /// Path to input file.
@@ -97,6 +97,20 @@ struct Args {
     linker_output: bool,
 }
 
+impl Args {
+    pub fn test_args(infile: String, has_entry: bool) -> Self {
+        Self {
+            infile: Some(infile),
+            verbose_logs: true,
+            dependencies: true,
+            linker_output: true,
+            mem_end_counter: 9999,
+            no_entry_point: !has_entry,
+            ..Default::default()
+        }
+    }
+}
+
 fn get_obj_str(obj: &Vec<GDObject>) -> String {
     obj.iter()
         .map(|obj| obj.serialise_to_string())
@@ -141,6 +155,53 @@ fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
     Ok(())
 }
 
+fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
+    let main_path = PathBuf::from(&args.infile.clone().unwrap());
+    // note: the path for each module must be relative to the module! not doing so may cause overwrites in the cache.
+    // relative path qualifier: (module, is done)
+    let mut module_cache: HashMap<PathBuf, (Tasm, bool, Vec<usize>)> = HashMap::new();
+    let mut dependency_map: HashMap<String, PathBuf> = HashMap::new(); // module ident => module path
+    let mut start_using_this_group = args.group_offset;
+    let (mut main_module, curr_group, _) = match parse_module(
+        main_path.clone(),
+        &args,
+        &mut module_cache,
+        &mut dependency_map,
+        &mut start_using_this_group,
+        !args.no_entry_point,
+        !args.no_log,
+    ) {
+        Ok(m) => m,
+        Err(e) => {
+            if !args.no_log {
+                println!("Unable to parse main module: {e}");
+            }
+            return Err(anyhow!(""));
+        }
+    };
+
+    if args.dependencies && !args.no_log {
+        println!("Using dependencies:");
+        for k in module_cache.keys() {
+            if k != &main_path {
+                println!("* {}", k.to_str().unwrap_or("Not a UTF-8 path!"));
+            }
+        }
+    }
+
+    if let Err(e) = post_link_processing(&mut main_module, module_cache, dependency_map) {
+        if !args.no_log {
+            println!("Unable to compile to level");
+            for err in e {
+                println!("{err}");
+            }
+        }
+        return Err(anyhow!(""));
+    }
+
+    return Ok((main_module, curr_group));
+}
+
 fn main() {
     let args = Args::parse();
     if args.error_help != 0 {
@@ -168,50 +229,10 @@ fn main() {
         return;
     }
 
-    let main_path = PathBuf::from(&args.infile.clone().unwrap());
-
-    // note: the path for each module must be relative to the module! not doing so may cause overwrites in the cache.
-    // relative path qualifier: (module, is done)
-    let mut module_cache: HashMap<PathBuf, (Tasm, bool, Vec<usize>)> = HashMap::new();
-    let mut dependency_map: HashMap<String, PathBuf> = HashMap::new(); // module ident => module path
-    let mut start_using_this_group = args.group_offset;
-    let (mut main_module, curr_group, _) = match parse_module(
-        main_path.clone(),
-        &args,
-        &mut module_cache,
-        &mut dependency_map,
-        &mut start_using_this_group,
-        !args.no_entry_point,
-    ) {
+    let (mut main_module, curr_group) = match parse_main(&args) {
         Ok(m) => m,
-        Err(e) => {
-            println!("Unable to parse main module: {e}");
-            return;
-        }
+        Err(_) => return,
     };
-
-    if args.dependencies {
-        println!("Using dependencies:");
-        for k in module_cache.keys() {
-            if k != &main_path {
-                println!("* {}", k.to_str().unwrap_or("Not a UTF-8 path!"));
-            }
-        }
-    }
-
-    if let Err(e) = post_link_processing(&mut main_module, module_cache, dependency_map) {
-        if !args.no_log {
-            println!("Unable to compile to level");
-            for err in e {
-                println!("{err}");
-            }
-        }
-        return;
-    }
-
-    // dedup copied routines
-    main_module.routines.sort_by(|a, b| a.group.cmp(&b.group));
-    main_module.routines.dedup_by(|a, b| a.group == b.group);
 
     if args.linker_output {
         println!("-------  linker output -------");

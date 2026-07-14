@@ -12,7 +12,7 @@ use crate::{
         structs::{Instruction, Routine, SymbolPath, Tasm, TasmValue, fits_arg_signature},
     },
     instr::{INSTR_SPEC, placeholder_panic_fn},
-    lexer,
+    lexer, log,
 };
 use anyhow::{Result, anyhow};
 
@@ -23,11 +23,12 @@ pub fn compile_tasm_module(
     args: &Args,
     start_using_this_group: i16,
     expect_entry_point: bool, // should always be false unless parsing from main
+    silent: bool,
 ) -> Result<Tasm> {
     let file = match fs::read_to_string(&path) {
         Ok(f) => f,
         Err(e) => {
-            println!("Couldn't read file! {e}");
+            log!(silent, "Couldn't read file! {e}");
             return Err(e.into());
         }
     };
@@ -123,11 +124,18 @@ pub fn parse_module(
     dependency_map: &mut HashMap<String, PathBuf>,
     start_using_this_group: &mut i16,
     has_entry_point: bool,
+    silent: bool,
 ) -> Result<(Tasm, i16, Vec<usize>)> {
-    println!("parsing {module_path:?}");
+    log!(silent, "Parsing {}", module_path.to_str().unwrap());
     // lexed tasm output
     let prev_used_groups = *start_using_this_group;
-    let mut module = compile_tasm_module(&module_path, args, prev_used_groups, has_entry_point)?;
+    let mut module = compile_tasm_module(
+        &module_path,
+        args,
+        prev_used_groups,
+        has_entry_point,
+        silent,
+    )?;
     // offsetting the starting group like this allows us to parse the routines with no group collision to begin with
     // name collision is yet to be resolved
     *start_using_this_group += module.curr_group - prev_used_groups;
@@ -187,6 +195,7 @@ pub fn parse_module(
             dependency_map,
             args,
             start_using_this_group,
+            silent,
         )?;
         dependency_map.insert(symbol.root.clone().unwrap(), dependency_path.clone());
 
@@ -225,6 +234,7 @@ pub fn parse_module(
                     &symbol.clone(),
                     args,
                     start_using_this_group,
+                    silent,
                 )?;
                 // replace existing symbol with this value
                 TasmValue::Group(routine_cache.get(&symbol).unwrap().0.group)
@@ -295,6 +305,7 @@ pub fn cache_module(
     dependency_map: &mut HashMap<String, PathBuf>,
     args: &Args,
     start_using_this_group: &mut i16,
+    silent: bool,
 ) -> Result<(PathBuf, String)> {
     // this is the module identifier, not its path. look this up in the current module.
     let (dependency_path, dependency) =
@@ -318,6 +329,7 @@ pub fn cache_module(
                 dependency_map,
                 start_using_this_group,
                 false, // library files should not have entry points
+                silent,
             )?;
 
             // push filler entry to mark it as done
@@ -365,6 +377,7 @@ pub fn index_routine_deps(
     symbol_path: &SymbolPath,
     args: &Args,
     start_using_this_group: &mut i16,
+    silent: bool,
 ) -> Result<()> {
     // as a rust developer, using all of these .clone()s feels like driving a stake through my heart.
     // this langauge was made to be performant and memory safe, yet here i am sacrificing the former
@@ -399,6 +412,7 @@ pub fn index_routine_deps(
                     dependency_map,
                     args,
                     start_using_this_group,
+                    silent,
                 )?;
             }
 
@@ -417,6 +431,7 @@ pub fn index_routine_deps(
                         &symbol,
                         args,
                         start_using_this_group,
+                        silent,
                     )?;
                 }
                 None => {
@@ -440,6 +455,7 @@ pub fn index_routine_deps(
                         &symbol,
                         args,
                         start_using_this_group,
+                        silent,
                     )?;
                 }
                 None => {
@@ -587,6 +603,10 @@ pub fn post_link_processing(
             }
         }
     }
+
+    // dedup copied routines
+    module.routines.sort_by(|a, b| a.group.cmp(&b.group));
+    module.routines.dedup_by(|a, b| a.group == b.group);
 
     if errors.is_empty() {
         Ok(())

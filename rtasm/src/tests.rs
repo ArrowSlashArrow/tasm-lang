@@ -12,16 +12,12 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<compile_success _ $file>]() {
-                let mut res = lexer::parse_file(
-                    fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    false
-                ).unwrap();
-                match res.handle_routines("") {
+                let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+                    format!("../tests/{}.tasm", $file),
+                    true
+                ))
+                .unwrap();
+                match res.handle_routines_inner("", group) {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -36,15 +32,10 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<fileparse_fail _ $file>]() {
-                assert!(lexer::parse_file(
-                    fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    false
-                ).is_err())
+                assert!(crate::parse_main(&crate::Args::test_args(
+                    format!("../tests/{}.tasm", $file),
+                    true
+                )).is_err());
             }
         }
     };
@@ -53,16 +44,12 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<translate_fail _ $file>]() {
-                let mut res = lexer::parse_file(
-                    fs::read_to_string(format!("../tests/{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    false
-                ).unwrap();
-                assert!(res.handle_routines("").is_err())
+                let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+                    format!("../tests/{}.tasm", $file),
+                    true
+                ))
+                .unwrap();
+                assert!(res.handle_routines_inner("", group).is_err());
             }
         }
     };
@@ -71,16 +58,12 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<example _ $file>]() {
-                let mut res = lexer::parse_file(
-                    fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    false
-                ).unwrap();
-                match res.handle_routines("") {
+                let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+                    format!("../example_programs/{}.tasm", $file),
+                    true
+                ))
+                .unwrap();
+                match res.handle_routines_inner("", group) {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -96,16 +79,12 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<example _ $file>]() {
-                let mut res = lexer::parse_file(
-                    fs::read_to_string(format!("../example_programs/{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    true
-                ).unwrap();
-                match res.handle_routines("") {
+                let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+                    format!("../example_programs/{}.tasm", $file),
+                    false
+                ))
+                .unwrap();
+                match res.handle_routines_inner("", group) {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -117,20 +96,17 @@ macro_rules! tasm_test {
     };
 
     // tests compiler-defined implementations located in `tests/compdef_{ident}.tasm`
+    // todo: move these to stdlib
     ($file:literal, compdef) => {
         paste! {
             #[test]
             fn [<compdef _ $file>]() {
-                let mut res = lexer::parse_file(
-                    fs::read_to_string(format!("../tests/compdef_{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    true // no entry point, since the routine should be named the same as the ident
-                ).unwrap();
-                assert!(res.handle_routines("").is_ok())
+                let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+                    format!("../tests/compdef_{}.tasm", $file),
+                    false,
+                ))
+                .unwrap();
+                res.handle_routines_inner("", group).unwrap();
             }
         }
     };
@@ -140,16 +116,12 @@ macro_rules! tasm_test {
         paste! {
             #[test]
             fn [<stdlib _ $file>]() {
-                let mut res = lexer::parse_file(
-                    fs::read_to_string(format!("../stdlib/{}.tasm", $file)).unwrap(),
-                    format!("testfile {}", $file),
-                    9999,
-                    0,
-                    true,
-                    true,
-                    true // no entry point in stdlib files
-                ).unwrap();
-                assert!(res.handle_routines("").is_ok())
+                let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+                    format!("../stdlib/{}.tasm", $file),
+                    false, // no entry point on stdlib files
+                ))
+                .unwrap();
+                res.handle_routines_inner("", group).unwrap();
             }
         }
     };
@@ -173,14 +145,18 @@ tasm_test!("bad_args", false);
 tasm_test!("bad_assignment", false, compile);
 tasm_test!("bad_instruction", false);
 tasm_test!("bad_token", false);
+tasm_test!("circular_import", false);
 tasm_test!("concurrent", true);
 tasm_test!("correct", true);
+tasm_test!("diamond_dependency", true);
 tasm_test!("division", true);
 tasm_test!("empty", false);
 tasm_test!("flags", true);
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
+tasm_test!("link_test", true);
 tasm_test!("lowercase", true);
+tasm_test!("memory", true);
 tasm_test!("multiple_mem", false, compile);
 tasm_test!("multiple_routines", false);
 tasm_test!("negative_ids", false);
@@ -225,17 +201,11 @@ fn no_int_detection() {
 
 #[test]
 fn parse_tasm() -> anyhow::Result<()> {
-    let file = fs::read_to_string("../programs/nuclear_reactor.tasm")?;
     let mut parse_start = Instant::now();
-    let mut tasm = lexer::parse_file(
-        file,
+    let (mut res, group) = crate::parse_main(&crate::Args::test_args(
         "../programs/nuclear_reactor.tasm".into(),
-        9999,
-        0,
         true,
-        true,
-        false,
-    )
+    ))
     .unwrap();
 
     println!(
@@ -244,7 +214,13 @@ fn parse_tasm() -> anyhow::Result<()> {
     );
 
     parse_start = Instant::now();
-    let _level = tasm.handle_routines("test level").unwrap();
+    let _level = match res.handle_routines_inner("", group) {
+        Ok(m) => m,
+        Err(e) => {
+            print_errors(e, "errors");
+            panic!()
+        }
+    };
     println!(
         "Serialise time: {:.3}ms",
         parse_start.elapsed().as_micros() as f64 / 1000.0

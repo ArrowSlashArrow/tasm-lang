@@ -1,0 +1,5 @@
+_init:
+    import badlib2
+
+routine:
+    spawn badlib2::routine

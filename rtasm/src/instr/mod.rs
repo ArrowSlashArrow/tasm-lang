@@ -8,6 +8,7 @@ use phf::phf_map;
 use crate::{
     core::{
         HandlerFn, HandlerReturn,
+        error::{TasmError, TasmErrorType},
         flags::FlagValue,
         structs::{HandlerArgs, InstrType, TasmPrimitive, TasmValue, TasmValueType},
     },
@@ -34,8 +35,15 @@ macro_rules! argset {
 
 /// This function exists as a placeholder for external symbols. Any instructions that use this function are to be resolved in the linking stage.
 /// This function WILL PANIC when called. DO NOT call this in `tasm.handle_routines`.
-pub const fn placeholder_panic_fn(_args: HandlerArgs) -> HandlerReturn {
-    panic!("Placeholder panic function was hit!");
+pub fn placeholder_panic_fn(args: HandlerArgs) -> HandlerReturn {
+    Err(TasmError {
+        etype: TasmErrorType::InvalidInstruction,
+        file: String::new(),
+        routine: String::new(),
+        line: args.line,
+        details: format!("Placeholder panic function was hit!"),
+        errcode: -1,
+    })
 }
 
 pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
