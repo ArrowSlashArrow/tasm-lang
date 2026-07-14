@@ -2,9 +2,9 @@
 
 extern crate alloc;
 
-use std::fs;
+use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use clap::Parser;
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use gdlib::{
@@ -14,12 +14,18 @@ use gdlib::{
 };
 use tungstenite::{Message, connect};
 
-use crate::core::{error::ERROR_DOCS, print_errors};
+use crate::core::{
+    error::ERROR_DOCS,
+    print_errors,
+    structs::{SymbolPath, Tasm},
+};
 
-pub mod core;
-pub mod instr;
-pub mod lexer;
+use crate::linker::{parse_module, post_link_processing};
 
+mod core;
+mod instr;
+mod lexer;
+mod linker;
 #[cfg(test)]
 mod tests;
 
@@ -81,6 +87,14 @@ struct Args {
     /// Prints help for a specific error code.
     #[arg(long, short, default_value_t = 0)]
     error_help: usize,
+
+    /// Displays all dependencies of the program being compiled
+    #[arg(long, short)]
+    dependencies: bool,
+
+    /// Show intermediate linker output. Used primarily for debugging.
+    #[arg(long, short)]
+    linker_output: bool,
 }
 
 fn get_obj_str(obj: &Vec<GDObject>) -> String {
@@ -132,19 +146,12 @@ fn main() {
     if args.error_help != 0 {
         match ERROR_DOCS.get(args.error_help) {
             Some(s) => println!("{s}"),
-            None => println!("Invalid error code."),
+            None => println!("No documentation for E{:0>4}.", args.error_help),
         };
         return;
     }
 
     log!(!args.no_log, "Parsing tasm...");
-    let file = match fs::read_to_string(&args.infile.clone().unwrap()) {
-        Ok(f) => f,
-        Err(e) => {
-            println!("Couldn't read file! {e}");
-            return;
-        }
-    };
 
     let id_limit = 9999;
     if args.mem_end_counter > id_limit {
@@ -161,25 +168,78 @@ fn main() {
         return;
     }
 
-    let mut tasm = match lexer::parse_file(
-        file,
-        args.infile.clone().unwrap(),
-        args.mem_end_counter,
-        args.group_offset,
-        args.verbose_logs && !args.no_log,
-        true,
-        args.no_entry_point,
+    let main_path = PathBuf::from(&args.infile.clone().unwrap());
+
+    // note: the path for each module must be relative to the module! not doing so may cause overwrites in the cache.
+    // relative path qualifier: (module, is done)
+    let mut module_cache: HashMap<PathBuf, (Tasm, bool, Vec<usize>)> = HashMap::new();
+    let mut dependency_map: HashMap<String, PathBuf> = HashMap::new(); // module ident => module path
+    let mut start_using_this_group = args.group_offset;
+    let (mut main_module, curr_group, _) = match parse_module(
+        main_path.clone(),
+        &args,
+        &mut module_cache,
+        &mut dependency_map,
+        &mut start_using_this_group,
+        !args.no_entry_point,
     ) {
-        Ok(t) => t,
-        Err(es) => {
-            if !args.no_log {
-                print_errors(es, &format!("Unable to compile {}", &args.infile.unwrap()));
-            }
+        Ok(m) => m,
+        Err(e) => {
+            println!("Unable to parse main module: {e}");
             return;
         }
     };
 
-    tasm.release_mode = args.release;
+    if args.dependencies {
+        println!("Using dependencies:");
+        for k in module_cache.keys() {
+            if k != &main_path {
+                println!("* {}", k.to_str().unwrap_or("Not a UTF-8 path!"));
+            }
+        }
+    }
+
+    if let Err(e) = post_link_processing(&mut main_module, module_cache, dependency_map) {
+        if !args.no_log {
+            println!("Unable to compile to level");
+            for err in e {
+                println!("{err}");
+            }
+        }
+        return;
+    }
+
+    // dedup copied routines
+    main_module.routines.sort_by(|a, b| a.group.cmp(&b.group));
+    main_module.routines.dedup_by(|a, b| a.group == b.group);
+
+    if args.linker_output {
+        println!("-------  linker output -------");
+        for routine in main_module.routines.iter() {
+            println!("{}: ({})", routine.ident, routine.group);
+            for instr in routine.instructions.iter() {
+                println!(
+                    "    {} {} | {}",
+                    instr.ident,
+                    instr
+                        .args
+                        .iter()
+                        .map(|a| format!("{a:?}"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    instr
+                        .flags
+                        .iter()
+                        .map(|a| format!("{a:?}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+        println!("----- end linker output -----");
+    }
+
+    main_module.release_mode = args.release;
 
     let level_name = match args.level_name {
         Some(l) => l,
@@ -190,12 +250,12 @@ fn main() {
         !args.no_log,
         "Using groups {} - {}",
         args.group_offset + 1,
-        tasm.curr_group
+        curr_group
     );
 
     log!(!args.no_log, "Encoding level...");
 
-    let level = match tasm.handle_routines(&level_name) {
+    let level = match main_module.handle_routines_inner(&level_name, curr_group) {
         Err(e) => {
             if !args.no_log {
                 print_errors(e, "Unable to compile to level");

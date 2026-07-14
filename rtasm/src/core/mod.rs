@@ -12,6 +12,7 @@ use crate::{
     instr::{fns::ioblock, get_item_spec},
 };
 
+extern crate alloc;
 use alloc::borrow::Cow;
 use std::collections::HashMap;
 
@@ -47,6 +48,17 @@ macro_rules! log {
 
 impl Tasm {
     pub fn handle_routines(&mut self, level_name: &str) -> Result<Level, Vec<TasmError>> {
+        self.handle_routines_inner(
+            level_name,
+            self.routines.len() as i16 + self.group_offset + 1,
+        )
+    }
+
+    pub fn handle_routines_inner(
+        &mut self,
+        level_name: &str,
+        start_at_group: i16,
+    ) -> Result<Level, Vec<TasmError>> {
         // clear errors
         self.errors.clear();
 
@@ -60,7 +72,7 @@ impl Tasm {
         let mut level = Level::new(level_name, "tasm", None, None);
 
         let routine_count = self.routines.len();
-        self.curr_group = routine_count as i16 + self.group_offset + 1;
+        self.curr_group = start_at_group;
 
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
         let routines = core::mem::take(&mut self.routines);
@@ -357,7 +369,6 @@ pub fn push_error(
         etype,
         file: file.to_string(),
         routine: rtn,
-        error: true,
         errcode,
         line,
         details,
@@ -375,7 +386,6 @@ pub fn push_error_lineless(
         etype,
         file: file.to_string(),
         routine: String::new(),
-        error: true,
         errcode,
         line: 0,
         details,

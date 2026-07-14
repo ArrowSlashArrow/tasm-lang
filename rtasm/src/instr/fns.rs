@@ -87,7 +87,6 @@ fn wait_internal(ticks: i32, line: usize) -> HandlerReturn {
             etype: TasmErrorType::InvalidWaitAmount,
             file: String::new(),
             routine: String::new(),
-            error: true,
             line,
             details: "Cannot wait a negative number of ticks.".to_string(),
             errcode: 6,

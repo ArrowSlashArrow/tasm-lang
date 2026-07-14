@@ -806,7 +806,7 @@ As of v0.3.0, there are install scripts for the TASM compiler. There are two ver
 You may also download the pre-built executables from the [GitHub repository](https://github.com/ArrowSlashArrow/tasm-lang), however, if it is not possible to use them, refer to the below instructions for manually operating the compiler:
 ## 4.1. rtasm compiler
 Prerequisites: 
-- Rust version v1.90.0 or later
+- Rust version v1.88.0 or later
 
 In the `rtasm` directory of the project, run `cargo build --release` to compile the executable. Assuming a successful compile, the executable will be at `target/release/tasmc[.exe]`. 
 ## 4.2. pytasm compiler

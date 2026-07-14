@@ -63,9 +63,10 @@ This error is emitted when the given memory size is negative.",
 
 This error is emitted when the compiler can't find the _start routine. If this routine 
 was intentionally omitted, this error can be silenced with --no-entry-point.",
-    "E0012: Instruction ALIAS must only have two arguments: [String, Any].
+    "E0012: Instruction <instruction> must only have X arguments: <arguments>.
     
-This error is emitted if the arguments to an ALIAS instruction are incorrect.",
+This error is emitted if the number of arguments for an instruction are incorrect. 
+This specific error only exists for IMPORT and ALIAS due to the way they are handled.",
     "E0013: Cannot override existing alias.
     
 This error is emitted if there are two or more ALIAS instructions that try to define a value
@@ -146,7 +147,54 @@ This error is emitted if a flag has a bad value",
 This error is emitted if an instruction may spawn the _init routine.
 Due to the way the _init routine works - that being that it is for setup instructions which 
 are not necessarily replicatable (for example, defining an alias) - it is not meant to be
-processed more than once at the beginning, and is therefore prevented from being spawned."
+processed more than once at the beginning, and is therefore prevented from being spawned.",
+    "E0034: Cannot import a module outside of the init routine.
+    
+Module imports are a setup action only allowed in the _init routine.",
+    "E0035: Unable to find module::symbol
+    
+This errors is emitted when an external symbol is referenced with mod::symbol syntax but
+the linker can't find the routine in the imported module. This indicates that either
+the symbol does not exist or its name was mistyped.",
+    "E0036: Unable to find module::routine
+    
+This error is emitted when a routine is parsed and the linker tries to find all the other 
+routines it references, except it can't one of those routines. This error happens only
+when the linker tries to resolve an imported symbol. Similar to E0035.",
+    "E0037: Unable to find module::routine
+    
+This error is emitted when a routine is parsed and the linker tries to find all the other 
+routines it references, except it can't one of those routines. This error happens only
+when the linker tries to resolve a symbol in the same file as the routine it is probing. 
+Similar to E0035.",
+    "E0038: Unable to find module.
+    
+This error is emitted when a module is imported via the IMPORT command but the linker
+can't find the module. Arguments to the IMPORT command must be paths relative to the
+module that is importing the dependency.",
+    "E0039: Unable to find dependency.
+    
+This error is emitted during post-link processing when the linker tries to resolve an
+unparsed dictionary flag entry that is an external symbol, however it cannot find the
+module to which the symbol points.",
+    "E0040: Could not find external symbol.
+    
+This error is emitted during post-link processing when the linker tries to resolve an
+unparsed dictionary flag entry that is an external symbol, however it cannot find the
+routine/alias to which the symbol points.",
+    "E0041: Invalid external alias dict value.
+    
+This error is emitted during post-link processing when the linker tries to resolve an
+unparsed dictionary flag entry as an integer, however it cannot due to the value not 
+being a value integer.",
+    "E0042: Instruction was not properly linked!
+    
+During the linking phase, external symbols which reference groups are attempted to be
+assigned a group (due to being resolved). If this fails, the assigned group will remain
+as the sentinel value given in the lexing stage, which does not correspond to a real group.
+
+This error should never occur normally. It will only be emitted if there is an instruction
+whose arguments were not properly resolved."
 ];
 
 /// Representative of TASM high-level lexer, parser, and logic errors.
@@ -162,7 +210,6 @@ pub struct TasmError {
     pub etype: TasmErrorType,
     pub file: String,
     pub routine: String, // routine (helps with navigation)
-    pub error: bool,     // warning: false
     pub line: usize,     // 0 if doesnt use a line (like ExceedsGroupLimit)
     pub details: String, // details msg
     // this is necessary to differentiate between different kinds of the same error type
@@ -191,6 +238,7 @@ pub enum TasmErrorType {
     MultipleAliasDefinitions,
     MultipleRoutineDefintions,
     NonInitAliasDefinition,
+    NonInitImport,
     InvalidPointerMove,
     InitRoutineMemoryAccess,
     NonexistentMemoryAccess,
@@ -228,6 +276,7 @@ impl Display for TasmError {
 }
 
 /// Low-level temporary error type used for internal handling.
+#[derive(Debug)]
 pub(crate) enum ParseErrorType {
     BadID,
     TrailingComma,

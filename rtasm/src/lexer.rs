@@ -43,18 +43,23 @@ use crate::{
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
         structs::{
-            Instruction, Routine, RoutineData, Tasm, TasmValue, fits_arg_signature,
+            Instruction, Routine, RoutineData, SymbolPath, Tasm, TasmValue, fits_arg_signature,
             is_builtin_alias,
         },
     },
-    instr::INSTR_SPEC,
+    instr::{INSTR_SPEC, placeholder_panic_fn},
     verbose_log,
 };
-use std::collections::{HashMap, hash_map};
+use std::{
+    collections::{HashMap, hash_map},
+    path::PathBuf,
+};
 
 const INIT_PLACEHOLDER_GROUP: i16 = -1i16;
 
 impl Tasm {
+    /// The job of the lexer is to index routines and parse their instructions.
+    /// Handlers for instructions will be determined later
     pub fn parse(&mut self, group_offset: i16, disable_entry_point_check: bool) {
         // index routines before anything else
 
@@ -82,6 +87,7 @@ impl Tasm {
             self.routine_data.insert(0, rtn);
             verbose_log!(self, "Parsing aliases");
             self.get_aliases_from_init();
+            self.get_imports_from_init();
         }
 
         // error if no entry point
@@ -103,6 +109,69 @@ impl Tasm {
         } else {
             verbose_log!(self, "Parsed file successfully with 0 errors.")
         }
+    }
+
+    pub fn get_imports_from_init(&mut self) {
+        // _init is at idx 0
+        let init_instructions = &mut self.routine_data[0].lines;
+
+        let mut imports: Vec<PathBuf> = vec![];
+
+        // need to take to iteration with mutable references to self in self.push_error
+        let instrs = core::mem::take(init_instructions);
+        for (line, raw_instr) in instrs.iter() {
+            if !raw_instr.to_uppercase().starts_with("IMPORT ") {
+                continue;
+            }
+            let args = raw_instr.split('|').next().unwrap();
+            let trimmed = &args[7..] // condition above ensures that this never fails
+                .split(',')
+                .map(|v| v.trim())
+                .collect::<Vec<_>>();
+            if trimmed.len() != 1 {
+                // otherwise, error
+                push_error(
+                    &mut self.errors,
+                    &self.fname,
+                    TasmErrorType::InvalidInstruction,
+                    *line,
+                    INIT_ROUTINE.into(),
+                    "Instruction IMPORT must only have one argument: [ModulePath]".to_string(),
+                    12, // this error code will remain unchanged as it is fundamentally the same error.
+                );
+            }
+
+            if let Ok(mut v) = TasmValue::to_value(trimmed[0]) {
+                v.parse_to_pathbuf();
+                let maybe_path = v.to_module_path();
+                if let None = maybe_path {
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::InvalidInstruction,
+                        *line,
+                        INIT_ROUTINE.into(),
+                        "Instruction IMPORT must only have one argument: [ModulePath]".to_string(),
+                        34, // this error code will remain unchanged as it is fundamentally the same error.
+                    );
+                    return;
+                }
+
+                let path = maybe_path.unwrap();
+                // resolve path to be relative to pwd
+                imports.push(
+                    PathBuf::from(self.fname.clone())
+                        .parent()
+                        .unwrap()
+                        .join(path),
+                );
+            };
+        }
+
+        // put these back after taking
+        self.routine_data[0].lines = instrs;
+
+        self.imports = imports;
     }
 
     pub fn get_aliases_from_init(&mut self) {
@@ -135,6 +204,7 @@ impl Tasm {
                 );
             }
 
+            // ensure that the alias identifier is a string
             if let Ok(v) = TasmValue::to_value(trimmed[0])
                 && let Some(s) = v.to_string()
             {
@@ -143,7 +213,7 @@ impl Tasm {
                         push_error(
                             &mut self.errors,
                             &self.fname,
-                            TasmErrorType::BadAlias,
+                            TasmErrorType::MultipleAliasDefinitions,
                             *line,
                             INIT_ROUTINE.into(),
                             format!("Cannot override existing alias {}.", entry.key()),
@@ -277,7 +347,6 @@ impl Tasm {
                 etype: TasmErrorType::InvalidInstruction,
                 file: self.fname.clone(),
                 routine: curr_routine.ident.clone(),
-                error: true,
                 line: curr_line,
                 details: "Bad flag arguments".into(),
                 errcode: 21,
@@ -341,7 +410,7 @@ impl Tasm {
 
             // exclude alias instructions (parsed first thing after lexing)
             if instr.as_str() == "ALIAS" {
-                if curr_routine.ident.as_str() != "_init" {
+                if curr_routine.ident.as_str() != INIT_ROUTINE {
                     push_error(
                         &mut self.errors,
                         &self.fname,
@@ -355,6 +424,22 @@ impl Tasm {
                 return;
             }
 
+            if instr.as_str() == "IMPORT" {
+                // why not
+                if curr_routine.ident.as_str() != INIT_ROUTINE {
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::NonInitImport,
+                        curr_line,
+                        curr_routine.ident.clone(),
+                        "Cannot import a module outside of the init routine.".to_string(),
+                        34,
+                    );
+                }
+                return;
+            }
+
             let mut erroneous_instr = false;
             // get all chars after the first space, which separates the instruction and args
             let mut raw_args = args_string[pos + 1..]
@@ -362,6 +447,7 @@ impl Tasm {
                 .map(|v| v.trim().to_string())
                 .collect::<Vec<_>>();
 
+            // this gets all local aliases. i'm not sure how i would handle fetching imported alias values.
             for raw in raw_args.iter_mut() {
                 // replace if an alias is referenced
                 if let Some(raw_val) = self.defined_aliases.get(&raw.to_string()) {
@@ -430,6 +516,23 @@ impl Tasm {
                 ),
                 26,
             );
+            return;
+        }
+
+        let has_external_symbols = args.iter().any(|a| a.is_routine_ref());
+
+        // if there is a RoutineRef in the arguments and it is external, skip evaluation
+        // this is must be resolved in the linking stage
+        if has_external_symbols {
+            curr_routine.add_instruction(Instruction {
+                ident: instr.clone(),
+                itype: *itype,
+                line_number: curr_line,
+                args,
+                flags,
+                handler_fn: placeholder_panic_fn,
+                is_concurrent,
+            });
             return;
         }
 
@@ -647,7 +750,6 @@ fn parse_flags_str(
                 etype: TasmErrorType::BadFlag,
                 file: file.to_owned(),
                 routine: routine.to_owned(),
-                error: true,
                 line: curr_line,
                 details: format!("Bad flag: {flag_segment}"),
                 errcode: 30,
@@ -678,7 +780,6 @@ fn parse_flags_str(
                         etype: TasmErrorType::BadFlag,
                         file: file.to_owned(),
                         routine: routine.to_owned(),
-                        error: true,
                         line: curr_line,
                         details: format!("Unrecognized flag {flag_segment}"),
                         errcode: 31,
@@ -699,7 +800,6 @@ fn parse_flags_str(
                     etype: TasmErrorType::BadFlag,
                     file: file.to_owned(),
                     routine: routine.to_owned(),
-                    error: true,
                     line: curr_line,
                     details: format!(
                         "Unable to parse {ident} with value of {raw_value} and type {t:?}"
@@ -726,14 +826,20 @@ pub fn validate_tasm_value(
         match routine_group_map.get(&s) {
             Some(&group) => {
                 if group != INIT_PLACEHOLDER_GROUP {
-                    Some(TasmValue::Group(group))
+                    // we must return a routine reference even if this routine has a known assigned group
+                    // so that the linker can resolve any dependency routines of this routine.
+                    // if this value were a group, it would be completely opaque and not resolvable.
+                    Some(TasmValue::RoutineRef(SymbolPath {
+                        root: None,
+                        ident: s,
+                        assigned_group: group, // save the group here for O(1) lookup
+                    }))
                 } else {
                     // only throw err if the group is the _init group
                     errors.push(TasmError {
                         etype: TasmErrorType::InitRoutineSpawnError,
                         file: fname.to_string(),
                         routine: routine.to_string(),
-                        error: true,
                         line: curr_line,
                         details: "Cannot spawn init routine.".to_string(),
                         errcode: 33,
