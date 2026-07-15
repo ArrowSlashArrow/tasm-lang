@@ -28,8 +28,9 @@ pub fn compile_tasm_module(
     let file = match fs::read_to_string(&path) {
         Ok(f) => f,
         Err(e) => {
-            log!(silent, "Couldn't read file! {e}");
-            return Err(e.into());
+            let msg = format!("Couldn't read file {path:?}! {e}");
+            log!(silent, "{msg}");
+            return Err(anyhow!("{msg}"));
         }
     };
 
@@ -144,6 +145,8 @@ pub fn parse_module(
     // use placeholder module here since it'll be returned at the end anyways
     // if it will cached, this entry should be overwritten with the actual module and marked as done.
     module_cache.insert(module_path.clone(), (Tasm::default(), false, vec![]));
+
+    log!(silent, "Got external symbols");
 
     let mut all_ext_symbols = module
         .routines
@@ -356,7 +359,10 @@ pub fn resolve_dependency_path(
                 .unwrap_or(&PathBuf::new())
                 .join(path);
             mpath.add_extension("tasm");
-            mpath.canonicalize()?
+            match mpath.canonicalize() {
+                Ok(m) => m,
+                Err(e) => return Err(anyhow!("[E0043] Unable to resolve path for module: {e}")),
+            }
         }
         None => return Err(anyhow!("[E0038] Unable to find module {dependency}.")),
     };

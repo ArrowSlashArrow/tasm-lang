@@ -156,7 +156,7 @@ fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
 }
 
 fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
-    let main_path = PathBuf::from(&args.infile.clone().unwrap());
+    let main_path = PathBuf::from(&args.infile.clone().unwrap()).canonicalize()?;
     // note: the path for each module must be relative to the module! not doing so may cause overwrites in the cache.
     // relative path qualifier: (module, is done)
     let mut module_cache: HashMap<PathBuf, (Tasm, bool, Vec<usize>)> = HashMap::new();

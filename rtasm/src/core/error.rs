@@ -194,7 +194,11 @@ assigned a group (due to being resolved). If this fails, the assigned group will
 as the sentinel value given in the lexing stage, which does not correspond to a real group.
 
 This error should never occur normally. It will only be emitted if there is an instruction
-whose arguments were not properly resolved."
+whose arguments were not properly resolved.",
+    "E0043: Unable to resolve path for module
+    
+The linker was not able to resolve an imported module's path. Similar to E0038, but 
+tends to occur rarely and on niche edge cases."
 ];
 
 /// Representative of TASM high-level lexer, parser, and logic errors.
