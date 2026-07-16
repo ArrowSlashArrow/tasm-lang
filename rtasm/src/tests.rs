@@ -177,6 +177,20 @@ tasm_test!("max", compdef);
 tasm_test!("mem_8bit", stdlib);
 tasm_test!("mem_14bit", stdlib);
 
+impl Args {
+    pub fn test_args(infile: String, has_entry: bool) -> Self {
+        Self {
+            infile: Some(infile),
+            verbose_logs: true,
+            dependencies: true,
+            linker_output: true,
+            mem_end_counter: 9999,
+            no_entry_point: !has_entry,
+            ..Default::default()
+        }
+    }
+}
+
 #[test]
 fn int_detection() {
     assert!(fits_arg_signature(

@@ -361,7 +361,13 @@ pub fn resolve_dependency_path(
             mpath.add_extension("tasm");
             match mpath.canonicalize() {
                 Ok(m) => m,
-                Err(e) => return Err(anyhow!("[E0043] Unable to resolve path for module: {e}")),
+                Err(e) => {
+                    return Err(anyhow!(
+                        "[E0043] Unable to resolve path for module {} in {}: {e}",
+                        path.to_str().unwrap(),
+                        parent_module_path.to_str().unwrap(),
+                    ));
+                }
             }
         }
         None => return Err(anyhow!("[E0038] Unable to find module {dependency}.")),

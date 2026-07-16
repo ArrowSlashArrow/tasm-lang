@@ -14,11 +14,7 @@ use gdlib::{
 };
 use tungstenite::{Message, connect};
 
-use crate::core::{
-    error::ERROR_DOCS,
-    print_errors,
-    structs::{SymbolPath, Tasm},
-};
+use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
 
 use crate::linker::{parse_module, post_link_processing};
 
@@ -95,20 +91,6 @@ struct Args {
     /// Show intermediate linker output. Used primarily for debugging.
     #[arg(long, short)]
     linker_output: bool,
-}
-
-impl Args {
-    pub fn test_args(infile: String, has_entry: bool) -> Self {
-        Self {
-            infile: Some(infile),
-            verbose_logs: true,
-            dependencies: true,
-            linker_output: true,
-            mem_end_counter: 9999,
-            no_entry_point: !has_entry,
-            ..Default::default()
-        }
-    }
 }
 
 fn get_obj_str(obj: &Vec<GDObject>) -> String {
