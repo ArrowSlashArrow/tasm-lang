@@ -47,10 +47,15 @@ macro_rules! log {
 }
 
 impl Tasm {
-    pub fn handle_routines(&mut self, level_name: &str) -> Result<Level, Vec<TasmError>> {
+    pub fn handle_routines(
+        &mut self,
+        level_name: &str,
+        skip_init: bool,
+    ) -> Result<Level, Vec<TasmError>> {
         self.handle_routines_inner(
             level_name,
             self.routines.len() as i16 + self.group_offset + 1,
+            skip_init,
         )
     }
 
@@ -58,10 +63,8 @@ impl Tasm {
         &mut self,
         level_name: &str,
         start_at_group: i16,
+        skip_init: bool,
     ) -> Result<Level, Vec<TasmError>> {
-        // clear errors
-        self.errors.clear();
-
         let spacing = match self.release_mode {
             true => 1.0,
             false => 30.0,
@@ -77,10 +80,18 @@ impl Tasm {
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
         let routines = core::mem::take(&mut self.routines);
         for routine in &routines {
+            if routine.ident == INIT_ROUTINE && skip_init {
+                continue;
+            }
+
             // setup position variables
             let mut obj_pos = 0.0;
             // subtracting from group offset ensures that high group IDs are still placed close to y=0
-            let rtn_ypos = 75.0 + ((routine.group - self.group_offset) as f64) * 30.0;
+            let rtn_ypos = if routine.group != 0 {
+                75.0 + ((routine.group - self.group_offset) as f64) * 30.0
+            } else {
+                75.0
+            };
             if self.curr_group > GROUP_LIMIT {
                 push_error_lineless(
                     &mut self.errors,

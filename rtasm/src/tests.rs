@@ -17,7 +17,7 @@ macro_rules! tasm_test {
                     true
                 ))
                 .unwrap();
-                match res.handle_routines_inner("", group) {
+                match res.handle_routines_inner("", group, false) {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -49,7 +49,7 @@ macro_rules! tasm_test {
                     true
                 ))
                 .unwrap();
-                assert!(res.handle_routines_inner("", group).is_err());
+                assert!(res.handle_routines_inner("", group, false).is_err());
             }
         }
     };
@@ -63,7 +63,7 @@ macro_rules! tasm_test {
                     true
                 ))
                 .unwrap();
-                match res.handle_routines_inner("", group) {
+                match res.handle_routines_inner("", group, false) {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -84,7 +84,7 @@ macro_rules! tasm_test {
                     false
                 ))
                 .unwrap();
-                match res.handle_routines_inner("", group) {
+                match res.handle_routines_inner("", group, false) {
                     Ok(_) => return,
                     Err(e) => {
                         print_errors(e, "errors");
@@ -106,7 +106,7 @@ macro_rules! tasm_test {
                     false,
                 ))
                 .unwrap();
-                res.handle_routines_inner("", group).unwrap();
+                res.handle_routines_inner("", group, false).unwrap();
             }
         }
     };
@@ -121,7 +121,7 @@ macro_rules! tasm_test {
                     false, // no entry point on stdlib files
                 ))
                 .unwrap();
-                res.handle_routines_inner("", group).unwrap();
+                res.handle_routines_inner("", group, false).unwrap();
             }
         }
     };
@@ -228,7 +228,7 @@ fn parse_tasm() -> anyhow::Result<()> {
     );
 
     parse_start = Instant::now();
-    let _level = match res.handle_routines_inner("", group) {
+    let _level = match res.handle_routines_inner("", group, false) {
         Ok(m) => m,
         Err(e) => {
             print_errors(e, "errors");

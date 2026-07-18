@@ -91,6 +91,10 @@ struct Args {
     /// Show intermediate linker output. Used primarily for debugging.
     #[arg(long, short)]
     linker_output: bool,
+
+    /// Disables the compiler from inserting the _init routine's triggers into the level. Does not skip parsing it. Useful when the _init routine is already in the level
+    #[arg(long)]
+    skip_init: bool,
 }
 
 fn get_obj_str(obj: &Vec<GDObject>) -> String {
@@ -258,7 +262,7 @@ fn main() {
 
     log!(!args.no_log, "Encoding level...");
 
-    let level = match main_module.handle_routines_inner(&level_name, curr_group) {
+    let level = match main_module.handle_routines_inner(&level_name, curr_group, args.skip_init) {
         Err(e) => {
             if !args.no_log {
                 print_errors(e, "Unable to compile to level");

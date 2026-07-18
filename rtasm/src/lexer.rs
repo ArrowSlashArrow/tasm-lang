@@ -440,38 +440,43 @@ impl Tasm {
                 return;
             }
 
-            let mut erroneous_instr = false;
-            // get all chars after the first space, which separates the instruction and args
-            let mut raw_args = args_string[pos + 1..]
-                .split(',')
-                .map(|v| v.trim().to_string())
-                .collect::<Vec<_>>();
+            if instr.as_str() == "RAWTRG" || instr.as_str() == "RAW" {
+                // these instructions need a raw string
+                args = vec![TasmValue::String(args_string[pos + 1..].to_string())];
+            } else {
+                let mut erroneous_instr = false;
+                // get all chars after the first space, which separates the instruction and args
+                let mut raw_args = args_string[pos + 1..]
+                    .split(',')
+                    .map(|v| v.trim().to_string())
+                    .collect::<Vec<_>>();
 
-            // this gets all local aliases. i'm not sure how i would handle fetching imported alias values.
-            for raw in raw_args.iter_mut() {
-                // replace if an alias is referenced
-                if let Some(raw_val) = self.defined_aliases.get(&raw.to_string()) {
-                    *raw = raw_val.clone();
+                // this gets all local aliases. i'm not sure how i would handle fetching imported alias values.
+                for raw in raw_args.iter_mut() {
+                    // replace if an alias is referenced
+                    if let Some(raw_val) = self.defined_aliases.get(&raw.to_string()) {
+                        *raw = raw_val.clone();
+                    }
                 }
-            }
 
-            for raw in raw_args {
-                match self.parse_raw_value(&raw, curr_line, &curr_routine.ident) {
-                    Some(v) => args.push(v),
-                    None => erroneous_instr = true,
+                for raw in raw_args {
+                    match self.parse_raw_value(&raw, curr_line, &curr_routine.ident) {
+                        Some(v) => args.push(v),
+                        None => erroneous_instr = true,
+                    }
                 }
-            }
-            if erroneous_instr {
-                verbose_log!(self, "Got bad args.");
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::InvalidInstruction,
-                    curr_line,
-                    curr_routine.ident.clone(),
-                    "Failed to parse instruction: invalid argset".into(),
-                    24,
-                );
+                if erroneous_instr {
+                    verbose_log!(self, "Got bad args.");
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::InvalidInstruction,
+                        curr_line,
+                        curr_routine.ident.clone(),
+                        "Failed to parse instruction: invalid argset".into(),
+                        24,
+                    );
+                }
             }
         } else {
             // no args or extras (everything after | )
