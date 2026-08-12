@@ -1,0 +1,13 @@
+_init:
+    ; diamond dependency test
+    ;       main 
+    ;     /      \
+    ;   lib1    lib2
+    ;     \      /
+    ;       lib3
+    import lib1
+    import lib2
+
+_start:
+    spawn lib1::routine1    ; calls lib3::routine3
+    spawn lib2::routine2    ; calls lib3::routine3

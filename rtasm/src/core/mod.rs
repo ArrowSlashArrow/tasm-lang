@@ -12,6 +12,7 @@ use crate::{
     instr::{fns::ioblock, get_item_spec},
 };
 
+extern crate alloc;
 use alloc::borrow::Cow;
 use std::collections::HashMap;
 
@@ -46,10 +47,24 @@ macro_rules! log {
 }
 
 impl Tasm {
-    pub fn handle_routines(&mut self, level_name: &str) -> Result<Level, Vec<TasmError>> {
-        // clear errors
-        self.errors.clear();
+    pub fn handle_routines(
+        &mut self,
+        level_name: &str,
+        skip_init: bool,
+    ) -> Result<Level, Vec<TasmError>> {
+        self.handle_routines_inner(
+            level_name,
+            self.routines.len() as i16 + self.group_offset + 1,
+            skip_init,
+        )
+    }
 
+    pub fn handle_routines_inner(
+        &mut self,
+        level_name: &str,
+        start_at_group: i16,
+        skip_init: bool,
+    ) -> Result<Level, Vec<TasmError>> {
         let spacing = match self.release_mode {
             true => 1.0,
             false => 30.0,
@@ -60,21 +75,30 @@ impl Tasm {
         let mut level = Level::new(level_name, "tasm", None, None);
 
         let routine_count = self.routines.len();
-        self.curr_group = routine_count as i16 + self.group_offset + 1;
+        self.curr_group = start_at_group;
 
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
         let routines = core::mem::take(&mut self.routines);
         for routine in &routines {
+            if routine.ident == INIT_ROUTINE && skip_init {
+                continue;
+            }
+
             // setup position variables
             let mut obj_pos = 0.0;
             // subtracting from group offset ensures that high group IDs are still placed close to y=0
-            let rtn_ypos = 75.0 + ((routine.group - self.group_offset) as f64) * 30.0;
+            let rtn_ypos = if routine.group != 0 {
+                75.0 + ((routine.group - self.group_offset) as f64) * 30.0
+            } else {
+                75.0
+            };
             if self.curr_group > GROUP_LIMIT {
                 push_error_lineless(
                     &mut self.errors,
                     &self.fname,
                     TasmErrorType::ExceedsGroupLimit,
                     format!("Program uses more than {GROUP_LIMIT} groups."),
+                    1,
                 );
                 break;
             }
@@ -176,6 +200,7 @@ impl Tasm {
                     instr.line_number,
                     INIT_ROUTINE.into(),
                     "Cannot access memory in the init routine.".to_string(),
+                    2,
                 );
                 return;
             }
@@ -187,6 +212,7 @@ impl Tasm {
                     instr.line_number,
                     routine.ident.clone(),
                     "Cannot access memory when none exists.".to_string(),
+                    3,
                 );
                 return;
             }
@@ -204,6 +230,7 @@ impl Tasm {
                     instr.line_number,
                     routine.ident.clone(),
                     format!("Cannot overwrite value of {counter_type:?}."),
+                    4,
                 );
                 return;
             }
@@ -314,6 +341,7 @@ impl Tasm {
                     instr.line_number,
                     routine.ident.clone(),
                     format!("Memory was already created on line {}.", m.line + 1),
+                    5,
                 );
                 return;
             }
@@ -346,12 +374,13 @@ pub fn push_error(
     line: usize,
     rtn: String,
     details: String,
+    errcode: i32,
 ) {
     errors.push(TasmError {
         etype,
         file: file.to_string(),
         routine: rtn,
-        error: true,
+        errcode,
         line,
         details,
     })
@@ -362,12 +391,13 @@ pub fn push_error_lineless(
     file: &str,
     etype: TasmErrorType,
     details: String,
+    errcode: i32,
 ) {
     errors.push(TasmError {
         etype,
         file: file.to_string(),
         routine: String::new(),
-        error: true,
+        errcode,
         line: 0,
         details,
     })

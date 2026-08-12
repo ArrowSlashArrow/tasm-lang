@@ -12,7 +12,7 @@ A powerful instruction set is provided, which allows for looping, branching, sto
 
 Quick links:
 - [Available Instructions](#312-available-instructions)
-- [Group Usage](#35-group-usage)
+- [Group Usage](#36-group-usage)
 - [Special Routines](#322-special-routines)
 - [Example Programs](#441-example-programs)
 - [Types of Values](#33-types-of-values)
@@ -26,15 +26,17 @@ An IOBlock is a structure that consists of the following:
 IOBlocks are intended as a mechanism for the creator to test the functionality of the program in-level by hitting the block with your player.
 ### 1.2.2. Argset
 Abbreviation for "Argument Set". Simply, a set of arguments passed to an instruction.
-```
+```x86asm
 INSTRUCTION a, b, c
 ```
 Here, `[a, b, c]` is the argset for the instruction.
 ### 1.2.3. n-tick
 n-tick refers to the execution time of any single instruction. A 1-tick instruction takes exactly one tick to execute.  
 To be clear, no instructions have a delay of execution. The execution time refers to how long the instruction takes to process.
+<!-- deprecated -->
 ### 1.2.4. MEMREG
 MEMREG is an abbreviation for "Memory Register". It is also the alias for the memory register item in TASM. 
+<!-- deprecated -->
 ### 1.2.5. Memory mode/function
 > [!NOTE]
 > These terms only apply to legacy memory. New memory supports reading and writing more directly.
@@ -48,19 +50,17 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of June 26, 2026 is **v0.3.0**. 
+The current version, as of June 26, 2026 is **v0.3.1**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
 ## 2.1. Constraints
-While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As such, TASM programmers must be aware of these constraints and their implications.
-- IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KB of information, assuming the availability of each and every counter and timer. 
+While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As a consequence, TASM programmers must be aware of these constraints and their implications.
+- The range of IDs normally accessible from triggers is \[1, 10000). This applies to all IDs: groups, counters, timers, collision blocks, etc. It is possible to access further items with remaps, most notably in Item Edit triggers, however this behaviour is not officially supported in GD and may lead to instability.  
 - Counter items (counters) are 32-bit integers. They may hold any value from \[-2<sup>32</sup> , 2<sup>32</sup>-1).
 - Timer items (timers) are 32-bit floats, as per the [IEEE-754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format) implementation. It is not possible to set the value of a timer higher than 9,999,999.0 with item edit triggers. However, time triggers are able to do this just fine.
-- The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms). As a result, trigger programs are quite slow compared to real programs.
-
-## 2.2. Useful mechanics
-When compiled, the spawn trigger for every routine ALWAYS uses the spawn-ordered option. This is to ensure control of execution and pauses between instructions. If not enabled, the spawn will incorrectly skip waits and make every instruction 1-tick, which is undesirable since some instructions need downtime to be fully and correctly processed.
+- The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms).
+- This section covers a few constraints of the GD runtime relevant to TASM. In reality, there are hundreds of undocumented edge cases. For known mechanics/bugs, see [this website](https://uhdanke.github.io/gd_docs/).
 
 # 3. The TASM language 
 ## 3.1. Instructions 
@@ -68,14 +68,14 @@ When compiled, the spawn trigger for every routine ALWAYS uses the spawn-ordered
 Instructions are written by their identifier followed by a space, followed by comma-separated arguments.
 If an instruction takes no arguments, simply the instruction identifier is enough.
 Examples:
-```
+```x86asm
 INSTRUCTION argument1, argument2
 NOARGS
 ```
 
 It is important to know that instruction arguments (argsets) are typed to ensure differentiation between different functions of an instruction.
 For example, the `SE` instruction is used as a branch instruction. It allows both the comparison of an item to a number and two items to each other:
-```
+```x86asm
 SE example_routine1, C1, 0
 SE example_routine2, C1, C2
 ```
@@ -187,11 +187,12 @@ If the first routine is not spawned, the second routine is spawned.
 The third argument (the chance) should be a float in the range \[0.0, 100.0].
 
 Examples:
-```
+```x86asm
 SRAND do_stuff, 42.8
 ```
 The routine `do_stuff` has a 42.8% chance of being spawned.
 
+<!-- deprecated -->
 #### 3.1.2.3. Memory
 > [!NOTE]
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
@@ -345,14 +346,14 @@ Only allowed in the `_init` routine.
 #### 3.1.2.8. The `ALIAS` instruction
 `ALIAS` is a special instruction that may only be used in the `_init` routine. It is used for defining custom aliases for values.  
 For readability, the following can be rewritten, from: 
-```
+```x86asm
 _start:
 	MOV C1, 10
 	MOV C2, 10
 	MOV C3, 10
 ```
 to:
-```
+```x86asm
 _init:
 	ALIAS start_value, 10
 
@@ -369,7 +370,7 @@ The instruction takes two arguments as input: `ALIAS <string> <value>`.
 * The string is the identifier of the alias and the identifier by which it must be referred to. Since aliases are parsed before anything else, aliases are resolved regardless of the location of their definiton within the `_init` routine.
 * The value may be of any type. This value is what is inserted when an alias is referenced by its identifier.
 
-```
+```x86asm
 _init:
 	ALIAS value, 42
 
@@ -380,7 +381,7 @@ _start:
 ```
 
 Aliases will **not** clone values from other aliases:
-```
+```x86asm
 _init:
 	ALIAS value, 42		; alias `value` holds 42
 	ALIAS value2, value	; alias `value2` holds "value", NOT 42. 
@@ -409,6 +410,30 @@ Much like the `RAW` instruction, the `RAWTRG` instruction takes an object string
 This instruction is to give the programmer the option to place a trigger that is not yet supported by TASM in the usual position and have the compiler treat that object as a trigger in the routine.
 
 Execution time: 1 tick.
+
+#### 3.1.2.10. The `IMPORT` instruction
+The `IMPORT` instruction is a way for the programmer to include library files to use their code in the program. This instruction expectes only one argument - a path to the library file. This path must be relative to this file's location but without the `.tasm` extension. 
+
+This instruction is exclusive to the `_init` routine.
+
+##### Usage Example
+For this example, this directory structure is assumed:
+```x86asm
+project/
+	main.tasm
+	library.tasm
+```
+For `main.tasm` to use the library, the `IMPORT` instruction must declare it:
+```x86asm
+_init:
+	; this instruction imports `library.tasm`
+	IMPORT library
+
+; now, we can use symbols from the library.
+```
+
+For more documentation on the module system, refer to [this section](#34-external-symbols-and-the-module-system).
+
 #### 3.1.2.10. Excluded instructions
 Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
 It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  
@@ -445,6 +470,8 @@ Below is a list of instructions and their corresponding structures:
 - `IOBLOCK`: An [IOBlock](#121-ioblock) that is put at y=75 and some specified x-position that acts as a debug group spawn. The x-position is processed such that it translates to a block position, e.g. 5 becomes 5 blocks (+ 2 for margin) to the right of the y-axis, centered on a cell.
 - `PERS`: Adds a persistent item trigger for the specified item.
 - `DISPLAY`: Displays a counter at some specified height and x=0 of the given counter.
+- `ALIAS`: See #[this documentation](#3128-the-alias-instruction)
+- `IMPORT`: See #[this documentation](#31210-the-import-instruction)
 ### 3.1.4. Instruction flags
 The function of a given instructions is usually simple/single-purposed, and only uses a handful of parameters within the trigger that it compiles to. However, triggers are remarkably configurable, and in some cases may simplify otherwise needlessly complex setups.  
 A common example is the implementation of getting the absolute value of a number. The old implementation required a comparison of the target (C1) against 0 to determine its sign, which determined whether it should be negatied. This is much more complex and wasteful of groups than simply using the absolute rounding mode.
@@ -479,17 +506,17 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 - Flags MUST be written after a `|` in the instruction line. There must only be one pipe character in the line if flags are used.
 	- `ADD C1, C2 | itemmod:0.5` compiles.
 	- `ADD C1, C2 | itemmod:0.5 | round:+` does not compile. 
-- Flag-value pairs must be separated by whitespace. The flag identifier and its value themselves must be separated by a colon, but with no whitespace in between
+- Flag-value pairs must be separated by whitespace. The flag identifier and its value themselves must be separated by a `=`, but with no whitespace in between
 	- `... | itemmod:0.5` compiles.
 	- `... | itemmod: 0.5` does not compile.
 	- `... | itemmod: 0.5, ` does not compile.
 	- This only applies if the flag accepts a data type other than Dict. Dicts must be denoted as such:
-		- `... | dict: {a:b, c:d, ...}`
+		- `... | dict: {a=b, c=d, ...}`
 		- There must be no spacing between the braces and the key/values.
-		- There must be no spacing between the keys/values and the colon separator.
+		- There must be no spacing between the keys/values and the `=` separator.
 		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
 		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
-		- Currently, the only supported values are 16-bit signed integers for both keys and their values. Other accepted values are routine identifiers or aliases for either ints or routines. When passed as either a key or a value, a routine identifier will be coerced to an int, which is its group ID.
+		- Currently, the only supported values are 16-bit signed integers for both keys and their values. Other accepted values are routine identifiers or aliases for either ints or routines. Identifiers for routines/aliases may also be imported, but must be declared with `module::identifier` syntax. When passed as either a key or a value, a routine identifier will be coerced to an int, which is its group ID.
 
 > [!NOTE]
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
@@ -620,12 +647,15 @@ All instructions under that identifier that are indented will be considered part
 ### 3.2.2. Special routines 
 Special routines are hard-coded to the compiler, and have special behaviour. They are *not* automatically generated. 
 #### 3.2.2.1. `_start` routine
-This routine is considered the entry point of the program, and is required by the compiler to be included in the input file.  
+This routine is considered the entry point of the program, and is required by the compiler to be included in the input file unless the `--no-entry-point` argument is passed. 
+This routine should be treated like the `main` function of other languages - the program is intended to start when this routine is spawned.
 An [IOBlock](#121-ioblock) is automatically placed to activate the group assigned to this routine. 
 #### 3.2.2.2. `_init` routine
-This routine is intended for any preliminary setup instructions. For example, declaring and initializing memory with values.  
-This is the only routine where initializer instructions are allowed, because they correspond to custom static structures in the level. See specifics of each instruction [here](#3131-initializer-instructions).
-Any non-initializer instruction found in the `_init` routine will be placed in the negative-x and positive-y quadrant.
+This routine is intended for all preliminary setup instructions not necessarily related directly to the program's function. For example, importing external modules, defining aliases, or marking items as persistent. 
+The programmer should use this routine only for init-specific instructions. Though it is possible to include instructions such as `MOV` which are repeatable actions, it is not recommended to do this
+since instructions in this routine are not preserved when the module is imported.
+
+Any non-initializer instruction found in the `_init` routine will be placed in the negative-x and positive-y quadrant. See specifics of each init instruction [here](#3131-initializer-instructions).
 ### 3.2.3. In-level object representation 
 Apart from the `_init` routine, all routines are compiled individually by instruction, with each object cluster being separated by one unit on the x-axis, starting at x=105.
 All routine groups are also on separate lines from each other, annotated by text formatted as `group: routine`, and positioned on x=0 and the same y-level as the rest of the group. This text object is not a part of the routine group.   
@@ -691,7 +721,7 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.3.0, the aliases that exist are:
+As of TASM v0.3.1, the built-in aliases that exist are:
 - `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
@@ -706,7 +736,103 @@ If a value was not parsed as any of the above, it is left as a string. Strings a
 ### 3.3.6. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 
-## 3.4. Memory
+
+## 3.4. External symbols and the module system
+The module system exists to allow for the reuse of code without needing to duplicate it to paste into the program. Modules may be imported with the usage of the [`IMPORT` instruction](#31210-the-import-instruction).
+
+Due to not being able to import triggers, all imported routines are statically linked into the original program. Names are automatically mangled by the compiler, so there is no need to try to account for name conflicts.
+
+### 3.4.1. Using external symbols
+When importing a module, the objective is to use symbols defined in that module. This is done by importing the module wherein the desired symbol is defined and then referencing that symbol in the main program.
+An external symbol is declared with the syntax `module::symbol`, where `module` is the module where the `symbol` lives. This symbol can be either a routine or an alias.
+
+### 3.4.2. Module usage examples 
+#### Basic usage example
+Library `library`:
+```x86asm
+multiply:
+	mul C1, 2
+```
+
+Main program:
+```x86asm
+_init:
+	import library
+
+_start:
+	mov C1, 4	; prep value
+	spawn library::multiply
+	; C1 is now 8
+```
+
+Here, the routine `multiply` is imported into the main routine from `library`. When this program is compiled, the routine will be copied into the main program. We can see this by enabling the `--linker-output` flag for the compiler:
+```
+; ------- linker output -------
+_init: (0)
+_start: (1)
+    MOV Counter(1), Number(4.0) |
+    SPAWN Group(2) |
+\\?\C:\Users\user\Documents\GitHub\tasm-lang\rtasm\library.tasm::multiply: (2)
+    MUL Counter(1), Number(2.0) |
+; ----- end linker output -----
+```
+The reference to `library::multiply` is replaced with its assigned group.
+
+The linker will not insert all routines from a file, only the ones necessary for the program. If a module is imported but not used, it is not considered by the linker except in the case of a circular import.
+
+#### Nested imports
+Suppose we have a library file which uses another dependency:
+```x86asm
+; math.tasm needs consts.tasm
+_init:
+	import consts
+
+; convert T1 from degrees to radians
+to_radians:
+	mul T1, consts::HALF_PI
+	div T1, 180
+```
+`consts.tasm` definition:
+```x86asm
+_init:
+	alias HALF_PI, 1.5708
+```
+Main program:
+```x86asm
+_init:
+	import math
+
+_start:
+	mov T1, 90
+	spawn math::to_radians
+```
+
+Both the routine `to_radians` will be inserted, as well as the value for `HALF_PI`. Dependencies are scanned recursively. If the imported module has no dependencies, it will be imported as-is. If it does, its dependencies will be resolved first and then imported.
+
+The linker yields the following:
+```x86asm
+; ------- linker output -------
+_init: (0)
+_start: (1)
+    MOV Timer(1), Number(90.0) |
+    SPAWN Group(2) |
+\\?\C:\Users\user\Documents\GitHub\tasm-lang\rtasm\math.tasm::to_radians: (2)
+    MUL Timer(1), Number(1.5708) |	; <-- was `consts::HALF_PI`
+    DIV Timer(1), Number(180.0) |
+; ----- end linker output -----
+```
+
+### 3.4.3. Edge cases
+Diamond dependencies are supported in TASM. The linker uses a module cache to keep track of all seen modules which also prevents any duplicate parsing and allows for faster compilation times.
+
+Circular imports are not allowed. Due to the linker needing to resolve all referenced symbols, recursively evaluating each module will lead to infinite recursion. This is caught by the linker's module cache early and prevented.
+There is always better way than a circular import. 
+
+<!-- deprecated -->
+<!-- replace this with a section titled `addressing items` -->
+## 3.5. Memory
+> [!WARNING]
+> As of v0.3.0, built-in memory is fully deprecated! Do not use memory instructions as they are likely to be removed very soon.
 Memory in TASM is designed for algorithms/processes which rely on dynamic addresses for data. For example, a sorting algorithm must iterate on each individual many times, which is simply impractical to hardcode.  
 
 Memory safety info: [Memory safety](#31231-memory-safety)
@@ -721,15 +847,13 @@ There are two types of memory in TASM. Below is a comparison table:
 | Collision IDs used      | 1 per item           | 0                        |
 | Usage                   | Until v0.2.2         | v0.2.3 and onwards       |
 
-While legacy memory is still usable, it is considered old and will not be actively maintained. Therefore, it is recommended to use the new memory instructions.
-
-### 3.4.1. New memory system
+### 3.5.1. New memory system
 Refer to this figure for any terms used that are specific to this memory structure:
 ![New memory](new_memory.png)
 
 The new memory system works based off of items encoded in groups, where each item's getter and setter has specific unique groups to any other item's getter/setter. To isolate a specific item, all groups that the memory block consists of except for the target item's groups.
 
-#### 3.4.1.1. Item ID binary group encoding
+#### 3.5.1.1. Item ID binary group encoding
 The way that items' getters/setters are assigned groups is by encoding the bits of the item's ID into groups.  
 When the compiler allocates memory, it first determines the maximum number of bits needed to encode. With a memory size of 25, only 5 bits are needed since 2^5 = 32, and 32 >= 25. To find the maximum number of bits needed, use the equation `bits = ceil( log_2 ( memsize ) )`.  
 Since each bit has two possible states, those being either on or off, two groups are needed per group. Groups for bit encoding start at 4, with each pair, e.g. 4 and 5, representing one bit, where the first bit represents "off" while the second represents "on". The next bit will be represented by the groups 6 and 7 for off and on respectively, and so on until all bits are encoded. Bits are encoded in order for least significant to most significant.  
@@ -747,7 +871,7 @@ The groups are allocated as such:
 | 4 to bits*2 + 4 | Groups used to encode bits |
 > [!NOTE]
 > Groups are offset by a static amount if a group offset is needed. The numbers in the table are for reference.
-#### 3.4.1.2. Calling getters/setters
+#### 3.5.1.2. Calling getters/setters
 When an instruction such as `MGET` or `MSET` is used, the memory controller uses the value of the PTRPOS counter to determine the target address.  
 First, the memory controller toggles on all of its groups to reset its state from any previous operations.
 When getting/setting an item with some arbitrary ID, all groups in the memory block are toggled off except for all the groups that the target trigger has. This is done by extracting each bit from the target address with a bit switch.
@@ -762,10 +886,10 @@ Using a bit switch on every bit of the address (whose bitsize is determined by t
 
 When using either `MGET` or `MSET`, the instruction automatically despawns the opposite operation's group. For instance, when using `MGET`, the user attempts to read the value of the target address, so the write group is toggled off, and vice versa. 
 
-Below is a diagram of the memory structure:
+Below is a diagram of the memory structure:  
 ![Parts of new memory](parts_of_new_memory.png)
 
-## 3.5. Group usage 
+## 3.6. Group usage 
 Group usage in TASM is meant to be optimized, but is not expected to be fully optimized while the language is still in development.   
 Each routine uses one group to hold all of its instructions. After that, any instructions that need extra groups may use them. 
 Below is the specification for all instructions and how many extra groups are used.
@@ -775,6 +899,7 @@ Below is the specification for all instructions and how many extra groups are us
 | Any arithmetic + MOV           | 0           | none                                                                                   |
 | Spawn compare                  | 1           | Spawn trigger for group                                                                |
 | Fork compare                   | 2           | Spawn triggers for both groups                                                         |
+| Instant spawn/fork compare	 | 0		   | This version does not use intermediate triggers.
 | SPAWN                          | 0           | none                                                                                   |
 | Non-memory initializer         | 0           | none                                                                                   |
 | NOP                            | 0           | none                                                                                   |
@@ -788,10 +913,9 @@ Below is a chart that depicts the group usage according to the equations listed.
 
 For a memsize of more than 20, using the new system is recommended for the sake of conserving groups.
 
-## 3.6. Comments
-<!-- Version Number -->
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.0. 
-## 3.7. Execution model
+## 3.7. Comments
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.1. 
+## 3.8. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
 - Each group is assigned a primary group to start, though more are used per comparison instruction.
@@ -799,26 +923,26 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-As of v0.3.0, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+As of v0.3.1, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
 - [Windows installer](https://tasm.mntpoint.org/install.ps1)
-- [Linux installer](https://tasm.mntpoint.org/install.sh)
+- [Linux installer](https://tasm.mntpoint.org/linux.sh)
 
 You may also download the pre-built executables from the [GitHub repository](https://github.com/ArrowSlashArrow/tasm-lang), however, if it is not possible to use them, refer to the below instructions for manually operating the compiler:
 ## 4.1. rtasm compiler
 Prerequisites: 
-- Rust version v1.90.0 or later
+- Rust version v1.88.0 or later
 
 In the `rtasm` directory of the project, run `cargo build --release` to compile the executable. Assuming a successful compile, the executable will be at `target/release/tasmc[.exe]`. 
 ## 4.2. pytasm compiler
-**NOTE:** pytasm is currently deprecated, and will NOT receive future updates. It is *HIGHLY* recommended to use the rust compiler instead. 
-**WARNING**: pytasm will **OVERWRITE** the first level in your savefile. Please be mindful of this when compiling a program. 
+**NOTE:** pytasm is currently deprecated, and will NOT receive future updates. It is *HIGHLY* recommended to use the rust compiler instead.  
+**WARNING**: pytasm will __**OVERWRITE**__ the first level in your savefile. Please be mindful of this when compiling a program. 
 
 Prerequisites: 
 - Python 3.9 
 - All packages in requirements.txt installed 
 	- If not installed, run `pip install -r requirements`.
 
-Navigate to the `pytasm/` directory, and run `python main.py <program>.tasm` to compile the program. 
+Navigate to the `old/pytasm/` directory, and run `python main.py <program>.tasm` to compile the program. 
 To see options, run `python main.py --help`. 
 ## 4.3. The interpreter/emulator 
 Note: The interpreter is currently only accessible through the pytasm compiler
@@ -826,7 +950,7 @@ Note: The interpreter is currently only accessible through the pytasm compiler
 The interpreter is a tool which is designed to emulate the program in the context of the GD runtime. It is intended to provide developers with a way to debug their program without having to run it in GD every time to test it. 
 It does not emulate the actual GD environment, which may involve niche edge cases and other unforeseen bugs. The interpreter program itself is written in rust, which makes it available for use on all operating systems. However, the only way to access it properly is through the pytasm compiler, which is built for windows and may break on linux.  
 
-To access the interpreter, first navigate to the `pytasm/` directory. Then, run `python main.py <program>.tasm --interpret`.
+To access the interpreter, first navigate to the `old/pytasm/` directory. Then, run `python main.py <program>.tasm --interpret`.
 ## 4.4. Getting started
 It may be intimidating to use a language like this one, however, the language is intended to be easy to read and understand. While the language is verbose, it should not be considered unapproachable in any way.
 ## 4.4.1. Example programs

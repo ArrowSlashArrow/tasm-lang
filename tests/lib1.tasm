@@ -1,0 +1,5 @@
+_init:
+    import lib3
+
+routine1:
+    spawn lib3::routine3

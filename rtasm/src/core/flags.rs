@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
 
+use crate::core::structs::{SymbolPath, split_at_str_once};
+
 #[derive(Debug, Clone)]
 pub struct Flag {
     pub ident: String,
@@ -32,6 +34,13 @@ pub enum FlagValue {
     Op(Op),
     Dict(Vec<(i16, i16)>),
     Bool(bool),
+    // parse this to a dict again when we resolve the external references
+    ExternRefsDict(
+        (
+            Vec<(i16, i16)>,
+            Vec<(UnparsedDictFlagEntry, UnparsedDictFlagEntry)>,
+        ),
+    ),
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +151,7 @@ impl FlagValue {
             },
             FlagValueType::Dict => {
                 let mut invalid_dict = false;
+                let mut has_extern_refs = false;
                 let resolve_int = |s: &str| -> Option<i16> {
                     if s.starts_with("0x") {
                         i16::from_str_radix(&s[2..], 16)
@@ -160,26 +170,55 @@ impl FlagValue {
                             0
                         })
                 };
+
+                let mut unparsed_pairs: Vec<(UnparsedDictFlagEntry, UnparsedDictFlagEntry)> =
+                    vec![];
+
+                let resolve_unparsed_entry =
+                    |s: &str, invalid_dict: &mut bool| -> UnparsedDictFlagEntry {
+                        match split_at_str_once(s, "::") {
+                            Some((left, right)) => {
+                                UnparsedDictFlagEntry::Path(SymbolPath {
+                                    root: Some(left.to_owned()),
+                                    ident: right.to_owned(),
+                                    assigned_group: -1, // this will get filled in during post-linking
+                                })
+                            }
+                            None => UnparsedDictFlagEntry::Int(parse_int(s, invalid_dict)),
+                        }
+                    };
+
                 let kv_pairs: Vec<(i16, i16)> = value[1..value.len() - 1]
                     .split(',')
                     .map(|kv| {
-                        let mut split = kv.trim().split(':');
-
-                        let key = parse_int(split.next().unwrap(), &mut invalid_dict);
-                        let value = match split.next() {
-                            Some(v) => parse_int(v, &mut invalid_dict),
+                        let (key, v) = match split_at_str_once(kv, "=") {
+                            Some(p) => p,
                             None => {
                                 invalid_dict = true;
-                                0
+                                ("", "")
                             }
                         };
 
-                        (key, value)
+                        if key.contains("::") || v.contains("::") {
+                            let key_parsed = resolve_unparsed_entry(key, &mut invalid_dict);
+                            let value_parsed = resolve_unparsed_entry(v, &mut invalid_dict);
+
+                            has_extern_refs = true;
+                            unparsed_pairs.push((key_parsed, value_parsed));
+                            (0, 0)
+                        } else {
+                            (
+                                parse_int(key, &mut invalid_dict),
+                                parse_int(v, &mut invalid_dict),
+                            )
+                        }
                     })
                     .collect::<Vec<_>>();
 
                 if invalid_dict {
                     None
+                } else if has_extern_refs {
+                    Some(Self::ExternRefsDict((kv_pairs, unparsed_pairs)))
                 } else {
                     Some(Self::Dict(kv_pairs))
                 }
@@ -199,6 +238,7 @@ impl FlagValue {
             Self::Op(_) => FlagValueType::Op,
             Self::Float(_) => FlagValueType::Float,
             Self::RoundSign(_) => FlagValueType::RoundSign,
+            Self::ExternRefsDict(_) => FlagValueType::Dict,
         }
     }
 
@@ -264,4 +304,10 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "nover" => FlagValueType::Bool,
         _ => return None,
     })
+}
+
+#[derive(Debug, Clone)]
+pub enum UnparsedDictFlagEntry {
+    Int(i16),
+    Path(SymbolPath),
 }

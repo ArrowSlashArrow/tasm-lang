@@ -213,7 +213,6 @@ pub fn legacy_malloc(args: HandlerArgs) -> HandlerReturn {
     Ok(legacy_malloc_inner(args, false))
 }
 pub fn legacy_fmalloc(args: HandlerArgs) -> HandlerReturn {
-    println!("nigga we called fmalloc {args:#?}");
     Ok(legacy_malloc_inner(args, true))
 }
 
@@ -228,9 +227,9 @@ pub fn init_mem(args: HandlerArgs) -> HandlerReturn {
                 etype: TasmErrorType::NonexistentMemoryAccess,
                 file: String::new(),
                 routine: String::new(),
-                error: true,
                 line: args.line,
                 details: "Cannot initialise memory when none exists.".into(),
+                errcode: 7,
             });
         }
     };
@@ -269,18 +268,23 @@ pub fn legacy_mptr(args: HandlerArgs) -> HandlerReturn {
     let add_cfg = cfg.clone().scale(1.0, 0.5).y(cfg.pos.1 - 7.5);
     let move_amount = args.args[0].to_float().unwrap();
     let invalid_move_reason;
+    let errcode;
+
     let is_valid_mem_move = match args.mem_info {
         Some(mem) => {
             if move_amount as i16 <= mem.size {
                 invalid_move_reason = String::new();
+                errcode = 0;
                 true
             } else {
                 invalid_move_reason = "Pointer moved more spaces than memory size".into();
+                errcode = 8;
                 false
             }
         }
         None => {
             invalid_move_reason = "Pointer moved while no memory exists".into();
+            errcode = 9;
             false
         }
     };
@@ -321,9 +325,9 @@ pub fn legacy_mptr(args: HandlerArgs) -> HandlerReturn {
             etype: TasmErrorType::InvalidPointerMove,
             file: String::new(),
             routine: String::new(),
-            error: true,
             line: args.line,
             details: invalid_move_reason,
+            errcode,
         })
     }
 }
@@ -412,9 +416,9 @@ pub fn malloc_generator(args: HandlerArgs, float_mem: bool) -> HandlerReturn {
             etype: TasmErrorType::InvalidMemoryRange,
             file: String::new(),
             routine: String::new(),
-            error: true,
             line: args.line,
             details: format!("Cannot allocate memory from {start_ctr} to {end_ctr}."),
+            errcode: 10,
         });
     }
 

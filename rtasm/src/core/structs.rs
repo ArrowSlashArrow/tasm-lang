@@ -1,5 +1,6 @@
+extern crate alloc;
 use alloc::borrow::Cow;
-use std::{collections::HashMap, hint::unreachable_unchecked};
+use std::{collections::HashMap, hint::unreachable_unchecked, path::PathBuf};
 
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
@@ -30,26 +31,23 @@ pub enum TasmValue {
     Number(f64),
     Group(i16),
     Alias(BuiltinAlias), // use ident instead of alias type
+    RoutineRef(SymbolPath),
+    ModulePath(PathBuf), // PathBuf serves the same function here
     /// Default
     String(String),
+    UnresolvedAlias(String), // temporary state
 }
 
-#[derive(Debug, Clone)]
-pub struct Alias {
-    pub ident: String,
-    pub value: TasmValue,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SymbolPath {
+    pub root: Option<String>, // if None, this routine is local
+    pub ident: String,        // ident of routine
+    pub assigned_group: i16,  // group assigned during binding stage for a single module
 }
 
-impl Alias {
-    pub fn to_alias(s: &str, v: TasmValue) -> Self {
-        Self {
-            ident: s.to_owned(),
-            value: v,
-        }
-    }
-
-    pub fn get_type(&self) -> TasmPrimitive {
-        self.value.get_type()
+impl SymbolPath {
+    pub fn is_external(&self) -> bool {
+        self.root.is_some()
     }
 }
 
@@ -111,6 +109,8 @@ pub enum TasmPrimitive {
     Number, // also a float.
     Int,    // subset of number
     Group,
+    RoutineRef, // reference to a routine through a path; convert to gid in linking stage
+    ModulePath, // path to a module
     String,
 }
 
@@ -135,7 +135,7 @@ impl Aliases {
 }
 
 impl TasmValue {
-    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String)> {
+    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String, i32)> {
         let mut iter = s.chars();
         let pref = match iter.next() {
             Some(c) => c,
@@ -144,6 +144,7 @@ impl TasmValue {
                 return Err((
                     ParseErrorType::TrailingComma,
                     "Got a 0-length string. Perhaps there is a trailing comma".into(),
+                    16,
                 ));
             }
         };
@@ -157,7 +158,7 @@ impl TasmValue {
             // since values are parsed as lexing stage, only builtin ones are available
             // user-defined aliases are determined at semantic analysis
             Ok(Self::Alias(a))
-        } else if (pref == 'T' || pref == 'C' || pref == 'g')
+        } else if (matches!(pref, 'T' | 't' | 'C' | 'c' | 'G' | 'g'))
             && let Ok(id) = remaining_i16
         {
             // check that the ID is in range
@@ -165,11 +166,15 @@ impl TasmValue {
                 return Err((
                     ParseErrorType::BadID,
                     format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+                    17,
                 ));
             }
             match pref {
                 'T' => Ok(Self::Timer(id)),
+                't' => Ok(Self::Timer(id)),
                 'C' => Ok(Self::Counter(id)),
+                'c' => Ok(Self::Counter(id)),
+                'G' => Ok(Self::Group(id)),
                 'g' => Ok(Self::Group(id)),
                 _ => unsafe {
                     // this is guaranteed to never trigger
@@ -182,9 +187,14 @@ impl TasmValue {
                 return Err((
                     ParseErrorType::InvalidNumber,
                     "Infinity is not allowed.".into(),
+                    18,
                 ));
             } else if n.is_nan() {
-                return Err((ParseErrorType::InvalidNumber, "NaN is not allowed.".into()));
+                return Err((
+                    ParseErrorType::InvalidNumber,
+                    "NaN is not allowed.".into(),
+                    19,
+                ));
             }
 
             Ok(Self::Number(n))
@@ -196,11 +206,30 @@ impl TasmValue {
                 Err((
                     ParseErrorType::BadHexLiteral,
                     "Could not parse hexadecimal number.".into(),
+                    20,
                 ))
             }
+        } else if s.contains("::")
+            && let Some((left, right)) = split_at_str_once(s, "::")
+        {
+            Ok(Self::RoutineRef(SymbolPath {
+                root: Some(left.to_owned()),
+                ident: right.to_owned(),
+                assigned_group: -1, // no group has been assigned yet
+            }))
         } else {
             Ok(Self::String(s.into()))
         }
+    }
+
+    /// Convert to Self::ModulePath if Self is String.
+    pub fn parse_to_pathbuf(&mut self) {
+        let maybe_string = self.to_string();
+        if let None = maybe_string {
+            return;
+        }
+
+        *self = Self::ModulePath(PathBuf::from(maybe_string.unwrap()));
     }
 
     pub fn get_type(&self) -> TasmPrimitive {
@@ -210,6 +239,9 @@ impl TasmValue {
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
             Self::Alias(a) => a.get_type(),
+            Self::RoutineRef(_) => TasmPrimitive::RoutineRef,
+            Self::ModulePath(_) => TasmPrimitive::ModulePath,
+            Self::UnresolvedAlias(_) => TasmPrimitive::String,
         }
     }
 
@@ -225,6 +257,20 @@ impl TasmValue {
         match self {
             Self::Timer(_) => true,
             Self::Alias(a) => a.get_type() == TasmPrimitive::Timer,
+            _ => false,
+        }
+    }
+
+    pub fn is_external_symbol(&self) -> bool {
+        match self {
+            Self::RoutineRef(r) => r.is_external(),
+            _ => false,
+        }
+    }
+
+    pub fn is_routine_ref(&self) -> bool {
+        match self {
+            Self::RoutineRef(_) => true,
             _ => false,
         }
     }
@@ -270,6 +316,36 @@ impl TasmValue {
             _ => None,
         }
     }
+
+    pub fn to_routine_ref(&self) -> Option<SymbolPath> {
+        match self {
+            Self::RoutineRef(r) => Some(r.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn to_module_path(&self) -> Option<PathBuf> {
+        match self {
+            Self::ModulePath(m) => Some(m.clone()),
+            _ => None,
+        }
+    }
+}
+
+pub(crate) fn split_at_str_once<'a>(s: &'a str, p: &'a str) -> Option<(&'a str, &'a str)> {
+    let mut line_split = s.split(p);
+
+    // the first part is always present, which is guaranteed to be
+    // the string with the instruction and its arguments
+    let left = line_split.next().unwrap();
+
+    let right = line_split.next().unwrap_or_default();
+
+    if line_split.next().is_some() {
+        return None;
+    }
+
+    Some((left, right))
 }
 
 pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
@@ -404,6 +480,8 @@ pub struct Tasm {
     pub release_mode: bool,
     pub defined_aliases: HashMap<String, String>, // alias => value
     pub fname: String,
+    // list of modules that were imported here
+    pub imports: Vec<PathBuf>,
 }
 
 /// Aliases lookup container
@@ -465,12 +543,6 @@ impl Routine {
 }
 
 impl HandlerData {
-    #[inline(always)]
-    pub fn set_objects(mut self, objects: Vec<GDObject>) -> Self {
-        self.objects = objects;
-        self
-    }
-
     #[inline(always)]
     pub fn from_objects(objects: Vec<GDObject>) -> Self {
         Self {
