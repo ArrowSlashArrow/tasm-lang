@@ -469,6 +469,8 @@ Below is a list of instructions and their corresponding structures:
 - `IOBLOCK`: An [IOBlock](#121-ioblock) that is put at y=75 and some specified x-position that acts as a debug group spawn. The x-position is processed such that it translates to a block position, e.g. 5 becomes 5 blocks (+ 2 for margin) to the right of the y-axis, centered on a cell.
 - `PERS`: Adds a persistent item trigger for the specified item.
 - `DISPLAY`: Displays a counter at some specified height and x=0 of the given counter.
+- `ALIAS`: See #[this documentation](#3128-the-alias-instruction)
+- `IMPORT`: See #[this documentation](#31210-the-import-instruction)
 ### 3.1.4. Instruction flags
 The function of a given instructions is usually simple/single-purposed, and only uses a handful of parameters within the trigger that it compiles to. However, triggers are remarkably configurable, and in some cases may simplify otherwise needlessly complex setups.  
 A common example is the implementation of getting the absolute value of a number. The old implementation required a comparison of the target (C1) against 0 to determine its sign, which determined whether it should be negatied. This is much more complex and wasteful of groups than simply using the absolute rounding mode.
@@ -503,17 +505,17 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 - Flags MUST be written after a `|` in the instruction line. There must only be one pipe character in the line if flags are used.
 	- `ADD C1, C2 | itemmod:0.5` compiles.
 	- `ADD C1, C2 | itemmod:0.5 | round:+` does not compile. 
-- Flag-value pairs must be separated by whitespace. The flag identifier and its value themselves must be separated by a colon, but with no whitespace in between
+- Flag-value pairs must be separated by whitespace. The flag identifier and its value themselves must be separated by a `=`, but with no whitespace in between
 	- `... | itemmod:0.5` compiles.
 	- `... | itemmod: 0.5` does not compile.
 	- `... | itemmod: 0.5, ` does not compile.
 	- This only applies if the flag accepts a data type other than Dict. Dicts must be denoted as such:
-		- `... | dict: {a:b, c:d, ...}`
+		- `... | dict: {a=b, c=d, ...}`
 		- There must be no spacing between the braces and the key/values.
-		- There must be no spacing between the keys/values and the colon separator.
+		- There must be no spacing between the keys/values and the `=` separator.
 		- Key-value pairs must be separated by a comma. There may be whitespace after the comma.
 		- There must be whitespace between the colon that separates the flag identifier and the value, and the dictionary itself: `dict: <whitespace> {...}` 
-		- Currently, the only supported values are 16-bit signed integers for both keys and their values. Other accepted values are routine identifiers or aliases for either ints or routines. When passed as either a key or a value, a routine identifier will be coerced to an int, which is its group ID.
+		- Currently, the only supported values are 16-bit signed integers for both keys and their values. Other accepted values are routine identifiers or aliases for either ints or routines. Identifiers for routines/aliases may also be imported, but must be declared with `module::identifier` syntax. When passed as either a key or a value, a routine identifier will be coerced to an int, which is its group ID.
 
 > [!NOTE]
 > The types of values that flags accept are different to those listed in the [Types of Values](#33-types-of-values) section. Please refer to the [Flag types](#3142-flag-types) section for more info on accepted values for flags.
