@@ -33,8 +33,10 @@ Here, `[a, b, c]` is the argset for the instruction.
 ### 1.2.3. n-tick
 n-tick refers to the execution time of any single instruction. A 1-tick instruction takes exactly one tick to execute.  
 To be clear, no instructions have a delay of execution. The execution time refers to how long the instruction takes to process.
+<!-- deprecated -->
 ### 1.2.4. MEMREG
 MEMREG is an abbreviation for "Memory Register". It is also the alias for the memory register item in TASM. 
+<!-- deprecated -->
 ### 1.2.5. Memory mode/function
 > [!NOTE]
 > These terms only apply to legacy memory. New memory supports reading and writing more directly.
@@ -48,19 +50,17 @@ When a memory mode is set, its group is toggled on, and the other's is toggled o
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of June 26, 2026 is **v0.3.0**. 
+The current version, as of June 26, 2026 is **v0.3.1**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
 ## 2.1. Constraints
-While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As such, TASM programmers must be aware of these constraints and their implications.
-- IDs are integers in the range \[1, 10000). As a result, one may theoretically store up to 80KB of information, assuming the availability of each and every counter and timer. 
+While TASM is theoretically turing-complete, assuming unbounded IDs, the GD environment imposes strict limits that are impossible to bypass. As a consequence, TASM programmers must be aware of these constraints and their implications.
+- The range of IDs normally accessible from triggers is \[1, 10000). This applies to all IDs: groups, counters, timers, collision blocks, etc. It is possible to access further items with remaps, most notably in Item Edit triggers, however this behaviour is not officially supported in GD and may lead to instability.  
 - Counter items (counters) are 32-bit integers. They may hold any value from \[-2<sup>32</sup> , 2<sup>32</sup>-1).
 - Timer items (timers) are 32-bit floats, as per the [IEEE-754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format) implementation. It is not possible to set the value of a timer higher than 9,999,999.0 with item edit triggers. However, time triggers are able to do this just fine.
-- The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms). As a result, trigger programs are quite slow compared to real programs.
-
-## 2.2. Useful mechanics
-When compiled, the spawn trigger for every routine ALWAYS uses the spawn-ordered option. This is to ensure control of execution and pauses between instructions. If not enabled, the spawn will incorrectly skip waits and make every instruction 1-tick, which is undesirable since some instructions need downtime to be fully and correctly processed.
+- The game runs on a 240Hz loop, which means that 1 tick in TASM takes, in theory, exactly 1/240th of a second (~4.166ms).
+- This section covers a few constraints of the GD runtime relevant to TASM. In reality, there are hundreds of undocumented edge cases. For known mechanics/bugs, see [this website](https://uhdanke.github.io/gd_docs/).
 
 # 3. The TASM language 
 ## 3.1. Instructions 
@@ -192,6 +192,7 @@ SRAND do_stuff, 42.8
 ```
 The routine `do_stuff` has a 42.8% chance of being spawned.
 
+<!-- deprecated -->
 #### 3.1.2.3. Memory
 > [!NOTE]
 > All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
@@ -646,12 +647,15 @@ All instructions under that identifier that are indented will be considered part
 ### 3.2.2. Special routines 
 Special routines are hard-coded to the compiler, and have special behaviour. They are *not* automatically generated. 
 #### 3.2.2.1. `_start` routine
-This routine is considered the entry point of the program, and is required by the compiler to be included in the input file.  
+This routine is considered the entry point of the program, and is required by the compiler to be included in the input file unless the `--no-entry-point` argument is passed. 
+This routine should be treated like the `main` function of other languages - the program is intended to start when this routine is spawned.
 An [IOBlock](#121-ioblock) is automatically placed to activate the group assigned to this routine. 
 #### 3.2.2.2. `_init` routine
-This routine is intended for any preliminary setup instructions. For example, declaring and initializing memory with values.  
-This is the only routine where initializer instructions are allowed, because they correspond to custom static structures in the level. See specifics of each instruction [here](#3131-initializer-instructions).
-Any non-initializer instruction found in the `_init` routine will be placed in the negative-x and positive-y quadrant.
+This routine is intended for all preliminary setup instructions not necessarily related directly to the program's function. For example, importing external modules, defining aliases, or marking items as persistent. 
+The programmer should use this routine only for init-specific instructions. Though it is possible to include instructions such as `MOV` which are repeatable actions, it is not recommended to do this
+since instructions in this routine are not preserved when the module is imported.
+
+Any non-initializer instruction found in the `_init` routine will be placed in the negative-x and positive-y quadrant. See specifics of each init instruction [here](#3131-initializer-instructions).
 ### 3.2.3. In-level object representation 
 Apart from the `_init` routine, all routines are compiled individually by instruction, with each object cluster being separated by one unit on the x-axis, starting at x=105.
 All routine groups are also on separate lines from each other, annotated by text formatted as `group: routine`, and positioned on x=0 and the same y-level as the rest of the group. This text object is not a part of the routine group.   
@@ -717,7 +721,7 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.3.0, the aliases that exist are:
+As of TASM v0.3.1, the built-in aliases that exist are:
 - `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
 - `POINTS`: refers to the points counter. This is a built-in item in GD.
 - `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
@@ -824,7 +828,8 @@ Diamond dependencies are supported in TASM. The linker uses a module cache to ke
 Circular imports are not allowed. Due to the linker needing to resolve all referenced symbols, recursively evaluating each module will lead to infinite recursion. This is caught by the linker's module cache early and prevented.
 There is always better way than a circular import. 
 
-
+<!-- deprecated -->
+<!-- replace this with a section titled `addressing items` -->
 ## 3.5. Memory
 > [!WARNING]
 > As of v0.3.0, built-in memory is fully deprecated! Do not use memory instructions as they are likely to be removed very soon.
@@ -909,7 +914,7 @@ Below is a chart that depicts the group usage according to the equations listed.
 For a memsize of more than 20, using the new system is recommended for the sake of conserving groups.
 
 ## 3.7. Comments
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.0. 
+A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.1. 
 ## 3.8. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
@@ -918,9 +923,9 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-As of v0.3.0, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+As of v0.3.1, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
 - [Windows installer](https://tasm.mntpoint.org/install.ps1)
-- [Linux installer](https://tasm.mntpoint.org/install.sh)
+- [Linux installer](https://tasm.mntpoint.org/linux.sh)
 
 You may also download the pre-built executables from the [GitHub repository](https://github.com/ArrowSlashArrow/tasm-lang), however, if it is not possible to use them, refer to the below instructions for manually operating the compiler:
 ## 4.1. rtasm compiler
