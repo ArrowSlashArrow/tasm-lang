@@ -153,7 +153,13 @@ impl FlagValue {
                 let mut invalid_dict = false;
                 let mut has_extern_refs = false;
                 let resolve_int = |s: &str| -> Option<i16> {
-                    s.parse::<i16>().ok().or_else(|| group_map.get(s).copied())
+                    if s.starts_with("0x") {
+                        i16::from_str_radix(&s[2..], 16)
+                    } else {
+                        s.parse::<i16>()
+                    }
+                    .ok()
+                    .or_else(|| group_map.get(s).copied())
                 };
 
                 let parse_int = |s: &str, invalid_dict: &mut bool| -> i16 {
