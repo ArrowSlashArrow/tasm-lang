@@ -9,6 +9,7 @@ If the program exceeds this limit due to too many routines or instructions with 
 this error will be tripped.
 
 As of GD 2.208, this limit is 9,999 groups.",
+    // deprecated
     "E0002: Cannot access memory in the _init routine.
 Note: This error is emitted only when working with legacy memory instructions.
 
@@ -16,6 +17,7 @@ Memory initialization happens in the _init routine, which means it is not safe t
 after the _init routine completes. The memory instructions themselves - LMALLOC and 
 LFMALLOC - signal to the compiler to insert a specific structure into the level, and they 
 are NOT repeatable actions with a definitive end like an arithmetic or comparison operation.",
+    // deprecated
     "E0003: Cannot access memory when none exists.
 Note: This error is emitted only when working with legacy memory instructions.
 
@@ -71,6 +73,7 @@ This specific error only exists for IMPORT and ALIAS due to the way they are han
     
 This error is emitted if there are two or more ALIAS instructions that try to define a value
 for a single alias. Since aliases are immutable, they cannot have more than one value.",
+    // deprecated
     "E0014: Cannot override default alias.
     
 This error is emitted if there is an ALIAS instruction that tries to define a value 
@@ -224,28 +227,20 @@ pub struct TasmError {
 #[non_exhaustive]
 pub enum TasmErrorType {
     InvalidInstruction,
-    InvalidArguments,
     InvalidAssignment,
     InvalidWaitAmount,
-    InvalidMemoryRange,
     BadID,
     BadToken,
-    BadAlias,
     BadFlag,
     BadHexLiteral,
     NoEntryPoint,
     InvalidNumber,
-    InvalidGroup,
     ExceedsGroupLimit,
     InitRoutineSpawnError,
-    MultipleMemoryInstances,
     MultipleAliasDefinitions,
     MultipleRoutineDefintions,
     NonInitAliasDefinition,
     NonInitImport,
-    InvalidPointerMove,
-    InitRoutineMemoryAccess,
-    NonexistentMemoryAccess,
     TrailingComma,
 }
 

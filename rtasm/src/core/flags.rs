@@ -8,7 +8,7 @@ use crate::core::structs::{SymbolPath, split_at_str_once};
 pub struct Flag {
     pub ident: String,
     pub value: FlagValue,
-    pub ftype: FlagValueType,
+    pub _ftype: FlagValueType,
 }
 
 impl Flag {
@@ -22,7 +22,7 @@ impl Flag {
         Some(Self {
             value: FlagValue::try_from(val, &t, gm, aliases)?,
             ident,
-            ftype: t,
+            _ftype: t,
         })
     }
 }

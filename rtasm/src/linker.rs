@@ -37,7 +37,6 @@ pub fn compile_tasm_module(
     let tasm = match lexer::parse_file(
         file,
         path.to_str().unwrap().to_string(),
-        args.mem_end_counter,
         start_using_this_group,
         args.verbose_logs && !args.no_log,
         true,

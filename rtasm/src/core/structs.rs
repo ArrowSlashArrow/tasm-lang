@@ -1,5 +1,4 @@
 extern crate alloc;
-use alloc::borrow::Cow;
 use std::{collections::HashMap, hint::unreachable_unchecked, path::PathBuf};
 
 use gdlib::gdobj::{GDObjConfig, GDObject, Item};
@@ -15,7 +14,6 @@ use crate::core::{
 pub enum InstrType {
     Arithmetic, // any instruction that performs mathematical operations with counters
     Init,       // any instruction that can only go into the _init routine.
-    Memory,     // any instruction that requires/interfaces with memory
     Timer,      // any instruction that interacts with timers non-arithmetically.
     Special,    // instructions that are miscellaneous (dont fit into any of these categories)
     Process,    // any instruction that modifies the process flow (PAUSE, RESUME, STOP)
@@ -27,10 +25,10 @@ pub enum InstrType {
 pub enum TasmValue {
     Counter(i16),
     Timer(i16),
+    /// Used for MainTime, Attempts and Points counters
     GDItem(Item),
     Number(f64),
     Group(i16),
-    Alias(BuiltinAlias), // use ident instead of alias type
     RoutineRef(SymbolPath),
     ModulePath(PathBuf), // PathBuf serves the same function here
     /// Default
@@ -51,40 +49,6 @@ impl SymbolPath {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum BuiltinAlias {
-    MEMREG,
-    PTRPOS,
-    POINTS,
-    ATTEMPTS,
-    MAINTIME,
-    MEMSIZE,
-}
-
-impl BuiltinAlias {
-    pub fn from_ident(s: &str) -> Option<Self> {
-        match s {
-            "MEMREG" => Some(Self::MEMREG),
-            "PTRPOS" => Some(Self::PTRPOS),
-            "POINTS" => Some(Self::POINTS),
-            "ATTEMPTS" => Some(Self::ATTEMPTS),
-            "MAINTIME" => Some(Self::MAINTIME),
-            "MEMSIZE" => Some(Self::MEMSIZE),
-            _ => None,
-        }
-    }
-
-    /// only works for builtin aliases
-    pub fn get_type(&self) -> TasmPrimitive {
-        match self {
-            Self::MEMREG | Self::PTRPOS | Self::POINTS | Self::ATTEMPTS | Self::MAINTIME => {
-                TasmPrimitive::Item
-            }
-            Self::MEMSIZE => TasmPrimitive::Number, // cannot be Int, since otherwise it isn;t recognized as a number
-        }
-    }
-}
-
 impl Default for TasmValue {
     fn default() -> Self {
         Self::Number(0.0)
@@ -96,11 +60,11 @@ impl Default for &TasmValue {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum TasmValueType {
-    Primitive(TasmPrimitive),
-    List(TasmPrimitive),
-}
+// this enum is no longer required; use TasmPrimitive
+// #[derive(PartialEq, Debug)]
+// pub enum TasmValueType {
+//     Primitive(TasmPrimitive),
+// }
 
 #[derive(PartialEq, Debug)]
 pub enum TasmPrimitive {
@@ -109,29 +73,9 @@ pub enum TasmPrimitive {
     Number, // also a float.
     Int,    // subset of number
     Group,
-    RoutineRef, // reference to a routine through a path; convert to gid in linking stage
+    RoutineRef, // reference to a routine through a path; converted to gid in linking stage
     ModulePath, // path to a module
     String,
-}
-
-pub fn is_builtin_alias(s: &str) -> bool {
-    matches!(
-        s,
-        "MEMREG" | "PTRPOS" | "MEMSIZE" | "POINTS" | "ATTEMPTS" | "MAINTIME"
-    )
-}
-
-impl Aliases {
-    pub fn get_value(&self, ident: BuiltinAlias) -> TasmValue {
-        match ident {
-            BuiltinAlias::MEMREG => self.memreg.clone(),
-            BuiltinAlias::PTRPOS => TasmValue::Counter(self.ptrpos_id),
-            BuiltinAlias::MEMSIZE => TasmValue::Number(self.memsize as f64),
-            BuiltinAlias::ATTEMPTS => TasmValue::GDItem(Item::Attempts),
-            BuiltinAlias::MAINTIME => TasmValue::GDItem(Item::MainTime),
-            BuiltinAlias::POINTS => TasmValue::GDItem(Item::Points),
-        }
-    }
 }
 
 impl TasmValue {
@@ -153,11 +97,13 @@ impl TasmValue {
         // string escapes are checked first
         if pref == '\\' {
             Ok(Self::String(s[1..].to_string()))
-        } else if let Some(a) = BuiltinAlias::from_ident(s) {
-            // then aliases are parsed
-            // since values are parsed as lexing stage, only builtin ones are available
-            // user-defined aliases are determined at semantic analysis
-            Ok(Self::Alias(a))
+        } else if matches!(s, "ATTEMPTS" | "MAINTIME" | "POINTS") {
+            match s {
+                "ATTEMPTS" => Ok(Self::GDItem(Item::Attempts)),
+                "MAINTIME" => Ok(Self::GDItem(Item::MainTime)),
+                "POINTS" => Ok(Self::GDItem(Item::Points)),
+                _ => unsafe { unreachable_unchecked() },
+            }
         } else if (matches!(pref, 'T' | 't' | 'C' | 'c' | 'G' | 'g'))
             && let Ok(id) = remaining_i16
         {
@@ -238,7 +184,6 @@ impl TasmValue {
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
             Self::String(_) => TasmPrimitive::String,
-            Self::Alias(a) => a.get_type(),
             Self::RoutineRef(_) => TasmPrimitive::RoutineRef,
             Self::ModulePath(_) => TasmPrimitive::ModulePath,
             Self::UnresolvedAlias(_) => TasmPrimitive::String,
@@ -248,7 +193,6 @@ impl TasmValue {
     pub fn is_int(&self) -> bool {
         match self {
             Self::Number(n) => n.fract() == 0.0,
-            Self::Alias(a) => a.get_type() == TasmPrimitive::Int,
             _ => false,
         }
     }
@@ -256,7 +200,6 @@ impl TasmValue {
     pub fn is_timer(&self) -> bool {
         match self {
             Self::Timer(_) => true,
-            Self::Alias(a) => a.get_type() == TasmPrimitive::Timer,
             _ => false,
         }
     }
@@ -338,7 +281,6 @@ pub(crate) fn split_at_str_once<'a>(s: &'a str, p: &'a str) -> Option<(&'a str, 
     // the first part is always present, which is guaranteed to be
     // the string with the instruction and its arguments
     let left = line_split.next().unwrap();
-
     let right = line_split.next().unwrap_or_default();
 
     if line_split.next().is_some() {
@@ -348,7 +290,7 @@ pub(crate) fn split_at_str_once<'a>(s: &'a str, p: &'a str) -> Option<(&'a str, 
     Some((left, right))
 }
 
-pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
+pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmPrimitive]) -> bool {
     // helper fn
     fn check_primitive(p: &TasmPrimitive, arg: &TasmValue) -> bool {
         // check if an int is required here
@@ -361,62 +303,28 @@ pub fn fits_arg_signature(args: &[TasmValue], sig: &[TasmValueType]) -> bool {
             _ => &arg.get_type() == p,
         }
     }
-    match sig.len() {
-        0 => args.is_empty(),
-        1 => match &sig[0] {
-            TasmValueType::List(l_type) => {
-                // check that all arguments are of the type in the list
-                args.iter().all(|arg| check_primitive(l_type, arg))
-            }
-            TasmValueType::Primitive(p) => {
-                if args.len() != 1 {
-                    return false;
-                }
-                // check that the argument matches the specified type
-                check_primitive(p, &args[0])
-            }
-        },
-        n => {
-            if args.len() != n {
-                return false;
-            }
-            for (arg, t) in args.iter().zip(sig) {
-                // skip list args, because we don't allow hybrid argsets
-                match t {
-                    TasmValueType::List(_) => continue,
-                    TasmValueType::Primitive(p) => {
-                        if !check_primitive(p, arg) {
-                            // println!("{arg:?} is not {p:?}");
-                            return false;
-                        }
-                    }
-                }
-            }
 
-            true
+    if args.len() != sig.len() {
+        return false;
+    }
+    for (arg, p) in args.iter().zip(sig) {
+        if !check_primitive(p, arg) {
+            return false;
         }
     }
+
+    true
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct HandlerArgs<'a> {
     /// Arguments to this function. e.g. Counter(C1), Number(2.5)
-    pub args: Cow<'a, [TasmValue]>,
+    pub args: &'a [TasmValue],
     /// Config (specifically position and group) of the resulting object(s)
     pub cfg: GDObjConfig,
     /// Next available group to use for the objects
     pub curr_group: i16,
-    /// Group of the pointer collision block
-    pub ptr_group: i16,
-    pub ptr_reset_group: i16,
-    pub memreg: &'a TasmValue,
-    pub ptrpos_id: i16,
     pub displayed_items: usize,
-    pub mem_end_counter: i16,
-    pub routine_count: usize,
-    pub mem_info: Option<&'a MemInfo>,
-
-    pub flags: &'a [Flag],
     pub flag_by_ident: HashMap<String, &'a Flag>,
 
     pub line: usize,
@@ -430,28 +338,13 @@ pub struct HandlerData {
     // extra used groups
     pub used_extra_groups: i16,
     // both set in malloc, keeps track of the groups of the respective objects
-    pub ptr_group: i16,
-    pub ptr_reset_group: i16,
     // set in display instr handler to tell the tasm object to bump displays counter
     pub added_item_display: bool,
-    pub new_mem: Option<MemInfo>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MemInfo {
-    pub _type: MemType,
-    pub memreg: TasmValue,
-    pub ptrpos: TasmValue,
-    pub size: i16,
-    pub read_group: i16,
-    pub write_group: i16,
-    pub start_counter_id: i16,
-    pub line: usize, // where is was created
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct RoutineData {
-    pub line_idx: usize,             // legacy: 0
+    pub _line_idx: usize,            // legacy: 0
     pub routine_ident: String,       // legacy: 1
     pub group_id: i16,               // legacy: 2
     pub lines: Vec<(usize, String)>, // legacy: 3
@@ -467,37 +360,16 @@ pub struct Tasm {
     pub group_offset: i16,
     pub has_entry_point: bool,
     pub lines: Vec<String>,
-    pub mem_end_counter: i16,
     pub curr_group: i16,
-    pub ptr_group: i16,
-    pub ptr_reset_group: i16,
     pub displayed_items: usize,
     pub start_rtn_group: i16,
-    pub mem_info: Option<MemInfo>,
     // aliases get resolved through the map:
-    pub aliases: Aliases,
     pub logs_enabled: bool,
     pub release_mode: bool,
     pub defined_aliases: HashMap<String, String>, // alias => value
     pub fname: String,
     // list of modules that were imported here
     pub imports: Vec<PathBuf>,
-}
-
-/// Aliases lookup container
-#[derive(Debug, Default, Clone)]
-pub struct Aliases {
-    pub memreg: TasmValue,
-    pub ptrpos_id: i16,
-    pub memsize: i16,
-}
-
-#[derive(Debug, Clone)]
-pub enum MemType {
-    Float,
-    Int,
-    LegacyFloat,
-    LegacyInt,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -577,10 +449,7 @@ impl Default for HandlerData {
             skip_spaces: 1, // advance one space by default
             objects: vec![],
             used_extra_groups: 0,
-            ptr_group: 0,
-            ptr_reset_group: 0,
             added_item_display: false,
-            new_mem: None,
         }
     }
 }

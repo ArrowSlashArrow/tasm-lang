@@ -44,7 +44,6 @@ use crate::{
         push_error, push_error_lineless,
         structs::{
             Instruction, Routine, RoutineData, SymbolPath, Tasm, TasmValue, fits_arg_signature,
-            is_builtin_alias,
         },
     },
     instr::{INSTR_SPEC, placeholder_panic_fn},
@@ -221,20 +220,7 @@ impl Tasm {
                         );
                     }
                     hash_map::Entry::Vacant(entry) => {
-                        if is_builtin_alias(entry.key()) {
-                            push_error(
-                                &mut self.errors,
-                                &self.fname,
-                                TasmErrorType::BadAlias,
-                                *line,
-                                INIT_ROUTINE.into(),
-                                format!("Cannot override default alias {}.", entry.key()),
-                                14,
-                            );
-                        } else {
-                            entry.insert(trimmed[1].into());
-                            continue;
-                        }
+                        entry.insert(trimmed[1].into());
                     }
                 };
             } else {
@@ -254,10 +240,6 @@ impl Tasm {
         self.routine_data[0].lines = instrs;
 
         self.defined_aliases = aliases;
-    }
-    pub fn mem_end_counter(mut self, ctr: i16) -> Self {
-        self.mem_end_counter = ctr;
-        self
     }
 
     pub fn handle_instructions(&mut self) {
@@ -659,7 +641,7 @@ impl Tasm {
 
                     // clear out bad data
                     curr_routine_data = RoutineData {
-                        line_idx,
+                        _line_idx: line_idx,
                         routine_ident,
                         group_id: self.curr_group,
                         lines: vec![],
@@ -862,13 +844,12 @@ pub fn validate_tasm_value(
 pub fn parse_file<T: AsRef<str>>(
     in_str: T,
     fname: String,
-    mem_end_counter: i16,
     group_offset: i16,
     verbose_logs: bool,
     log_errs: bool,
     disable_entry_point_check: bool,
 ) -> Result<Tasm, Vec<TasmError>> {
-    let mut tasm = Tasm::default().mem_end_counter(mem_end_counter);
+    let mut tasm = Tasm::default();
     let lines = in_str
         .as_ref()
         .replace('\t', " ") // tabs converted to spaces, works for parsing purposes.

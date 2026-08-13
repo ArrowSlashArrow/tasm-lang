@@ -1,8 +1,7 @@
 use paste::paste;
-use std::fs;
 use std::time::Instant;
 
-use crate::core::structs::{TasmPrimitive, TasmValue, TasmValueType, fits_arg_signature};
+use crate::core::structs::{TasmPrimitive, TasmValue, fits_arg_signature};
 
 use super::*;
 
@@ -184,7 +183,6 @@ impl Args {
             verbose_logs: true,
             dependencies: true,
             linker_output: true,
-            mem_end_counter: 9999,
             no_entry_point: !has_entry,
             ..Default::default()
         }
@@ -195,10 +193,7 @@ impl Args {
 fn int_detection() {
     assert!(fits_arg_signature(
         &[TasmValue::Number(1.0), TasmValue::Number(1.1)],
-        &[
-            TasmValueType::Primitive(TasmPrimitive::Int),
-            TasmValueType::Primitive(TasmPrimitive::Number),
-        ],
+        &[TasmPrimitive::Int, TasmPrimitive::Number,],
     ))
 }
 
@@ -206,10 +201,7 @@ fn int_detection() {
 fn no_int_detection() {
     assert!(!fits_arg_signature(
         &[TasmValue::Number(1.1), TasmValue::Number(1.1)],
-        &[
-            TasmValueType::Primitive(TasmPrimitive::Int),
-            TasmValueType::Primitive(TasmPrimitive::Number),
-        ],
+        &[TasmPrimitive::Int, TasmPrimitive::Number,],
     ))
 }
 
