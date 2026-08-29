@@ -49,8 +49,11 @@ pub type HandlerAssoc = (&'static [TasmPrimitive], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
+    "PERS" => (false, &[argset!((Item) => pers)], InstrType::Init),
+    "UNPERS" => (false, &[argset!((Item) => unpers)], InstrType::Arithmetic),
+    "UNPERSALL" => (false, &[argset!((Item) => unpersall)], InstrType::Arithmetic),
+    "RPERSALL" => (false, &[argset!((Item) => rpersall)], InstrType::Arithmetic),
     // if an instruction can only go in the _init routine, it **MUST** be designated that.
-    "PERS" => (true, &[argset!((Item) => pers)], InstrType::Init),
     "DISPLAY" => (
         true,
         &[argset!((Item) => display)],
