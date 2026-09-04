@@ -229,7 +229,7 @@ pub enum TasmErrorType {
     InvalidInstruction,
     InvalidAssignment,
     InvalidWaitAmount,
-    BadID,
+    // BadID,
     BadToken,
     BadFlag,
     BadHexLiteral,
@@ -277,7 +277,7 @@ impl Display for TasmError {
 /// Low-level temporary error type used for internal handling.
 #[derive(Debug)]
 pub(crate) enum ParseErrorType {
-    BadID,
+    // BadID,
     TrailingComma,
     InvalidNumber,
     BadHexLiteral,

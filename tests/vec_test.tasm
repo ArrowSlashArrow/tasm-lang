@@ -1,0 +1,40 @@
+_init:
+    import ../stdlib/vec
+    ; the first three elements of the vector
+    display C1
+    display C2
+    display C3
+    display C4
+    display C5
+    display C6
+    display Cx34
+    display Cx35
+    display Cx36
+_start:
+    ; clear displays
+    mov C1, 0
+    mov C2, 0
+    mov C3, 0
+
+    ; init vector: [67, 78, 89] at 0x34
+    mov Cx34, 67
+    mov Cx35, 78
+    mov Cx36, 89
+    ; vector struct at 0x4
+    mov C4, 0x34
+    mov C5, 3
+    ; requested addr
+    mov C6, 0
+
+    ; read vec[0] to C1
+    spawn vec::get_nth_item | remap: {1 = 4, 2 = 5, 3 = 6, 4 = 1}
+    wait 4
+    add C6, 1
+    ; read vec[1] to C1
+    spawn vec::get_nth_item | remap: {1 = 4, 2 = 5, 3 = 6, 4 = 2}
+    wait 4
+    add C6, 1
+    ; read vec[2] to C1
+    spawn vec::get_nth_item | remap: {1 = 4, 2 = 5, 3 = 6, 4 = 3}
+    wait 4
+    

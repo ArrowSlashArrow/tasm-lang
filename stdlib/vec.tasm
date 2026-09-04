@@ -1,0 +1,48 @@
+; implements a dynamically sized array of integers
+_init:
+    import mem_8bit
+
+; vec specification:
+; `start`: [int] address of first element
+; `length`: [int] length of this vector
+; capacity is omitted since we are not working in an environment with an allocator
+
+
+; paramters:
+; * `C1`: `vec.start`
+; * `C2`: `vec.length`
+; * `C3`: index
+; returns:
+; * `C4`: value at vec[i]. -2147483648 if the index is invalid (idx < 0 or idx >= vec.length)
+; temporary items used: C4
+; time: 4 ticks
+get_nth_item:
+    ; check bounds, only continue if 0 < c3 < c2
+    mov mem_8bit::ptrpos, 0
+    spawn __check_bounds | ordered:false remap: {10001 = 2, 10002 = 3, 10003 = __get_nth_item_continue, 10004 = __fail}
+
+; continue after branch
+__get_nth_item_continue:
+    rawtrg 1,1006,2,555,3,225,36,1,51,1000,47,0.2,210,1,7,0,8,250,9,175
+    ; read number at [C1 + C3]
+    add mem_8bit::ptrpos, C1, C3
+    spawn mem_8bit::mem | ordered:false remap: {mem_8bit::mem_end = mem_8bit::cread}
+    ; move to return variable
+    mov C4, mem_8bit::cmemreg
+
+; debug routine
+__fail:
+    rawtrg 1,1006,2,555,3,225,36,1,51,1000,47,0.2,210,1,7,212,8,0,9,32
+
+; ----- helper functions -----
+; prefixed with `__` to mark them as internal to this module
+
+; C1: length, C2: requested index
+; spawn `g3` if ptr is in bounds, `g4` if not
+__check_bounds:
+    ; C2 < 0?
+    ifl g10004, __check_bounds_continue, C10002, 0
+
+__check_bounds_continue:
+    ; C2 >= C1 (length) ?
+    ifge g10004, g10003, C10002, C10001 

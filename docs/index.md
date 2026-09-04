@@ -700,12 +700,16 @@ An item literal represents a GD item, most commonly a counter or timer item. It 
 - Timer: `TXXXX`, where `XXXX` represents the ID of the timer. Example: `T456` represents the timer with ID 456.
 IDs do not have to be 0-padded, and they must be in decimal form. They are only valid if they are in the range [1, 9999]. The same goes for IDs in group literals.   
 Item literals are parsed by first checking for a prefix of either `C` or `T`, and if this is true, the rest of the literal is parsed as a base-10 signed 16-bit integer, since IDs are internally represented as signed 16-bit integers by GD.
+
+As of v0.3.2, item literals may also be given a hexadecimal ID: `Cx56` corresponds to counter with ID 0x56. This works for both counters and timers.
 ### 3.3.3. Groups
 Both of the following are interally groups:
 #### 3.3.3.1. Group literals
 Group literals refer to a static group ID. They are written as `g{id}`, where ID is a valid group ID.  
 Group literals are parsed the same way as item literals, except for the prefix.  
 Example: `g123` refers to the group with ID 123.
+
+As of v0.3.2, group literals may also be given a hexadecimal ID: `gx56` corresponds to group with ID 0x56.
 #### 3.3.3.2. Routines
 Routines are specified simply by their identifier. Since they are parsed first, any routine name declaration/reference order conflicts are avoided.
 ```

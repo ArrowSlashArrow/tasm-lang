@@ -2,8 +2,8 @@
 _init:
     ; MALLOC is omitted, because multiple memory instances are not allowed.
     ; FMALLOC uses the same object constructors internally
-    LFMALLOC 25
-    INITMEM 1.5, 2.8, 3.14
+    ; LFMALLOC 25
+    ; INITMEM 1.5, 2.8, 3.14
     DISPLAY C1
     PERS C1
     IOBLOCK routine1, 2, ioblock
@@ -30,31 +30,45 @@ _start:
     TSTOP T1
     WAIT 1
 
-    SE routine1, C1, C2
-    SNE routine1, C1, C2
-    SL routine1, C1, C2
-    SLE routine1, C1, C2
-    SG routine1, C1, C2
-    SGE routine1, C1, C2
     PAUSE routine1
+    SE routine1, C1, C2
+    ISE routine1, C1, C2
+    SNE routine1, C1, C2
+    ISNE routine1, C1, C2
+    SL routine1, C1, C2
+    ISL routine1, C1, C2
+    SLE routine1, C1, C2
+    ISLE routine1, C1, C2
+    SG routine1, C1, C2
+    ISG routine1, C1, C2
+    SGE routine1, C1, C2
+    ISGE routine1, C1, C2
     FE routine1, routine2, C1, C2
+    IFE routine1, routine2, C1, C2
     FNE routine1, routine2, C1, C2
+    IFNE routine1, routine2, C1, C2
     FL routine1, routine2, C1, C2
+    IFL routine1, routine2, C1, C2
     FLE routine1, routine2, C1, C2
+    IFLE routine1, routine2, C1, C2
     FG routine1, routine2, C1, C2
+    IFG routine1, routine2, C1, C2
     FGE routine1, routine2, C1, C2
+    IFGE routine1, routine2, C1, C2
     RESUME routine1
     KILL routine2
     SRAND routine1, 50
-    FRAND routine1, routine2, 50
+    IFRAND routine1, routine2, 50
+    SRAND routine1, 50
+    IFRAND routine1, routine2, 50
 
     TSTART T1
+    UNPERS C1
+    RPERSALL
+    UNPERSALL
 
-    LMREAD
-    LMPTR 5
-    LMFUNC
-    LMRESET
-    LMWRITE
+    RAW 1,1,2,15,3,15
+    RAWTRG 1,3604,2,255,3,75,155,1,36,1,51,11,447,9,525,7,430,8.9.10;
 
     NOP
     SPAWN routine1

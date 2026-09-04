@@ -5,17 +5,17 @@ use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
 use crate::core::{
     HandlerFn,
-    consts::GROUP_LIMIT,
     error::{ParseErrorType, TasmError},
     flags::Flag,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum InstrType {
+    // this instruction assumes that the first argument is always present and is also where the result is written
     Arithmetic, // any instruction that performs mathematical operations with counters
     Init,       // any instruction that can only go into the _init routine.
     Timer,      // any instruction that interacts with timers non-arithmetically.
-    Special,    // instructions that are miscellaneous (dont fit into any of these categories)
+    Misc,       // instructions that are miscellaneous (dont fit into any of these categories)
     Process,    // any instruction that modifies the process flow (PAUSE, RESUME, STOP)
     Wait,       // any instruction that waits (NOP, WAIT)
     Debug, // any instruction that is only used by the emulator, and ignored when parsing to GD objects.
@@ -92,11 +92,31 @@ impl TasmValue {
                 ));
             }
         };
-        let remaining_i16 = iter.collect::<String>().parse::<i16>();
+        let remaining = iter.collect::<String>();
+        let second_char = if remaining.len() == 0 {
+            "\x00" // null byte doesn't match anything            
+        } else {
+            &remaining[0..1].to_lowercase()
+        };
+        let remaining_i16 = remaining.parse::<i16>();
+
+        let remaining_i16_hex = if remaining.len() == 0 {
+            "fail".parse()
+        } else {
+            i16::from_str_radix(&remaining[1..], 16)
+        };
 
         // string escapes are checked first
         if pref == '\\' {
             Ok(Self::String(s[1..].to_string()))
+        } else if s.contains("::")
+            && let Some((left, right)) = split_at_str_once(s, "::")
+        {
+            Ok(Self::RoutineRef(SymbolPath {
+                root: Some(left.to_owned()),
+                ident: right.to_owned(),
+                assigned_group: -1, // no group has been assigned yet
+            }))
         } else if matches!(s, "ATTEMPTS" | "MAINTIME" | "POINTS") {
             match s {
                 "ATTEMPTS" => Ok(Self::GDItem(Item::Attempts)),
@@ -104,17 +124,27 @@ impl TasmValue {
                 "POINTS" => Ok(Self::GDItem(Item::Points)),
                 _ => unsafe { unreachable_unchecked() },
             }
-        } else if (matches!(pref, 'T' | 't' | 'C' | 'c' | 'G' | 'g'))
-            && let Ok(id) = remaining_i16
-        {
+        } else if matches!(pref, 'T' | 't' | 'C' | 'c' | 'G' | 'g') {
+            // the only possible value here is an item or a string
+            let id = if let Ok(id) = remaining_i16 {
+                id
+            } else if second_char == "x"
+                && let Ok(id) = remaining_i16_hex
+            {
+                id
+            } else {
+                return Ok(Self::String(s.into()));
+            };
+
             // check that the ID is in range
-            if id <= 0 || id > GROUP_LIMIT {
-                return Err((
-                    ParseErrorType::BadID,
-                    format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
-                    17,
-                ));
-            }
+            // if id <= 0 || id > GROUP_LIMIT {
+            //     return Err((
+            //         ParseErrorType::BadID,
+            //         format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+            //         17,
+            //     ));
+            // }
+
             match pref {
                 'T' => Ok(Self::Timer(id)),
                 't' => Ok(Self::Timer(id)),
@@ -155,14 +185,6 @@ impl TasmValue {
                     20,
                 ))
             }
-        } else if s.contains("::")
-            && let Some((left, right)) = split_at_str_once(s, "::")
-        {
-            Ok(Self::RoutineRef(SymbolPath {
-                root: Some(left.to_owned()),
-                ident: right.to_owned(),
-                assigned_group: -1, // no group has been assigned yet
-            }))
         } else {
             Ok(Self::String(s.into()))
         }
@@ -276,12 +298,15 @@ impl TasmValue {
 }
 
 pub(crate) fn split_at_str_once<'a>(s: &'a str, p: &'a str) -> Option<(&'a str, &'a str)> {
+    if !s.contains(p) {
+        return None;
+    }
     let mut line_split = s.split(p);
 
     // the first part is always present, which is guaranteed to be
     // the string with the instruction and its arguments
     let left = line_split.next().unwrap();
-    let right = line_split.next().unwrap_or_default();
+    let right = line_split.next()?;
 
     if line_split.next().is_some() {
         return None;
@@ -350,7 +375,7 @@ pub struct RoutineData {
     pub lines: Vec<(usize, String)>, // legacy: 3
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Tasm {
     pub routines: Vec<Routine>,
     pub errors: Vec<TasmError>,

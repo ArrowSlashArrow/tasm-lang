@@ -1,0 +1,8 @@
+_start:
+    spawn g3 | remap: {2 = routine}
+
+routine:
+    spawn g2
+    
+routine2:
+    rawtrg 1,1006,2,555,3,225,36,1,51,1000,47,0.2,210,1,7,212,8,0,9,32

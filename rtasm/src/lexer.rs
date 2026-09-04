@@ -295,7 +295,7 @@ impl Tasm {
                     &mut self.errors,
                     &self.fname,
                     match etype {
-                        ParseErrorType::BadID => TasmErrorType::BadID,
+                        // ParseErrorType::BadID => TasmErrorType::BadID,
                         ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
                         ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
                         ParseErrorType::BadHexLiteral => TasmErrorType::BadHexLiteral,
