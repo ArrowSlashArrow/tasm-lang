@@ -51,8 +51,6 @@ pub fn compile_tasm_module(
         }
     };
 
-    // println!("parsed {path:?}: {tasm:#?}");
-
     Ok(tasm)
 }
 
@@ -336,7 +334,7 @@ pub fn cache_module(
     silent: bool,
 ) -> Result<(PathBuf, String)> {
     // this is the module identifier, not its path. look this up in the current module.
-    println!("called cache module with symbol {symbol:?}");
+    log!(silent, "called cache module with symbol {symbol:?}");
     let (dependency_path, dependency) =
         resolve_dependency_path(symbol, parent_module_imports, parent_module_path)?;
 
