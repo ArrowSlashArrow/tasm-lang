@@ -89,14 +89,7 @@ pub fn scan_referenced_symbols(routine: &Routine) -> Vec<SymbolPath> {
             })
             .collect::<Vec<_>>();
         symbols.extend(symbol_args);
-    }
-    symbols
-}
-
-pub fn scan_referenced_symbols_in_flags(routine: &Routine) -> Vec<SymbolPath> {
-    let mut symbols = vec![];
-    for instr in routine.instructions.iter() {
-        let flag_symbols = instr
+        let symbol_flags = instr
             .flags
             .iter()
             .filter_map(|f| match &f.value {
@@ -113,8 +106,7 @@ pub fn scan_referenced_symbols_in_flags(routine: &Routine) -> Vec<SymbolPath> {
             })
             .flatten()
             .collect::<Vec<_>>();
-
-        symbols.extend(flag_symbols);
+        symbols.extend(symbol_flags);
     }
     symbols
 }
@@ -149,7 +141,7 @@ pub fn parse_module(
 
     log!(silent, "Got external symbols");
 
-    let mut all_ext_symbols = module
+    let all_ext_symbols = module
         .routines
         .iter()
         .map(|routine| scan_referenced_symbols(routine))
@@ -157,15 +149,6 @@ pub fn parse_module(
         .map(|v| v) // idx: replace value after done parsing (index into this list from index in all_ext_symbols)
         .collect::<Vec<_>>(); // any symbols whose index >= this do not get replaced
     // all_ext_symbols.retain(|s| s.is_external());
-
-    let ext_symbols_flags = module
-        .routines
-        .iter()
-        .map(|routine| scan_referenced_symbols_in_flags(routine))
-        .flatten()
-        .map(|v| v);
-
-    all_ext_symbols.extend(ext_symbols_flags);
 
     if all_ext_symbols.is_empty() {
         // this would return here either if:
@@ -197,7 +180,7 @@ pub fn parse_module(
         if !symbol.is_external() {
             // this branch is only entered when a routine in this module is referenced in a flag
             let routine_ident = &symbol.ident;
-            let mut routine = match module_routines_clone
+            let routine = match module_routines_clone
                 .iter()
                 .find(|&r| r.ident == *routine_ident)
             {
@@ -225,8 +208,7 @@ pub fn parse_module(
                 silent,
             )?;
 
-            // we don't need to replace any values since we are resolving a reference in a flag
-            // flags are cleaned up in post-processing
+            // aliases will be resolved in `post_processing`
 
             continue;
         }
@@ -445,6 +427,7 @@ pub fn index_routine_deps(
         "Scanning {dependency_path:?}::{} for external symbols.",
         routine.ident
     );
+    // log this routine as "incomplete" in the cache
     routine_cache.insert(symbol_path.clone(), (Routine::empty(), false));
     let symbols = scan_referenced_symbols(routine);
     if symbols.is_empty() {
@@ -458,6 +441,7 @@ pub fn index_routine_deps(
     let imports = this_module.0.imports.clone();
 
     for symbol in symbols {
+        log!(silent, "checking symbol {symbol:?}");
         if let Some(_) = routine_cache.get(&symbol) {
             continue; // routine is confirmed to exist and we can assume that it will get parsed
         }
@@ -483,6 +467,7 @@ pub fn index_routine_deps(
 
             let routine_dependency = module_cache.get(&routine_dependency_path).unwrap();
             let routines = routine_dependency.0.routines.clone();
+            let aliases = routine_dependency.0.defined_aliases.clone();
 
             match routines.iter().find(|r| r.ident == symbol.ident) {
                 Some(r) => {
@@ -491,8 +476,8 @@ pub fn index_routine_deps(
                         routine_cache,
                         dependency_map,
                         r,
-                        local_routines,
-                        dependency_path,
+                        &routines,
+                        &routine_dependency_path,
                         &symbol,
                         args,
                         start_using_this_group,
@@ -500,6 +485,10 @@ pub fn index_routine_deps(
                     )?;
                 }
                 None => {
+                    if let Some(_) = aliases.iter().find(|(a, _)| **a == symbol.ident) {
+                        // alias will be replaced in parse_module.
+                        continue;
+                    }
                     return Err(anyhow!(
                         "[E0036] Unable to find routine {}::{}",
                         symbol.root.unwrap_or("<Module>".to_string()),
@@ -524,6 +513,14 @@ pub fn index_routine_deps(
                     )?;
                 }
                 None => {
+                    log!(
+                        silent,
+                        "routines in this module: {:?}",
+                        local_routines
+                            .iter()
+                            .map(|r| r.ident.clone())
+                            .collect::<Vec<_>>()
+                    );
                     return Err(anyhow!(
                         "[E0037] Unable to find routine {}::{}",
                         symbol.root.unwrap_or("<Module>".to_string()),
@@ -626,23 +623,58 @@ pub fn post_link_processing(
         }
     };
 
+    // dedup copied routines
+    module.routines.sort_by(|a, b| a.group.cmp(&b.group));
+    module.routines.dedup_by(|a, b| a.group == b.group);
+
     for routine in &mut module.routines {
         'instrs: for instr in &mut routine.instructions {
             // replace old symbol references before searching for handler fn
             for arg in instr.args.iter_mut() {
-                if let TasmValue::RoutineRef(r) = arg {
+                if let TasmValue::RoutineRef(symbol) = arg {
                     // all external symbols should have already been linked,
                     // therefore all of these symbols must have a known group
 
-                    if r.assigned_group == -1 {
-                        errors.push(format!(
-                            "{} @ {}:{} [E0042] Instruction was not properly linked!",
-                            module.fname, routine.ident, instr.line_number,
-                        ));
-                        continue 'instrs;
-                    }
+                    if symbol.assigned_group == -1 {
+                        // this only happens for **ONLY** external symbols in specific routines
+                        // therefore we try to find the external symbol (which is either a routine or alias)
+                        // before erroring
 
-                    *arg = TasmValue::Group(r.assigned_group);
+                        // first, find the symbol that is referenced
+                        // these don't fail due to checks in index_routine_deps
+                        let module = symbol.root.clone().unwrap();
+                        let dep_module_path = dependency_map.get(&module).unwrap();
+                        let dep_module = module_cache.get(dep_module_path).unwrap();
+
+                        let routines = dep_module.0.routines.clone();
+                        let aliases = dep_module.0.defined_aliases.clone();
+
+                        let value = match routines.iter().find(|r| r.ident == symbol.ident) {
+                            Some(r) => TasmValue::Group(r.group),
+                            None => {
+                                if let Some((_, alias_value)) =
+                                    aliases.iter().find(|(a, _)| **a == symbol.ident)
+                                {
+                                    match TasmValue::to_value(&alias_value) {
+                                        Ok(v) => v,
+                                        Err((etype, msg, code)) => {
+                                            errors.push(format!("[E{code:0>4}] {etype:?} {msg}"));
+                                            continue 'instrs;
+                                        }
+                                    }
+                                } else {
+                                    errors.push(format!(
+                                        "[E0043] Unable to find routine {module}::{}",
+                                        symbol.ident
+                                    ));
+                                    continue 'instrs;
+                                }
+                            }
+                        };
+                        *arg = value;
+                    } else {
+                        *arg = TasmValue::Group(symbol.assigned_group);
+                    }
                 }
             }
 
@@ -676,10 +708,6 @@ pub fn post_link_processing(
             }
         }
     }
-
-    // dedup copied routines
-    module.routines.sort_by(|a, b| a.group.cmp(&b.group));
-    module.routines.dedup_by(|a, b| a.group == b.group);
 
     if errors.is_empty() {
         Ok(())
