@@ -5,8 +5,9 @@ _init:
     display C2
     display C3
     display C4
-    display C5
-    display C6
+    display C14
+    display C15
+    display C16
     display Cx34
     display Cx35
     display Cx36
@@ -21,20 +22,20 @@ _start:
     mov Cx35, 78
     mov Cx36, 89
     ; vector struct at 0x4
-    mov C4, 0x34
-    mov C5, 3
+    mov C14, 0x34
+    mov C15, 3
     ; requested addr
-    mov C6, 0
+    mov C16, 0
 
     ; read vec[0] to C1
-    spawn vec::get_nth_item | remap: {1 = 4, 2 = 5, 3 = 6, 4 = 1}
+    spawn vec::get_nth_item | remap: {1 = 14, 2 = 15, 3 = 16}
     wait 4
-    add C6, 1
+    mov C16, 1
     ; read vec[1] to C1
-    spawn vec::get_nth_item | remap: {1 = 4, 2 = 5, 3 = 6, 4 = 2}
+    spawn vec::get_nth_item | remap: {1 = 14, 2 = 15, 3 = 16}
     wait 4
-    add C6, 1
+    mov C16, 2
     ; read vec[2] to C1
-    spawn vec::get_nth_item | remap: {1 = 4, 2 = 5, 3 = 6, 4 = 3}
+    spawn vec::get_nth_item | remap: {1 = 14, 2 = 15, 3 = 16}
     wait 4
     

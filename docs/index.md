@@ -325,11 +325,25 @@ Arguments: `TSTOP <timer>`
 Pauses a running timer.  
 Execution time: 1 tick.
 #### 3.1.2.7. Miscellaneous
-##### PERS
+All instructions in this section provide functionality that does not neatly fit into any other category. 
+##### 3.1.2.7.1. Persistent item trigger
+###### PERS
 Arguments: `PERS <item>`
 
-Makes the corresponding item persistent.  
-Only allowed in the `_init` routine.
+Makes the given item persistent.  
+###### UNPERS
+Arguments: `UNPERS <item>`
+
+Removes the given item's persistence.  
+###### RPERSALL
+Arguments: `RPERSALL`
+
+Resets all currently persistent items to 0.  
+###### UNPERSALL
+Arguments: `UNPERSALL`
+
+Revmoes the persistence of all currently persistent items.
+
 ##### DISPLAY
 Arguments: `DISPLAY <item>`
 

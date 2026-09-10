@@ -1,3 +1,5 @@
+; NOTE: this file is currently still in maintainance as it is not verified to work properly.
+
 ; implements a dynamically sized array of integers
 _init:
     import mem_8bit

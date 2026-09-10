@@ -151,7 +151,7 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         &mut dependency_map,
         &mut start_using_this_group,
         !args.no_entry_point,
-        !args.no_log,
+        !args.no_log && args.verbose_logs,
     ) {
         Ok(m) => m,
         Err(e) => {

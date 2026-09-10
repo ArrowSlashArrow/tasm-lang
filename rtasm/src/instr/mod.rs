@@ -49,7 +49,7 @@ pub type HandlerAssoc = (&'static [TasmPrimitive], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
-    "PERS" => (false, &[argset!((Item) => pers)], InstrType::Init),
+    "PERS" => (false, &[argset!((Item) => pers)], InstrType::Misc),
     "UNPERS" => (false, &[argset!((Item) => unpers)], InstrType::Misc),
     "UNPERSALL" => (false, &[argset!(() => unpersall)], InstrType::Misc),
     "RPERSALL" => (false, &[argset!(() => rpersall)], InstrType::Misc),
