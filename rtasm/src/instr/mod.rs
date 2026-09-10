@@ -10,13 +10,12 @@ use crate::{
         HandlerFn, HandlerReturn,
         error::{TasmError, TasmErrorType},
         flags::FlagValue,
-        structs::{HandlerArgs, InstrType, TasmPrimitive, TasmValue, TasmValueType},
+        structs::{HandlerArgs, InstrType, TasmPrimitive, TasmValue},
     },
-    instr::{fns::*, mem::*},
+    instr::fns::*,
 };
 
 pub mod fns;
-pub mod mem;
 
 /// Length of 1 game tick in seconds.
 pub const GROUP_SPAWN_DELAY: f64 = 0.0044;
@@ -24,13 +23,13 @@ pub const GROUP_SPAWN_DELAY: f64 = 0.0044;
 // convert a list of type identifiers into a slice
 macro_rules! argset {
     (($($arg:ident),*) => $fn:ident) => {
-        (&[ $(TasmValueType::Primitive(TasmPrimitive::$arg),)* ], $fn)
+        (&[ $(TasmPrimitive::$arg,)* ], $fn)
     };
 
-    // use this for list args
-    ([$argtype:ident] => $fn:ident) => {
-        (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn)
-    }
+    // // use this for list args
+    // ([$argtype:ident] => $fn:ident) => {
+    //     (&[TasmValueType::List(TasmPrimitive::$argtype)], $fn)
+    // }
 }
 
 /// This function exists as a placeholder for external symbols. Any instructions that use this function are to be resolved in the linking stage.
@@ -46,33 +45,15 @@ pub fn placeholder_panic_fn(args: HandlerArgs) -> HandlerReturn {
     })
 }
 
-pub type HandlerAssoc = (&'static [TasmValueType], HandlerFn);
+pub type HandlerAssoc = (&'static [TasmPrimitive], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
 pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
+    "PERS" => (false, &[argset!((Item) => pers)], InstrType::Misc),
+    "UNPERS" => (false, &[argset!((Item) => unpers)], InstrType::Misc),
+    "UNPERSALL" => (false, &[argset!(() => unpersall)], InstrType::Misc),
+    "RPERSALL" => (false, &[argset!(() => rpersall)], InstrType::Misc),
     // if an instruction can only go in the _init routine, it **MUST** be designated that.
-    /// Allocate integer memory in a specified range.
-    /// * Allocates memory on counter IDs [a, b].
-    "MALLOC" => (
-        true,
-        &[
-            argset!((Int, Int) => malloc)
-            ],
-            InstrType::Init,
-        ),
-    /// Allocate float memory in a specified range.
-    /// * Allocates memory on timer IDs [a, b].
-    "FMALLOC" => (
-        true,
-        &[argset!((Int, Int) => fmalloc)],
-        InstrType::Init,
-    ),
-    "INITMEM" => (
-        true,
-        &[argset!([Number] => init_mem)],
-        InstrType::Init,
-    ),
-    "PERS" => (true, &[argset!((Item) => pers)], InstrType::Init),
     "DISPLAY" => (
         true,
         &[argset!((Item) => display)],
@@ -83,43 +64,6 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         &[argset!((Group, Int, String) => ioblock)],
         InstrType::Init,
     ),
-    // legacy memory
-    "LMALLOC" => (
-        true,
-        &[argset!((Int) => legacy_malloc)],
-        InstrType::Init,
-    ),
-    "LFMALLOC" => (
-        true,
-        &[argset!((Int) => legacy_fmalloc)],
-        InstrType::Init,
-    ),
-    "LMFUNC" => (
-        false,
-        &[argset!(() => legacy_mfunc)],
-        InstrType::Memory,
-    ),
-    "LMREAD" => (
-        false,
-        &[argset!(() => legacy_mread)],
-        InstrType::Memory,
-    ),
-    "LMWRITE" => (
-        false,
-        &[argset!(() => legacy_mwrite)],
-        InstrType::Memory,
-    ),
-    "LMPTR" => (
-        false,
-        &[argset!((Int) => legacy_mptr)],
-        InstrType::Memory,
-    ),
-    "LMRESET" => (
-        false,
-        &[argset!(() => legacy_mreset)],
-        InstrType::Memory,
-    ),
-    // memory
     "MOV" => (
         false,
         &[
@@ -128,8 +72,6 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         ],
         InstrType::Arithmetic,
     ),
-    "MSET" => (false, &[argset!(() => mset)], InstrType::Memory),
-    "MGET" => (false, &[argset!(() => mget)], InstrType::Memory),
     // debug
     "BREAKPOINT" => (
         false,
@@ -486,12 +428,12 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
     "RAW" => (
         false,
         &[argset!((String) => raw_objs)],
-        InstrType::Special,
+        InstrType::Misc,
     ),
     "RAWTRG" => (
         false,
         &[argset!((String) => raw_trigger)],
-        InstrType::Special,
+        InstrType::Misc,
     ),
 };
 

@@ -13,7 +13,6 @@ use crate::{
 };
 
 extern crate alloc;
-use alloc::borrow::Cow;
 use std::collections::HashMap;
 
 pub mod consts {
@@ -47,17 +46,17 @@ macro_rules! log {
 }
 
 impl Tasm {
-    pub fn handle_routines(
-        &mut self,
-        level_name: &str,
-        skip_init: bool,
-    ) -> Result<Level, Vec<TasmError>> {
-        self.handle_routines_inner(
-            level_name,
-            self.routines.len() as i16 + self.group_offset + 1,
-            skip_init,
-        )
-    }
+    // pub fn handle_routines(
+    //     &mut self,
+    //     level_name: &str,
+    //     skip_init: bool,
+    // ) -> Result<Level, Vec<TasmError>> {
+    //     self.handle_routines_inner(
+    //         level_name,
+    //         self.routines.len() as i16 + self.group_offset + 1,
+    //         skip_init,
+    //     )
+    // }
 
     pub fn handle_routines_inner(
         &mut self,
@@ -71,10 +70,7 @@ impl Tasm {
         };
 
         // setup state
-        self.aliases.ptrpos_id = self.mem_end_counter;
         let mut level = Level::new(level_name, "tasm", None, None);
-
-        let routine_count = self.routines.len();
         self.curr_group = start_at_group;
 
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
@@ -128,7 +124,6 @@ impl Tasm {
                     &mut obj_pos,
                     rtn_ypos,
                     spacing,
-                    routine_count,
                     &mut level,
                 );
             }
@@ -137,11 +132,11 @@ impl Tasm {
 
         if self.start_rtn_group != 0 {
             let ioblock_result = ioblock(HandlerArgs {
-                args: Cow::Owned(vec![
+                args: &[
                     TasmValue::Group(self.start_rtn_group),
                     TasmValue::Number(0.0),
                     TasmValue::String("start".into()),
-                ]),
+                ],
                 cfg: GDObjConfig::new(),
                 displayed_items: self.displayed_items,
                 curr_group: self.curr_group,
@@ -172,56 +167,12 @@ impl Tasm {
         obj_pos: &mut f64,
         rtn_ypos: f64,
         spacing: f64,
-        routine_count: usize,
         level: &mut Level,
     ) {
-        let instr_args: Cow<'_, [TasmValue]> =
-            if instr.args.iter().any(|v| matches!(v, TasmValue::Alias(_))) {
-                let mut resolved = instr.args.clone();
-                for v in &mut resolved {
-                    if let TasmValue::Alias(alias) = v {
-                        // builtin alias
-                        *v = self.aliases.get_value(*alias)
-                    }
-                }
-                Cow::Owned(resolved)
-            } else {
-                Cow::Borrowed(instr.args.as_slice())
-            };
-        let resolved_args = instr_args.as_ref();
-
-        // check that we are not accessing memory in init routine
-        if instr.itype == InstrType::Memory {
-            if routine.ident == INIT_ROUTINE {
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::InitRoutineMemoryAccess,
-                    instr.line_number,
-                    INIT_ROUTINE.into(),
-                    "Cannot access memory in the init routine.".to_string(),
-                    2,
-                );
-                return;
-            }
-            if self.mem_info.is_none() {
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::NonexistentMemoryAccess,
-                    instr.line_number,
-                    routine.ident.clone(),
-                    "Cannot access memory when none exists.".to_string(),
-                    3,
-                );
-                return;
-            }
-        }
-
         // check that any bad assignments aren't happening
         if instr.itype == InstrType::Arithmetic {
-            // first argument is always the result
-            let counter_type = get_item_spec(&resolved_args[0]).unwrap().get_type();
+            // arithmetic instructions always write back to first argument
+            let counter_type = get_item_spec(&instr.args[0]).unwrap().get_type();
             if counter_type == ItemType::Attempts || counter_type == ItemType::MainTime {
                 push_error(
                     &mut self.errors,
@@ -272,36 +223,18 @@ impl Tasm {
 
         let handler = instr.handler_fn;
         let args = HandlerArgs {
-            args: instr_args,
-            // assuming that all init instructions are before x=0,
-            // which only doesnt happen if the triggers were manually moved,
-            // then they all execute immediately at the start of the level,
-            // hence they are "initializers".
-            // there is nothing to spawn them, since they are on group 0
-            // therefore, the "spawn triggered" option is omitted
+            args: &instr.args[..],
             cfg: if routine.ident != INIT_ROUTINE {
                 cfg.spawnable(true)
             } else {
+                // init stuff doesn't get spawned normally
+                // though it is really up to the programmer what they wanna do with it
                 cfg
             },
             curr_group: self.curr_group, // used as auxiliary group
-            ptr_group: self.ptr_group,
-            ptr_reset_group: self.ptr_reset_group,
             line: instr.line_number,
-            // these two are set only once a MALLOC instruction is processed
-            // if there is no malloc, there is no memory access allowed
-            // therefore it does not matter if there is junk data in there
-            // since it will either be overwritten or never used
-            memreg: &self.aliases.memreg,
-            ptrpos_id: self.aliases.ptrpos_id,
             displayed_items: self.displayed_items,
-            routine_count,
-            mem_end_counter: self.mem_end_counter,
-
-            flags: instr.flags.as_slice(),
             flag_by_ident: flag_assoc,
-
-            mem_info: self.mem_info.as_ref(),
         };
 
         let data = match handler(args) {
@@ -324,45 +257,6 @@ impl Tasm {
 
         if data.added_item_display {
             self.displayed_items += 1;
-        }
-
-        // this if statement handles the logic of keeping track of the ptr group
-        // it is necessary for instructions such as MRESET and MPTR which move the pointer
-        // this information is only updated if it is set. this information is set
-        // only in the malloc methods, which would be parsed before any mem ops
-
-        if let Some(m) = data.new_mem {
-            // check that memory does not already exist
-            if self.mem_info.is_some() {
-                push_error(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::MultipleMemoryInstances,
-                    instr.line_number,
-                    routine.ident.clone(),
-                    format!("Memory was already created on line {}.", m.line + 1),
-                    5,
-                );
-                return;
-            }
-
-            // assigning new mem info, also assign the aliases
-
-            self.mem_info = Some(m);
-            let mref = self.mem_info.as_ref().unwrap();
-            // assign to alias map
-            self.aliases.memreg = mref.memreg.clone();
-            self.aliases.ptrpos_id = mref.ptrpos.to_counter_id().unwrap();
-            self.aliases.memsize = mref.size;
-            // assign aliases themselves
-        }
-
-        if data.ptr_group != 0 {
-            self.ptr_group = data.ptr_group
-        }
-
-        if data.ptr_reset_group != 0 {
-            self.ptr_reset_group = data.ptr_reset_group
         }
     }
 }

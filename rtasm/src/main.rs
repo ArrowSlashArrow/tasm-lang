@@ -38,10 +38,6 @@ struct Args {
     #[arg(long, short)]
     release: bool,
 
-    /// Ending counter ID of memory block. Does not apply to programs using new memory.
-    #[arg(long, default_value_t = 9999i16, value_parser = clap::value_parser!(i16))]
-    mem_end_counter: i16,
-
     /// Whether to export the compiled level as a .gmd
     #[arg(long, short)]
     gmd: bool,
@@ -155,7 +151,7 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         &mut dependency_map,
         &mut start_using_this_group,
         !args.no_entry_point,
-        !args.no_log,
+        !args.no_log && args.verbose_logs,
     ) {
         Ok(m) => m,
         Err(e) => {
@@ -200,28 +196,13 @@ fn main() {
 
     log!(!args.no_log, "Parsing tasm...");
 
-    let id_limit = 9999;
-    if args.mem_end_counter > id_limit {
-        log!(
-            !args.no_log,
-            "You may not set the end counter beyond the ID limit of {id_limit}"
-        );
-        return;
-    } else if args.mem_end_counter < 0 {
-        log!(
-            !args.no_log,
-            "You may not set the end counter to a negative ID."
-        );
-        return;
-    }
-
     let (mut main_module, curr_group) = match parse_main(&args) {
         Ok(m) => m,
         Err(_) => return,
     };
 
     if args.linker_output {
-        println!("-------  linker output -------");
+        println!("------- linker output -------");
         for routine in main_module.routines.iter() {
             println!("{}: ({})", routine.ident, routine.group);
             for instr in routine.instructions.iter() {

@@ -20,8 +20,8 @@ _init:
     mov C46, 20
     mov C47, 10
     display C4
-    display mem_8bit::_std_mem_ptrpos
-    display mem_8bit::_std_mem_cmemreg
+    display mem_8bit::ptrpos
+    display mem_8bit::cmemreg
 
 _start:
     ; setup params
@@ -33,17 +33,17 @@ _start:
     ; setup temp vars
     add C5, C1, C2  ; end addr of list
     mov C5, 50
-    mov mem_8bit::_std_mem_ptrpos, C1
+    mov mem_8bit::ptrpos, C1
     spawn search_iter
 
 search_iter:
     ; mget
-    SPAWN mem_8bit::mem   | ordered:false remap: {mem_8bit::_std_mem_end = mem_8bit::_std_mem_cread}
-    ise found, mem_8bit::_std_mem_cmemreg, C3    ; end if number is found
-    add mem_8bit::_std_mem_ptrpos, 1
+    SPAWN mem_8bit::mem   | ordered:false remap: {mem_8bit::mem_end = mem_8bit::cread}
+    ise found, mem_8bit::cmemreg, C3    ; end if number is found
+    add mem_8bit::ptrpos, 1
 
     ; goto not_found if ptrpos > end list addr
-    fle search_iter, not_found, mem_8bit::_std_mem_ptrpos, C5
+    fle search_iter, not_found, mem_8bit::ptrpos, C5
 
 found:
     ; due to the timing caused by iterating over this group with the last instruction of search_iter,

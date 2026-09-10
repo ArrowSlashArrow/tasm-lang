@@ -725,6 +725,30 @@ pub fn pers(args: HandlerArgs) -> HandlerReturn {
     )]))
 }
 
+pub fn unpers(args: HandlerArgs) -> HandlerReturn {
+    let item = get_item_spec(&args.args[0]).unwrap();
+    Ok(HandlerData::from_objects(vec![persistent_item(
+        &args.cfg,
+        item.id(),
+        item.get_type() == ItemType::Timer,
+        false,
+        false,
+        false,
+    )]))
+}
+
+pub fn unpersall(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![persistent_item(
+        &args.cfg, 0, false, false, true, false,
+    )]))
+}
+
+pub fn rpersall(args: HandlerArgs) -> HandlerReturn {
+    Ok(HandlerData::from_objects(vec![persistent_item(
+        &args.cfg, 0, false, true, true, true,
+    )]))
+}
+
 pub fn ton(args: HandlerArgs) -> HandlerReturn {
     Ok(HandlerData::from_objects(vec![toggle_trigger(
         &args.cfg,

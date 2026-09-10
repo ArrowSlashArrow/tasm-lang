@@ -1,14 +1,21 @@
 ; This program uses a variety of values to test the compiler's parsing ability
 _init:
-    LFMALLOC 50.0 ; technically an int
-    INITMEM +1, 2e+0, 3.14159265, -4, 5.0e0, 6.023E22 ; various floats 
-    IOBLOCK g58, 1e2, STRING ; 1e2 is also technically an int (100)
+    IOBLOCK g58, 1e2, STRING ; 1e2 is technically an int (100)
 
 routine:
-    MOV T1, T2 ; timers and counters
-    MOV C1, C2 
+    MOV t1, Tx2 ; timers and counters
+    MOV c1, Cx2 
 
 _start:
     ; groups
     SPAWN g42
+    SPAWN Gx42
     SPAWN routine
+    ; floats
+    mov t14, +1
+    mov t15, 2e+0
+    mov t16, 3.14159265
+    mov t17, -4
+    mov t18, 5.0e0
+    mov t19, 6.023E22
+

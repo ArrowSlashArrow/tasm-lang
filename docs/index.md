@@ -325,11 +325,25 @@ Arguments: `TSTOP <timer>`
 Pauses a running timer.  
 Execution time: 1 tick.
 #### 3.1.2.7. Miscellaneous
-##### PERS
+All instructions in this section provide functionality that does not neatly fit into any other category. 
+##### 3.1.2.7.1. Persistent item trigger
+###### PERS
 Arguments: `PERS <item>`
 
-Makes the corresponding item persistent.  
-Only allowed in the `_init` routine.
+Makes the given item persistent.  
+###### UNPERS
+Arguments: `UNPERS <item>`
+
+Removes the given item's persistence.  
+###### RPERSALL
+Arguments: `RPERSALL`
+
+Resets all currently persistent items to 0.  
+###### UNPERSALL
+Arguments: `UNPERSALL`
+
+Revmoes the persistence of all currently persistent items.
+
 ##### DISPLAY
 Arguments: `DISPLAY <item>`
 
@@ -700,12 +714,16 @@ An item literal represents a GD item, most commonly a counter or timer item. It 
 - Timer: `TXXXX`, where `XXXX` represents the ID of the timer. Example: `T456` represents the timer with ID 456.
 IDs do not have to be 0-padded, and they must be in decimal form. They are only valid if they are in the range [1, 9999]. The same goes for IDs in group literals.   
 Item literals are parsed by first checking for a prefix of either `C` or `T`, and if this is true, the rest of the literal is parsed as a base-10 signed 16-bit integer, since IDs are internally represented as signed 16-bit integers by GD.
+
+As of v0.3.2, item literals may also be given a hexadecimal ID: `Cx56` corresponds to counter with ID 0x56. This works for both counters and timers.
 ### 3.3.3. Groups
 Both of the following are interally groups:
 #### 3.3.3.1. Group literals
 Group literals refer to a static group ID. They are written as `g{id}`, where ID is a valid group ID.  
 Group literals are parsed the same way as item literals, except for the prefix.  
 Example: `g123` refers to the group with ID 123.
+
+As of v0.3.2, group literals may also be given a hexadecimal ID: `gx56` corresponds to group with ID 0x56.
 #### 3.3.3.2. Routines
 Routines are specified simply by their identifier. Since they are parsed first, any routine name declaration/reference order conflicts are avoided.
 ```
@@ -721,14 +739,11 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.3.1, the built-in aliases that exist are:
-- `ATTEMPTS`: refers to the number of attempts. This is a built-in item in GD.
-- `POINTS`: refers to the points counter. This is a built-in item in GD.
-- `MAINTIME`: refers to the MainTime timer. This is a built-in item in GD.
-Aliases that are now used only for memory instructions and are now deprecated are:
-- `MEMREG`: the [MEMREG](#124-memreg). Has a default value of `C9998`/`T9998` for legacy memory, but may change according to compiler arguments.
-- `PTRPOS`: counter that stores the current pointer position (0-indexed).
-- `MEMSIZE`: integer that stores the size of the memory. 0 if no memory exists.
+As of TASM v0.3.2, the only built-in aliases are for special built-in items in GD:
+- `ATTEMPTS`: refers to the `Attempts` counter.
+- `POINTS`: refers to the `Points` counter.
+- `MAINTIME`: refers to the `MainTime` timer..
+
 ### 3.3.5. Strings
 A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, `\g123` will compile into the string literal `"g123"`.   
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
@@ -772,7 +787,7 @@ _init: (0)
 _start: (1)
     MOV Counter(1), Number(4.0) |
     SPAWN Group(2) |
-\\?\C:\Users\user\Documents\GitHub\tasm-lang\rtasm\library.tasm::multiply: (2)
+<path>\library.tasm::multiply: (2)
     MUL Counter(1), Number(2.0) |
 ; ----- end linker output -----
 ```
@@ -914,7 +929,7 @@ Below is a chart that depicts the group usage according to the equations listed.
 For a memsize of more than 20, using the new system is recommended for the sake of conserving groups.
 
 ## 3.7. Comments
-A comment is anything that follows a semicolon (`;`) on the same line. Multi-line comments are not supported as of TASM v0.3.1. 
+A comment is anything that follows a semicolon (`;`) on the same line.
 ## 3.8. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.

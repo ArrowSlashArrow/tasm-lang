@@ -1,0 +1,4 @@
+_start:
+    spawn Gx5f
+    mov Cx42, 0x120f
+    mov Tx42, 0x120e

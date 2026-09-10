@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
 
-use crate::core::structs::{SymbolPath, split_at_str_once};
+use crate::core::structs::{SymbolPath, SymbolValue, split_at_str_once};
 
 #[derive(Debug, Clone)]
 pub struct Flag {
     pub ident: String,
     pub value: FlagValue,
-    pub ftype: FlagValueType,
+    pub _ftype: FlagValueType,
 }
 
 impl Flag {
@@ -22,7 +22,7 @@ impl Flag {
         Some(Self {
             value: FlagValue::try_from(val, &t, gm, aliases)?,
             ident,
-            ftype: t,
+            _ftype: t,
         })
     }
 }
@@ -35,12 +35,7 @@ pub enum FlagValue {
     Dict(Vec<(i16, i16)>),
     Bool(bool),
     // parse this to a dict again when we resolve the external references
-    ExternRefsDict(
-        (
-            Vec<(i16, i16)>,
-            Vec<(UnparsedDictFlagEntry, UnparsedDictFlagEntry)>,
-        ),
-    ),
+    ExternRefsDict(Vec<(UnparsedDictFlagEntry, UnparsedDictFlagEntry)>),
 }
 
 #[derive(Debug, Clone)]
@@ -151,7 +146,6 @@ impl FlagValue {
             },
             FlagValueType::Dict => {
                 let mut invalid_dict = false;
-                let mut has_extern_refs = false;
                 let resolve_int = |s: &str| -> Option<i16> {
                     if s.starts_with("0x") {
                         i16::from_str_radix(&s[2..], 16)
@@ -159,7 +153,7 @@ impl FlagValue {
                         s.parse::<i16>()
                     }
                     .ok()
-                    .or_else(|| group_map.get(s).copied())
+                    // .or_else(|| unparsed_pairs.push(group_map.get(s).copied()))
                 };
 
                 let parse_int = |s: &str, invalid_dict: &mut bool| -> i16 {
@@ -171,9 +165,6 @@ impl FlagValue {
                         })
                 };
 
-                let mut unparsed_pairs: Vec<(UnparsedDictFlagEntry, UnparsedDictFlagEntry)> =
-                    vec![];
-
                 let resolve_unparsed_entry =
                     |s: &str, invalid_dict: &mut bool| -> UnparsedDictFlagEntry {
                         match split_at_str_once(s, "::") {
@@ -181,14 +172,22 @@ impl FlagValue {
                                 UnparsedDictFlagEntry::Path(SymbolPath {
                                     root: Some(left.to_owned()),
                                     ident: right.to_owned(),
-                                    assigned_group: -1, // this will get filled in during post-linking
+                                    assigned_value: SymbolValue::NotFound, // this will get filled in during post-linking
                                 })
                             }
-                            None => UnparsedDictFlagEntry::Int(parse_int(s, invalid_dict)),
+                            None => match group_map.get(s) {
+                                Some(routine) => UnparsedDictFlagEntry::Path(SymbolPath {
+                                    root: None, // this is a local routine
+                                    ident: s.to_owned(),
+                                    assigned_value: SymbolValue::Group(*routine),
+                                }),
+                                None => UnparsedDictFlagEntry::Int(parse_int(s, invalid_dict)),
+                            },
                         }
                     };
 
-                let kv_pairs: Vec<(i16, i16)> = value[1..value.len() - 1]
+                let unparsed_pairs: Vec<(UnparsedDictFlagEntry, UnparsedDictFlagEntry)> = value
+                    [1..value.len() - 1]
                     .split(',')
                     .map(|kv| {
                         let (key, v) = match split_at_str_once(kv, "=") {
@@ -199,28 +198,17 @@ impl FlagValue {
                             }
                         };
 
-                        if key.contains("::") || v.contains("::") {
-                            let key_parsed = resolve_unparsed_entry(key, &mut invalid_dict);
-                            let value_parsed = resolve_unparsed_entry(v, &mut invalid_dict);
-
-                            has_extern_refs = true;
-                            unparsed_pairs.push((key_parsed, value_parsed));
-                            (0, 0)
-                        } else {
-                            (
-                                parse_int(key, &mut invalid_dict),
-                                parse_int(v, &mut invalid_dict),
-                            )
-                        }
+                        (
+                            resolve_unparsed_entry(key, &mut invalid_dict),
+                            resolve_unparsed_entry(v, &mut invalid_dict),
+                        )
                     })
                     .collect::<Vec<_>>();
 
                 if invalid_dict {
                     None
-                } else if has_extern_refs {
-                    Some(Self::ExternRefsDict((kv_pairs, unparsed_pairs)))
                 } else {
-                    Some(Self::Dict(kv_pairs))
+                    Some(Self::ExternRefsDict(unparsed_pairs))
                 }
             }
             FlagValueType::Bool => match value {

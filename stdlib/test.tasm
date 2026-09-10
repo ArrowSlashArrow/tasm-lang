@@ -1,0 +1,5 @@
+_init:
+    import mem_8bit
+
+_start:
+    mov mem_8bit::ptrpos, 0x10
