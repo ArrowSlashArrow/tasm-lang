@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, f32::consts::E, fs, path::PathBuf};
 
 use crate::{
     core::{
@@ -9,7 +9,10 @@ use crate::{
             UnparsedDictFlagEntry,
         },
         print_errors,
-        structs::{Instruction, Routine, SymbolPath, Tasm, TasmValue, fits_arg_signature},
+        structs::{
+            Instruction, Routine, SymbolPath, SymbolPathIdentifier, SymbolValue, Tasm, TasmValue,
+            fits_arg_signature,
+        },
     },
     instr::{INSTR_SPEC, placeholder_panic_fn},
     lexer, log,
@@ -63,7 +66,8 @@ pub fn scan_referenced_symbols_mut<'a>(routine: &'a mut Routine) -> Vec<&'a mut 
             .args
             .iter_mut()
             .filter_map(|v| match v {
-                TasmValue::RoutineRef(_) => Some(v),
+                // only deal with external symbols since they are treated in parse_modul
+                TasmValue::RoutineRef(n) if n.is_external() => Some(v),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -73,19 +77,35 @@ pub fn scan_referenced_symbols_mut<'a>(routine: &'a mut Routine) -> Vec<&'a mut 
     symbols
 }
 
-pub fn scan_referenced_symbols(routine: &Routine) -> Vec<SymbolPath> {
+// tuple of (path, is in flag )
+pub fn scan_referenced_symbols(
+    routine: &Routine,
+    ignore_local_symbols_in_args: bool,
+) -> Vec<(SymbolPath, bool)> {
     let mut symbols = vec![];
     for instr in routine.instructions.iter() {
         // symbols: alias, routine
         // aliases are resolved* in lexing stage so we only care about routine idents
-        let symbol_args = instr
-            .args
-            .iter()
-            .filter_map(|v| match v {
-                TasmValue::RoutineRef(r) => Some(r.clone()),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+        let symbol_args = if ignore_local_symbols_in_args {
+            instr
+                .args
+                .iter()
+                .filter_map(|v| match v {
+                    TasmValue::RoutineRef(r) if r.is_external() => Some((r.clone(), false)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        } else {
+            instr
+                .args
+                .iter()
+                .filter_map(|v| match v {
+                    TasmValue::RoutineRef(r) => Some((r.clone(), false)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+
         symbols.extend(symbol_args);
         let symbol_flags = instr
             .flags
@@ -96,7 +116,7 @@ pub fn scan_referenced_symbols(routine: &Routine) -> Vec<SymbolPath> {
                         .flat_map(|(a, b)| [a, b])
                         .filter_map(|entry| match entry {
                             UnparsedDictFlagEntry::Int(_) => None,
-                            UnparsedDictFlagEntry::Path(p) => Some(p.clone()),
+                            UnparsedDictFlagEntry::Path(p) => Some((p.clone(), true)),
                         })
                         .collect::<Vec<_>>(),
                 ),
@@ -142,7 +162,7 @@ pub fn parse_module(
     let all_ext_symbols = module
         .routines
         .iter()
-        .map(|routine| scan_referenced_symbols(routine))
+        .map(|routine| scan_referenced_symbols(routine, true))
         .flatten()
         .map(|v| v) // idx: replace value after done parsing (index into this list from index in all_ext_symbols)
         .collect::<Vec<_>>(); // any symbols whose index >= this do not get replaced
@@ -167,15 +187,18 @@ pub fn parse_module(
             .map(|v| v) // idx: replace value after done parsing (index into this list from index in all_ext_symbols)
             .collect::<Vec<_>>()
     };
+
     // ext_symbols.retain(|s| s.is_external_symbol());
     let ext_symbol_length = ext_symbols.len();
     let mut added_routines = vec![];
 
+    let mut mut_symbols_array_idx = 0;
     // evaluate external symbols from here
-    for (idx, symbol) in all_ext_symbols.iter().enumerate() {
+    for (symbol, is_in_flag) in all_ext_symbols.iter() {
         // symbol may be either external or local
         // if local, we need to find the routine in this module and cache that routine.
         if !symbol.is_external() {
+            println!("skipped an index");
             // this branch is only entered when a routine in this module is referenced in a flag
             let routine_ident = &symbol.ident;
             let routine = match module_routines_clone
@@ -238,7 +261,7 @@ pub fn parse_module(
         }
         // fetch routine and all its subsequent dependency routines.
         // element: (routine, is done)
-        let mut routine_cache: HashMap<SymbolPath, (Routine, bool)> = HashMap::new();
+        let mut routine_cache: HashMap<SymbolPathIdentifier, (Routine, bool)> = HashMap::new();
         let replace_with_value = match dependency_module
             .routines
             .iter()
@@ -263,7 +286,7 @@ pub fn parse_module(
                     silent,
                 )?;
                 // replace existing symbol with this value
-                TasmValue::Group(routine_cache.get(&symbol).unwrap().0.group)
+                SymbolValue::Group(routine_cache.get(&symbol.hashable()).unwrap().0.group)
             }
             None => {
                 // could be referencing an alias
@@ -275,7 +298,7 @@ pub fn parse_module(
                     Some((_, alias_value)) => {
                         // since alias values cannot be cloned, we know that the alias must be defined in this module.
                         match TasmValue::to_value(&alias_value) {
-                            Ok(v) => v,
+                            Ok(v) => SymbolValue::TasmValue(Box::new(v)),
                             Err((etype, msg, code)) => {
                                 return Err(anyhow!("[E{code:0>4}] {etype:?} {msg}"));
                             }
@@ -294,11 +317,13 @@ pub fn parse_module(
         // now, routine_cache has all the routines this one needs
         // mangle all names to prevent name collisions.
 
-        // this symbol is now resolved and we can turn it into a routine ident
-        if idx < ext_symbol_length {
-            *ext_symbols[idx] = replace_with_value;
+        if !is_in_flag {
+            // this symbol is now resolved and we can turn it into a routine ident
+            if let TasmValue::RoutineRef(r) = &mut ext_symbols[mut_symbols_array_idx] {
+                r.assigned_value = replace_with_value;
+            }
+            mut_symbols_array_idx += 1;
         }
-
         for (dep_routine, _) in routine_cache.into_values() {
             let mangled_name = format!(
                 "{}::{}",
@@ -355,7 +380,7 @@ pub fn cache_module(
                 module_cache,
                 dependency_map,
                 start_using_this_group,
-                false, // library files should not have entry points
+                false, // library files are not expected to have entry points
                 silent,
             )?;
 
@@ -406,7 +431,7 @@ pub fn resolve_dependency_path(
 // so a symbol here can refer to just a SymbolPath and also doesn't need to be mutable
 pub fn index_routine_deps(
     module_cache: &mut HashMap<PathBuf, (Tasm, bool, Vec<usize>)>,
-    routine_cache: &mut HashMap<SymbolPath, (Routine, bool)>,
+    routine_cache: &mut HashMap<SymbolPathIdentifier, (Routine, bool)>,
     dependency_map: &mut HashMap<String, PathBuf>,
     // routine that is being scanned
     routine: &Routine,
@@ -426,11 +451,11 @@ pub fn index_routine_deps(
         routine.ident
     );
     // log this routine as "incomplete" in the cache
-    routine_cache.insert(symbol_path.clone(), (Routine::empty(), false));
-    let symbols = scan_referenced_symbols(routine);
+    routine_cache.insert(symbol_path.hashable(), (Routine::empty(), false));
+    let symbols = scan_referenced_symbols(routine, false);
     if symbols.is_empty() {
         log!(silent, "Routine has no external symbols.");
-        routine_cache.insert(symbol_path.clone(), (routine.clone(), true));
+        routine_cache.insert(symbol_path.hashable(), (routine.clone(), true));
         return Ok(());
     }
 
@@ -438,9 +463,9 @@ pub fn index_routine_deps(
     let fname = this_module.0.fname.clone();
     let imports = this_module.0.imports.clone();
 
-    for symbol in symbols {
+    for (symbol, _) in symbols {
         log!(silent, "checking symbol {symbol:?}");
-        if let Some(_) = routine_cache.get(&symbol) {
+        if let Some(_) = routine_cache.get(&symbol.hashable()) {
             continue; // routine is confirmed to exist and we can assume that it will get parsed
         }
 
@@ -529,7 +554,7 @@ pub fn index_routine_deps(
         }
     }
 
-    routine_cache.insert(symbol_path.clone(), (routine.clone(), true));
+    routine_cache.insert(symbol_path.hashable(), (routine.clone(), true));
     Ok(())
 }
 
@@ -553,7 +578,7 @@ pub fn post_link_processing(
                 // since an alias and routine can't have a name collision, order shouldn't matter here
                 let dep_name = match &p.root {
                     Some(r) => r,
-                    None => return p.assigned_group,
+                    None => return p.get_group().unwrap(),
                 };
 
                 let dep_path = match dependency_map.get(dep_name) {
@@ -633,7 +658,8 @@ pub fn post_link_processing(
                     // all external symbols should have already been linked,
                     // therefore all of these symbols must have a known group
 
-                    if symbol.assigned_group == -1 {
+                    if !symbol.has_known_value() {
+                        println!("hit weirdo branch");
                         // this only happens for **ONLY** external symbols in specific routines
                         // therefore we try to find the external symbol (which is either a routine or alias)
                         // before erroring
@@ -671,7 +697,7 @@ pub fn post_link_processing(
                         };
                         *arg = value;
                     } else {
-                        *arg = TasmValue::Group(symbol.assigned_group);
+                        *arg = symbol.get_value().unwrap();
                     }
                 }
             }
@@ -739,7 +765,7 @@ fn find_handler_for_instr(
                     "Instruction {} has no argument handler for the argset {argtypes:?}",
                     instr.ident
                 ),
-                errcode: 27,
+                errcode: 57,
             })
         }
     }

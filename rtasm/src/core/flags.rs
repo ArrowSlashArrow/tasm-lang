@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
 
-use crate::core::structs::{SymbolPath, split_at_str_once};
+use crate::core::structs::{SymbolPath, SymbolValue, split_at_str_once};
 
 #[derive(Debug, Clone)]
 pub struct Flag {
@@ -172,14 +172,14 @@ impl FlagValue {
                                 UnparsedDictFlagEntry::Path(SymbolPath {
                                     root: Some(left.to_owned()),
                                     ident: right.to_owned(),
-                                    assigned_group: -1, // this will get filled in during post-linking
+                                    assigned_value: SymbolValue::NotFound, // this will get filled in during post-linking
                                 })
                             }
                             None => match group_map.get(s) {
                                 Some(routine) => UnparsedDictFlagEntry::Path(SymbolPath {
                                     root: None, // this is a local routine
                                     ident: s.to_owned(),
-                                    assigned_group: *routine,
+                                    assigned_value: SymbolValue::Group(*routine),
                                 }),
                                 None => UnparsedDictFlagEntry::Int(parse_int(s, invalid_dict)),
                             },

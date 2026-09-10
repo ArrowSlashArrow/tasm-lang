@@ -5,8 +5,10 @@ use gdlib::gdobj::{GDObjConfig, GDObject, Item};
 
 use crate::core::{
     HandlerFn,
+    consts::GROUP_LIMIT,
     error::{ParseErrorType, TasmError},
     flags::Flag,
+    structs::SymbolValue::NotFound,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -36,11 +38,48 @@ pub enum TasmValue {
     UnresolvedAlias(String), // temporary state
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct SymbolPath {
-    pub root: Option<String>, // if None, this routine is local
-    pub ident: String,        // ident of routine
-    pub assigned_group: i16,  // group assigned during binding stage for a single module
+    pub root: Option<String>,        // if None, this routine is local
+    pub ident: String,               // ident of routine
+    pub assigned_value: SymbolValue, // group assigned during binding stage for a single module
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SymbolPathIdentifier {
+    pub root: Option<String>,
+    pub ident: String,
+}
+
+impl SymbolPath {
+    pub fn has_known_value(&self) -> bool {
+        match self.assigned_value {
+            SymbolValue::NotFound => false,
+            _ => true,
+        }
+    }
+
+    pub fn get_group(&self) -> Option<i16> {
+        match self.assigned_value {
+            SymbolValue::Group(g) => Some(g),
+            _ => None,
+        }
+    }
+
+    pub fn get_value(&self) -> Option<TasmValue> {
+        match &self.assigned_value {
+            SymbolValue::NotFound => None,
+            SymbolValue::Group(g) => Some(TasmValue::Group(*g)),
+            SymbolValue::TasmValue(t) => Some(*t.clone()),
+        }
+    }
+
+    pub fn hashable(&self) -> SymbolPathIdentifier {
+        SymbolPathIdentifier {
+            root: self.root.clone(),
+            ident: self.ident.clone(),
+        }
+    }
 }
 
 impl SymbolPath {
@@ -115,7 +154,7 @@ impl TasmValue {
             Ok(Self::RoutineRef(SymbolPath {
                 root: Some(left.to_owned()),
                 ident: right.to_owned(),
-                assigned_group: -1, // no group has been assigned yet
+                assigned_value: NotFound, // no group has been assigned yet
             }))
         } else if matches!(s, "ATTEMPTS" | "MAINTIME" | "POINTS") {
             match s {
@@ -137,13 +176,13 @@ impl TasmValue {
             };
 
             // check that the ID is in range
-            // if id <= 0 || id > GROUP_LIMIT {
-            //     return Err((
-            //         ParseErrorType::BadID,
-            //         format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
-            //         17,
-            //     ));
-            // }
+            if id <= 0 {
+                return Err((
+                    ParseErrorType::BadID,
+                    format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+                    17,
+                ));
+            }
 
             match pref {
                 'T' => Ok(Self::Timer(id)),
@@ -477,4 +516,11 @@ impl Default for HandlerData {
             added_item_display: false,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum SymbolValue {
+    Group(i16),
+    TasmValue(Box<TasmValue>),
+    NotFound,
 }

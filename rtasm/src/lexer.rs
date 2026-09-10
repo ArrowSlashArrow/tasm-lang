@@ -43,7 +43,8 @@ use crate::{
         flags::{Flag, FlagValueType, get_flag_type},
         push_error, push_error_lineless,
         structs::{
-            Instruction, Routine, RoutineData, SymbolPath, Tasm, TasmValue, fits_arg_signature,
+            Instruction, Routine, RoutineData, SymbolPath, SymbolValue, Tasm, TasmValue,
+            fits_arg_signature,
         },
     },
     instr::{INSTR_SPEC, placeholder_panic_fn},
@@ -295,7 +296,7 @@ impl Tasm {
                     &mut self.errors,
                     &self.fname,
                     match etype {
-                        // ParseErrorType::BadID => TasmErrorType::BadID,
+                        ParseErrorType::BadID => TasmErrorType::BadID,
                         ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
                         ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
                         ParseErrorType::BadHexLiteral => TasmErrorType::BadHexLiteral,
@@ -819,7 +820,7 @@ pub fn validate_tasm_value(
                     Some(TasmValue::RoutineRef(SymbolPath {
                         root: None,
                         ident: s,
-                        assigned_group: group, // save the group here for O(1) lookup
+                        assigned_value: SymbolValue::Group(group), // save the group here for O(1) lookup
                     }))
                 } else {
                     // only throw err if the group is the _init group
