@@ -40,7 +40,7 @@ To use the current up-to-date SDK, you may do the following:
     git clone https://github.com/ArrowSlashArrow/tasm-lang
     cd tasm-lang/rtasm
     cargo build --release
-    .\target\release\tasm.exe <your_file>
+    .\target\release\tasmc <your_file>
     ``` 
 
 Note that running from source requires Rust v1.88.0. 
