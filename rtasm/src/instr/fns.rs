@@ -1,11 +1,12 @@
 use gdlib::gdobj::{
     GDObjConfig, GDObject, GDValue, Group, ItemType, ZLayer,
-    ids::properties::{TARGET_ITEM, TARGET_ITEM_2},
+    ids::properties::{ACTIVATE_GROUP, TARGET_ITEM, TARGET_ITEM_2, TRIGGER_ON_EXIT},
     misc::{default_block, text},
     triggers::{
-        CompareOp, CompareOperand, ItemAlign, Op, RoundMode, SignMode, StopMode, TimeTriggerConfig,
-        counter_object, item_compare, item_edit, persistent_item, random_trigger, spawn_trigger,
-        stop_trigger, time_control, time_trigger, toggle_trigger,
+        ColliderConfig, CompareOp, CompareOperand, ItemAlign, Op, RoundMode, SignMode, StopMode,
+        TimeTriggerConfig, collision_trigger, counter_object, instant_coll_trigger, item_compare,
+        item_edit, persistent_item, random_trigger, spawn_trigger, stop_trigger, time_control,
+        time_trigger, toggle_trigger,
     },
 };
 
@@ -16,7 +17,7 @@ use crate::{
         HandlerReturn,
         error::{TasmError, TasmErrorType},
         flags::FlagValue,
-        structs::{HandlerArgs, HandlerData},
+        structs::{HandlerArgs, HandlerData, Hitbox, validate_hitboxes},
     },
     instr::{
         GROUP_SPAWN_DELAY, LowerCompOp, LowerOp, flag_override, get_flag_value, get_flag_value_opt,
@@ -796,4 +797,96 @@ pub fn raw_trigger(args: HandlerArgs) -> HandlerReturn {
         .collect::<Vec<GDObject>>();
 
     Ok(HandlerData::from_objects(objs))
+}
+
+pub fn instcoll(args: HandlerArgs) -> HandlerReturn {
+    let g1 = args.args[0].to_group_id().unwrap();
+    let g2 = args.args[1].to_group_id().unwrap();
+    let c1 = args.args[2].to_collblock().unwrap();
+    let c2 = args.args[3].to_collblock().unwrap();
+
+    if !validate_hitboxes(c1, c2) {
+        return Err(TasmError {
+            etype: TasmErrorType::InvalidInstruction,
+            file: String::new(),
+            routine: String::new(),
+            line: args.line,
+            details: format!("Cannot detect collision between {c1:?} and {c2:?}"),
+            errcode: 48,
+        });
+    }
+
+    let mut coll_cfg = ColliderConfig {
+        collider1: 0,
+        collider2: 0,
+        collide_player1: false,
+        collide_player2: false,
+        collide_both_players: true,
+    };
+
+    if let Hitbox::Player2 = c2 {
+        coll_cfg.collide_both_players = true;
+    } else {
+        coll_cfg.collider2 = c2.get_id().unwrap();
+        match c1 {
+            Hitbox::CollBlock(c) => coll_cfg.collider1 = c,
+            Hitbox::Player1 => coll_cfg.collide_player1 = true,
+            Hitbox::Player2 => coll_cfg.collide_player2 = true,
+            Hitbox::EitherPlayer => {
+                coll_cfg.collide_player1 = true;
+                coll_cfg.collide_player2 = true;
+            }
+        }
+    }
+
+    return Ok(HandlerData::from_objects(vec![instant_coll_trigger(
+        &args.cfg, coll_cfg, g1, g2,
+    )]));
+}
+
+pub fn coll(args: HandlerArgs) -> HandlerReturn {
+    let g1 = args.args[0].to_group_id().unwrap();
+    let c1 = args.args[1].to_collblock().unwrap();
+    let c2 = args.args[2].to_collblock().unwrap();
+
+    if !validate_hitboxes(c1, c2) {
+        return Err(TasmError {
+            etype: TasmErrorType::InvalidInstruction,
+            file: String::new(),
+            routine: String::new(),
+            line: args.line,
+            details: format!("Cannot detect collision between {c1:?} and {c2:?}"),
+            errcode: 48,
+        });
+    }
+
+    let mut coll_cfg = ColliderConfig {
+        collider1: 0,
+        collider2: 0,
+        collide_player1: false,
+        collide_player2: false,
+        collide_both_players: true,
+    };
+
+    if let Hitbox::Player2 = c2 {
+        coll_cfg.collide_both_players = true;
+    } else {
+        coll_cfg.collider2 = c2.get_id().unwrap();
+        match c1 {
+            Hitbox::CollBlock(c) => coll_cfg.collider1 = c,
+            Hitbox::Player1 => coll_cfg.collide_player1 = true,
+            Hitbox::Player2 => coll_cfg.collide_player2 = true,
+            Hitbox::EitherPlayer => {
+                coll_cfg.collide_player1 = true;
+                coll_cfg.collide_player2 = true;
+            }
+        }
+    }
+    return Ok(HandlerData::from_objects(vec![collision_trigger(
+        &args.cfg,
+        coll_cfg,
+        g1,
+        !<FlagValue as Into<bool>>::into(get_flag_value(&args, "nospawn", FlagValue::Bool(false))),
+        get_flag_value(&args, "onexit", FlagValue::Bool(false)).into(),
+    )]));
 }

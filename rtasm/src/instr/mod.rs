@@ -435,6 +435,17 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         &[argset!((String) => raw_trigger)],
         InstrType::Misc,
     ),
+    // collision triggers
+    "INSTCOLL" => (
+        false,
+        &[argset!((Group, Group, CollBlock, CollBlock) => instcoll)],
+        InstrType::Process
+    ),
+    "COLL" => (
+        true,
+        &[argset!((Group, CollBlock, CollBlock) => coll)],
+        InstrType::Process
+    )
 };
 
 // -- utils -- \\

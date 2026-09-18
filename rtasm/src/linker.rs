@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32::consts::E, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use crate::{
     core::{
@@ -189,7 +189,6 @@ pub fn parse_module(
     };
 
     // ext_symbols.retain(|s| s.is_external_symbol());
-    let ext_symbol_length = ext_symbols.len();
     let mut added_routines = vec![];
 
     let mut mut_symbols_array_idx = 0;
@@ -198,7 +197,6 @@ pub fn parse_module(
         // symbol may be either external or local
         // if local, we need to find the routine in this module and cache that routine.
         if !symbol.is_external() {
-            println!("skipped an index");
             // this branch is only entered when a routine in this module is referenced in a flag
             let routine_ident = &symbol.ident;
             let routine = match module_routines_clone
@@ -659,7 +657,6 @@ pub fn post_link_processing(
                     // therefore all of these symbols must have a known group
 
                     if !symbol.has_known_value() {
-                        println!("hit weirdo branch");
                         // this only happens for **ONLY** external symbols in specific routines
                         // therefore we try to find the external symbol (which is either a routine or alias)
                         // before erroring

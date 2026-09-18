@@ -8,11 +8,11 @@ icon: home
 ## 1.1. Abstract 
 TASM is a powerful, domain-specific language that is designed to take advantage of the trigger system in Geometry Dash. The language is intended as an alternative to hand-placement of triggers in a level, and encourages developers to instead write clean code to achieve the same. 
 The language is theoretically turing-complete, assuming unbounded IDs, however, GD imposes strictly unavoidable [constraints](#21-constraints). 
-A powerful instruction set is provided, which allows for looping, branching, storage of information in memory, as well as a versatile SDK.
+A powerful instruction set is provided, which allows for looping, branching, as well as a versatile SDK.
 
 Quick links:
 - [Available Instructions](#312-available-instructions)
-- [Group Usage](#36-group-usage)
+- [Group Usage](#35-group-usage)
 - [Special Routines](#322-special-routines)
 - [Example Programs](#441-example-programs)
 - [Types of Values](#33-types-of-values)
@@ -34,23 +34,13 @@ Here, `[a, b, c]` is the argset for the instruction.
 n-tick refers to the execution time of any single instruction. A 1-tick instruction takes exactly one tick to execute.  
 To be clear, no instructions have a delay of execution. The execution time refers to how long the instruction takes to process.
 <!-- deprecated -->
-### 1.2.4. MEMREG
-MEMREG is an abbreviation for "Memory Register". It is also the alias for the memory register item in TASM. 
-<!-- deprecated -->
-### 1.2.5. Memory mode/function
-> [!NOTE]
-> These terms only apply to legacy memory. New memory supports reading and writing more directly.
-Memory mode is simply the mode of the memory. There are two modes:
-- read mode: When LMFUNC is called, the current memory cell's stored value is read to the MEMREG.
-- write mode: When LMFUNC is called, the value in the MEMREG is stored inside of the current memory cell.  
 
-When a memory mode is set, its group is toggled on, and the other's is toggled off.
 ## 1.3. Version and updating
 
 The version is defined according to [semantic versioning](https://semver.org).
 ### 1.3.1. Current version
 <!-- Version number -->
-The current version, as of June 26, 2026 is **v0.3.1**. 
+The current version, as of September 9, 2026 is **v0.3.2**. 
 Development of the project can be found on the [TASM repo](https://github.com/ArrowSlashArrow/tasm-lang).
 # 2. The GD environment
 This section contains documentation of the GD environment that is relevant to the purposes and function of TASM and/or the compiler.
@@ -82,6 +72,8 @@ SE example_routine2, C1, C2
 Note that instruction argsets are typed to ensure that valid arguments are passed. Learn more in [this section](#336-argsets).
 ### 3.1.2. Available instructions 
 All instructions in this section are expected to be fully functional. Any deprecated instructions will not be listed as of the next minor release.
+
+If an instruction does not have a specified execution time, assume that it is a 1-tick instruction.
 #### 3.1.2.1 Arithmetic
 All arithmetic instructions are 1-tick.  
 By convention, the counter that stores the result of an arithmetic operation is usually specified as the first argument.
@@ -165,7 +157,7 @@ The first routine is spawned if the two arguments meet the condition. Otherwise,
 
 ##### Instant compares
 "Instant" compares can be accessed by prefixing a compare instruction with `I`. These instructions directly spawn the target groups instead of using any intermediate triggers.
-This means that spawned groups will not be spawned with spawn ordered or will be able to be paused/stopped. This feature is intended for fast execution of utility groups. Note that remaps are still carried through any instant compares.
+This means that spawned groups will not be spawned with spawn ordered or will be able to be paused/stopped. This feature is intended for fast execution of routines. Note that remaps are still carried through any instant compares.
 
 All available instant compare instructions:
 - ISE, ISNE, ISL, ISLE, ISG, ISGE
@@ -193,67 +185,29 @@ SRAND do_stuff, 42.8
 The routine `do_stuff` has a 42.8% chance of being spawned.
 
 <!-- deprecated -->
-#### 3.1.2.3. Memory
-> [!NOTE]
-> All instructions prefixed with an `L` are LEGACY instructions that use the old memory structure.
-> This memory structure is still usable, however it is considered deprecated and much less group-efficient than the structure used by the new memory instructions.
+#### 3.1.2.3. Collision checkers
+These instructions check collisions between two hitboxes. They primarily use the collision and instant collision triggers.
+##### INSTCOLL
+Arguments: `INSTCOLL <group> <group> <hitbox> <hitbox>`
+Spawns the first group if the hitboxes are colliding at the instant that this instruction runs; spawns the second group if that is not the case. Leave either group as `0` to not spawn anything.
 
-> [!NOTE]
-> As of v0.3.0, memory instructions are no longer part of the TASM ISA. Memory is now handled through the standard library instead of dedicated instructions.  
-> Aliases `PTRPOS`, `MEMREG` and `MEMSIZE` are now all deprecated too. All new aliases are defined in any file that uses them.
+See #[this section](#3341-valid-hitbox-cominations) for valid combinations of the third and fourth arguments.
+##### COLL
+Arguments: `COLL <group> <hitbox> <hitbox>`
+Spawns the target group when the two hitboxes collide. Leave the target group as `0` to not spawn anything. This trigger will spawn the group whenever the two hitboxes collide.
 
-##### LMALLOC
-Arguments: `LMALLOC <positive int>`
-
-Allocates a specified amount of counters to memory. 
-Only one memory allocation is allowed per program.  
-Only allowed in `_init` routine.
-##### LFMALLOC
-Arguments: `LFMALLOC <positive int>`
-
-Allocates a specified amount of timers (floats) to memory. 
-Only one memory allocation is allowed per program.  
-Only allowed in `_init` routine.
-##### LMFUNC
-Arguments: `LMFUNC`
-
-If the current memory mode is read mode, then the value of the current memory location will be read to the MEMREG.
-If the current memory mode is write mode, then the value of to the MEMREG will be written to the current memory location.  
-Execution time: 2 ticks.  
-##### LMREAD
-Arguments: `LMREAD`
-
-Sets the memory mode to read mode.  
-Execution time: 1 tick.  
-##### LMWRITE
-Arguments: `LMWRITE`
-
-Sets the memory mode to write mode.  
-Execution time: 1 tick.  
-##### LMPTR
-Arguments: `LMPTR <int>`
-
-Moves the pointer by a specified amount. A positive number pushes it forward into memory, while a negative number retracts it back towards address 0. This movement amount is added to the PTRPOS counter to keep track of the pointer's position.  
-Note: If the pointer is moved outside of memory, namely outside the range \[0, memsize), it will not read any memory, and will not get moved back down if LMFUNC is called. 
-Please be mindful of this when using the instruction. If it is desirable that the pointer returns to valid address space, please use the instruction LMRESET.  
-Execution time: 1 tick.  
-##### LMRESET
-Arguments: `LMRESET`
-
-Resets the pointer position to 0 and the PTRPOS counter to 0.  
-Execution time: 1 tick.  
-##### 3.1.2.3.1. Memory safety 
-When using the legacy memory block, if the pointer is outside of the memory range \[0, memsize), no memory will be read. This means that nothing will be read from or written to the MEMREG, but the pointer will still move upwards.
-If INITMEM is not called, the default values of each memory cell will remain, which are 0 for both counters and timers.  
-When using the new memory block, reading an address outside of the allocated range may lead to unintended side effects. Reading a counter outside of the allocated range will not actually result in the address being read, but due to the way the new memory block works, it is not guaranteed which address will be read.  
-Memory I/O operations are NOT thread-safe. If two simultaneous or overlapping memory reads or writes are attempted, undefined behaviour may occur, which could be corrupted data writes or reads, or a flat-out failed operation.
-
+See #[this section](#3341-valid-hitbox-cominations) for valid combinations of the second and third arguments.  
+Supported flags: `nospawn`, `onexit`.  
+Only allowed in the `_init` routine.
 #### 3.1.2.4. Process
+These instructions are responsible for managing running groups. This includes spawning them, stopping and killing them.
 > Note that the terms "routine" and "group" refer to essentialy the same thing in this section. The distinction between the two terms stems from the knowledge of the contents on the group; where a routine has known triggers (as is specified in a program), and a group may have some arbitrary external objects. All routines are treated as groups in GD.
 ##### SPAWN
 Arguments: `SPAWN <routine>`
 
 Spawns the corresponding routine. Does not pause the current group.  
+By default, the generated spawn trigger has `spawn ordered` set to `true`. This can be changed by setting the `ordered` to true. More on flags #[here](#314-instruction-flags).
+
 Execution time: 1 tick.  
 
 ##### PAUSE
@@ -448,39 +402,24 @@ _init:
 
 For more documentation on the module system, refer to [this section](#34-external-symbols-and-the-module-system).
 
-#### 3.1.2.10. Excluded instructions
+#### 3.1.2.11. Excluded instructions
 Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
 It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  
 Likewise, all bitwise instructions were left out of the TASM instruction set because there are no built-in operations to compute, for instance, a & b.
 
-In light of this, it is necessary to address the existence of instructions such as `MSET`/`MGET`, since they compile to multiple operations. These instructions are part of the memory instruction subset, and they exist as an interface to TASM's custom memory structure. Without them, the programmer would need to manually write out the same logic for accessing/setting a specific memory cell with the exact triggers and delays needed. The `MSET`/`MGET` instructions (among others) exist to simplify this process and to reduce bottlenecks in the development of programs.
 
 ### 3.1.3. In-level object representation 
 All arithmetic instructions use a single Item Edit trigger, including MOV.  
 All spawn compare instructions use 2 triggers: one for the Item Compare, to perform the comparison, and one for the group spawner.  
 All fork compare instructions use 3 triggers: one for the Item Compare, to perform the comparison, and two for each group spawner.  
 
-NOP does not compile to any objects, instead, a black space is left which acts as a wait since the group will be spawn-ordered.  
+NOP does not compile to any objects, instead, a blank space is left which acts as a wait since the group will be spawn-ordered.  
 SPAWN simply adds a spawn trigger (with spawn-ordered enabled) to the specified group.   
-> It should be noted that all group are spawned by a spawn trigger with spawn-ordered enabled.  
-
-LMFUNC, LMPTR and LMRESET are move triggers that target the memory pointer. LMPTR and LMRESET also include item edit triggers that update the pointer's position in the PTRPOS item.  
-LMREAD/LMWRITE set the read mode by toggling on the respective item group and toggling off the other item group.  
-- LMREAD toggles on the read group and toggles off the write group
-- LMWRITE toggles on the write group and toggles off the read group
+> It should be noted that all group are spawned by a spawn trigger with **spawn-ordered enabled by default**. 
 
 #### 3.1.3.1. Initializer instructions
 All initiazlier instructions correspond to custom in-level structures, which may not necessarily be single triggers. For this reason, they are allowed only as setup instructions.
 Below is a list of instructions and their corresponding structures:
-- `MALLOC`: Creates a block of memory cells with a pointer collision block and a reset block, where each memory cell contains a:
-	- collision block, for detecting the collision between it and the pointer, triggering the execution of the memory function,
-	- item edit trigger for reading the value of this memory cell to the MEMREG, (on the read group),
-	- item edit trigger for writing the value of the MEMREG to this memory cell (on the write group),
-	- move trigger, for moving the pointer once the collision with this cell's collider is registered,
-	- counter object, for a visual display of the current memory cell's value,
-	- collision trigger, for registering the collision between the pointer and this cell's collider. This object is placed before x=0 so that it is initialised before anything.
-- `LFMALLOC`: Like `MALLOC`, except that all of the memory cells and the MEMREG are timers (floats), hence the `F` in `LFMALLOC`.
-- `INITMEM`: A column of item edit triggers that set each memory cell to the given values. Intended to initialise memory with values.
 - `IOBLOCK`: An [IOBlock](#121-ioblock) that is put at y=75 and some specified x-position that acts as a debug group spawn. The x-position is processed such that it translates to a block position, e.g. 5 becomes 5 blocks (+ 2 for margin) to the right of the y-axis, centered on a cell.
 - `PERS`: Adds a persistent item trigger for the specified item.
 - `DISPLAY`: Displays a counter at some specified height and x=0 of the given counter.
@@ -555,6 +494,8 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
 | tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |
 | nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |
+| nospawn | Toggle the target group off instead of activating it.                                                 | `COLL`       | Boolean    |
+| onexit  | Spawn the target group when the two hitboxes stop colliding vs when they start colliding.             | `COLL`       | Boolean    |
 #### 3.1.4.2. Flag types
 ##### Round/Sign
 Rounding and sign (absolute/negative) configuration string.  
@@ -646,7 +587,7 @@ swap:
 ```
 
 > [!NOTE]
-> While there likely is a deterministic and predictable way in which triggers are executed in one tick, the maintainer of this project was not aware of the mechanism. If it becomes known, please open a feature request PR on the repo.
+> It is not clear what instructions work when made concurrent and what instructions do not. It is deterministic but largely unpredictable. Please contact the maintainer of this project if you have knowledge concerning the spawn order of objects.
 
 ## 3.2. Routines 
 ### 3.2.1. Routine declaration 
@@ -698,7 +639,7 @@ cont:
 	RESUME routine
 ```
 
-This is dangerous, because the GD runtime does not specify a call stack. Therefore, upon unpausing `routine`, all paused instances of `routine` get release at once, and it is impossible to release all instances of `routine` one at a time, sequentially. 
+This is dangerous, because the GD runtime does not have a call stack (of course, it is possible to make one in TASM). Therefore, upon unpausing `routine`, all paused instances of `routine` get release at once, and it is impossible to release all instances of `routine` one at a time, sequentially. 
 ## 3.3. Types of values 
 ### 3.3.1. Number literals
 A number literal is any string that may be parsed as a float. Unless specified to be strictly an integer, all numbers are parsed as double-precision floats (f64).  
@@ -735,20 +676,44 @@ spawner_routine:
 	SPAWN routine
 ```
 If the `--group-offset` argument is specified, the groups of each routine will change, which is unlike group literals, since they are static.
-### 3.3.4. Aliases
+### 3.3.4. Hitboxes
+Used for collision block instructions.
+There are two ways to declare a hitbox:
+1. `b{id}` where `id` is the ID of a collision block
+2. [Using an alias](#335-aliases).
+
+#### 3.3.4.1. Valid hitbox cominations
+When using a collision instruction, the two hitboxes can only be one of the below pairs.
+Any other combination is not supported in GD and will cause the compiler to throw an error.
+
+| Hitbox 1        | Hitbox 2        |
+| --------------- | --------------- |
+| Collision block | Collision block |
+| Player 1        | Collision block |
+| Player 2        | Collision block |
+| Either player   | Collision block |
+| Player 1        | Player 2        |
+
+"Collision block" refers to a collision block with an ID - these can be declared with `b{id}` syntax. 
+
+
+### 3.3.5. Aliases
 Aliases act as substitutions for other values, namely, other items. They are used primarily to reference items that may not have a constant value.
 
 <!-- Version number -->
-As of TASM v0.3.2, the only built-in aliases are for special built-in items in GD:
+As of TASM v0.3.2, these are the built-in aliases:
 - `ATTEMPTS`: refers to the `Attempts` counter.
 - `POINTS`: refers to the `Points` counter.
-- `MAINTIME`: refers to the `MainTime` timer..
+- `MAINTIME`: refers to the `MainTime` timer.
+- `COLL_P1`: enables the option to check for collision with player 1 (for collision instructions)
+- `COLL_P2`: enables the option to check for collision with player 2 (for collision instructions)
+- `COLL_P_ANY`: enables the option to check for collision with player 1 or player 2 (for collision instructions)
 
-### 3.3.5. Strings
+### 3.3.6. Strings
 A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, `\g123` will compile into the string literal `"g123"`.   
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
 **Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group if not escaped.**
-### 3.3.6. Argsets 
+### 3.3.7. Argsets 
 Instructions may have different uses depending on the provided arguments. For this reason, they are explicitly typed. 
 Since instruction arguments are typed, these types are checked during compilation in the [instruction parsing stage](#53-instruction-parsing). 
 
@@ -843,70 +808,8 @@ Diamond dependencies are supported in TASM. The linker uses a module cache to ke
 Circular imports are not allowed. Due to the linker needing to resolve all referenced symbols, recursively evaluating each module will lead to infinite recursion. This is caught by the linker's module cache early and prevented.
 There is always better way than a circular import. 
 
-<!-- deprecated -->
-<!-- replace this with a section titled `addressing items` -->
-## 3.5. Memory
-> [!WARNING]
-> As of v0.3.0, built-in memory is fully deprecated! Do not use memory instructions as they are likely to be removed very soon.
-Memory in TASM is designed for algorithms/processes which rely on dynamic addresses for data. For example, a sorting algorithm must iterate on each individual many times, which is simply impractical to hardcode.  
-
-Memory safety info: [Memory safety](#31231-memory-safety)
-
-There are two types of memory in TASM. Below is a comparison table:
-
-| Metric                  | Legacy Memory        | New Memory               |
-| ----------------------- | -------------------- | ------------------------ |
-| Group usage             | On the order of O(n) | On the order of O(log n) |
-| Minimum read/write time | 2 ticks              | 4 ticks                  |
-| Objects used            | 6 per item           | 3 per item               |
-| Collision IDs used      | 1 per item           | 0                        |
-| Usage                   | Until v0.2.2         | v0.2.3 and onwards       |
-
-### 3.5.1. New memory system
-Refer to this figure for any terms used that are specific to this memory structure:
-![New memory](new_memory.png)
-
-The new memory system works based off of items encoded in groups, where each item's getter and setter has specific unique groups to any other item's getter/setter. To isolate a specific item, all groups that the memory block consists of except for the target item's groups.
-
-#### 3.5.1.1. Item ID binary group encoding
-The way that items' getters/setters are assigned groups is by encoding the bits of the item's ID into groups.  
-When the compiler allocates memory, it first determines the maximum number of bits needed to encode. With a memory size of 25, only 5 bits are needed since 2^5 = 32, and 32 >= 25. To find the maximum number of bits needed, use the equation `bits = ceil( log_2 ( memsize ) )`.  
-Since each bit has two possible states, those being either on or off, two groups are needed per group. Groups for bit encoding start at 4, with each pair, e.g. 4 and 5, representing one bit, where the first bit represents "off" while the second represents "on". The next bit will be represented by the groups 6 and 7 for off and on respectively, and so on until all bits are encoded. Bits are encoded in order for least significant to most significant.  
-> A counter with at position 5 out of 8 cells will have the bits 101, which means it will have the groups [5, 6, 9].  
-> No two counters will share an identical group sequence, since each counter's ID is different.
-
-Encoding using bits instead of an entire group per counter, which is O(n), allows the user to allocate all available counters in only 60 groups, since the new memory system grows at a rate of O(log n) for each new group added.
-
-The groups are allocated as such:
-| Group | Purpose |
-| ----- | ------- |
-| 1 | Read group |
-| 2 | Write group |
-| 3 | Shared group |
-| 4 to bits*2 + 4 | Groups used to encode bits |
-> [!NOTE]
-> Groups are offset by a static amount if a group offset is needed. The numbers in the table are for reference.
-#### 3.5.1.2. Calling getters/setters
-When an instruction such as `MGET` or `MSET` is used, the memory controller uses the value of the PTRPOS counter to determine the target address.  
-First, the memory controller toggles on all of its groups to reset its state from any previous operations.
-When getting/setting an item with some arbitrary ID, all groups in the memory block are toggled off except for all the groups that the target trigger has. This is done by extracting each bit from the target address with a bit switch.
-
-A bit switch is a simple mechanism which does the following in order:
-- Shifts the target value to the left by `n` bits
-- Checks if this new value is divisible by two, which requires a temporary counter.
-- If this value is divisible by two, it means that this bit is a 0, and the group that corresponds to a 1 for this bit is toggled off.
-- If this value is not divisible by two, the group that corresponds to a 0 is toggled off.
-
-Using a bit switch on every bit of the address (whose bitsize is determined by the compiler to be the maximum number of bits in group encoding step) allows the memory controller to toggle off every trigger that is not concerned with the target address. Since all triggers are assigned a unique combination of groups, only one trigger remains unscathed.
-
-When using either `MGET` or `MSET`, the instruction automatically despawns the opposite operation's group. For instance, when using `MGET`, the user attempts to read the value of the target address, so the write group is toggled off, and vice versa. 
-
-Below is a diagram of the memory structure:  
-![Parts of new memory](parts_of_new_memory.png)
-
-## 3.6. Group usage 
-Group usage in TASM is meant to be optimized, but is not expected to be fully optimized while the language is still in development.   
-Each routine uses one group to hold all of its instructions. After that, any instructions that need extra groups may use them. 
+## 3.5. Group usage 
+Some instructions use a group or two to sustain the intended functionality of the instruction. Please be mindful of this when working on a project that may take a lot of groups.
 Below is the specification for all instructions and how many extra groups are used.
 
 | Instruction                    | Groups      | Usage                                                                                  |
@@ -914,23 +817,13 @@ Below is the specification for all instructions and how many extra groups are us
 | Any arithmetic + MOV           | 0           | none                                                                                   |
 | Spawn compare                  | 1           | Spawn trigger for group                                                                |
 | Fork compare                   | 2           | Spawn triggers for both groups                                                         |
-| Instant spawn/fork compare	 | 0		   | This version does not use intermediate triggers.
+| Instant spawn/fork compare	 | 0		   | This version does not use intermediate triggers.										|
 | SPAWN                          | 0           | none                                                                                   |
-| Non-memory initializer         | 0           | none                                                                                   |
-| NOP                            | 0           | none                                                                                   |
-| Non-initializer memory command | 0           | none                                                                                   |
-| LMALLOC/LFMALLOC               | memsize + 4 | one for the pointer, pointer reset, read and write groups, and one per allocated cell. |
-| MALLOC/FMALLOC                 | 4*ceil(log2(memsize)) + 4 | 4 per bit of the memory size + 2 for the read and write group + 1 for the controller group + 1 for spawning the target trigger |
+| Wait instructions (e.g. NOP)   | 0           | none                                                                                   |
 
-Below is a chart that depicts the group usage according to the equations listed. The red line represents the usage of the old memory system, whereas the blue line represents the group usage of the new memory system.
-
-![Memory group usage](group_usage.png)
-
-For a memsize of more than 20, using the new system is recommended for the sake of conserving groups.
-
-## 3.7. Comments
+## 3.6. Comments
 A comment is anything that follows a semicolon (`;`) on the same line.
-## 3.8. Execution model
+## 3.7. Execution model
 The execution model of TASM is one fairly similar to that of real hardware:
 - All instructions take some amount of time to execute, always an integer amount of ticks.
 - Each group is assigned a primary group to start, though more are used per comparison instruction.
@@ -938,7 +831,7 @@ The execution model of TASM is one fairly similar to that of real hardware:
 - Routines are always spawned with spawn-ordered enabled.
 - Spawned routines execute concurrently, no matter how many of them there are.
 # 4. TASM Toolkit
-As of v0.3.1, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
+As of v0.3.2, there are install scripts for the TASM compiler. There are two versions, one for windows, which is a powershell script, and one for linux, which is a shell script: 
 - [Windows installer](https://tasm.mntpoint.org/install.ps1)
 - [Linux installer](https://tasm.mntpoint.org/linux.sh)
 
@@ -982,36 +875,41 @@ The code snippet above uses one group for the routine, and generates three objec
 #### Fibonacci Sequence
 ``` tasm
 _init:
-    DISPLAY C1
-    LMALLOC 50
-    INITMEM 0,1
+	; ensure that stdlib is downloaded and in the same directory as the program
+    import stdlib/mem_8bit
+	alias MAX_INDEX, 50
+    alias temp_counter, c260
 
 fib:
-    ; read the previous value
-    LMREAD
-    LMFUNC
-    MOV C1, MEMREG ; read value from the memreg
-    
-    ; increment pointer and read the next number
-    LMPTR 1
-    LMFUNC
+    ; read the previous value
+    ; all `wait` instructions are necessary for the program to work with `--release`
+    spawn mem_8bit::mem | ordered:false remap: {mem_8bit::mem_end = mem_8bit::cread}
+    wait 2
+    add mem_8bit::ptrpos, 1
+    wait 2
+    mov temp_counter, mem_8bit::cmemreg	; read from counter register
+	wait 2
 
-    ; add the previously stored value to the memreg, 
-    ; to get the sum of the previous value and this one 
-    ADD MEMREG, C1
-    
-    ; write the sum into the next memory cell
-    LMWRITE
-    LMPTR 1
-    LMFUNC
-    
-    ; move pointer back to the previous number in preparation for the next iteration
-    LMPTR -1
+    spawn mem_8bit::mem | ordered:false remap: {mem_8bit::mem_end = mem_8bit::cread}
+    wait 2
+    add mem_8bit::cmemreg, temp_counter ; add next number to counter
+    wait 2
 
-    SL fib, PTRPOS, 50
+    ; write the sum into the next memory cell
+    add mem_8bit::ptrpos, 1
+    wait 2
+    spawn mem_8bit::mem | ordered:false remap: {mem_8bit::mem_end = mem_8bit::cwrite}
+    wait 1
+    
+    ; move pointer back to the previous number in preparation for the next iteration
+    sub mem_8bit::ptrpos, 1
+    
+    sl fib, mem_8bit::ptrpos, MAX_INDEX
   
 _start:
-    SPAWN fib
+    mov C2, 1   ; starting value
+    mov mem_8bit::ptrpos, 1
+    spawn fib
 ```
 This program generates the fibonacci sequence in the provided memory. The result memory reads as such: 0 1 1 2 3 5 8 13 ...  
 This program uses 3 groups: one for the `_start` routine, one for the `fib` iteration routine, and one for the condition check at the end of the `fib` routine. It notably does not use a group for the `_init` routine, since all initializer functions correspond to structures instead of triggers.

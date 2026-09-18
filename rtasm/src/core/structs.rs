@@ -29,6 +29,7 @@ pub enum TasmValue {
     Timer(i16),
     /// Used for MainTime, Attempts and Points counters
     GDItem(Item),
+    CollBlock(Hitbox),
     Number(f64),
     Group(i16),
     RoutineRef(SymbolPath),
@@ -36,6 +37,36 @@ pub enum TasmValue {
     /// Default
     String(String),
     UnresolvedAlias(String), // temporary state
+}
+
+/// Options for colliders in collision triggers
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Hitbox {
+    CollBlock(i16),
+    Player1,
+    Player2,
+    EitherPlayer,
+}
+
+impl Hitbox {
+    pub fn get_id(&self) -> Option<i16> {
+        match self {
+            Self::CollBlock(h) => Some(*h),
+            _ => None,
+        }
+    }
+}
+
+pub fn validate_hitboxes(a: Hitbox, b: Hitbox) -> bool {
+    match b {
+        Hitbox::Player1 => return false,
+        Hitbox::EitherPlayer => return false,
+        Hitbox::Player2 => match a {
+            Hitbox::Player1 => true,
+            _ => false,
+        },
+        Hitbox::CollBlock(_) => return true,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +142,7 @@ pub enum TasmPrimitive {
     Timer,  // subset of item
     Number, // also a float.
     Int,    // subset of number
+    CollBlock,
     Group,
     RoutineRef, // reference to a routine through a path; converted to gid in linking stage
     ModulePath, // path to a module
@@ -138,7 +170,6 @@ impl TasmValue {
             &remaining[0..1].to_lowercase()
         };
         let remaining_i16 = remaining.parse::<i16>();
-
         let remaining_i16_hex = if remaining.len() == 0 {
             "fail".parse()
         } else {
@@ -156,13 +187,23 @@ impl TasmValue {
                 ident: right.to_owned(),
                 assigned_value: NotFound, // no group has been assigned yet
             }))
-        } else if matches!(s, "ATTEMPTS" | "MAINTIME" | "POINTS") {
+        } else if matches!(
+            s,
+            "ATTEMPTS" | "MAINTIME" | "POINTS" | "COLL_P_ANY" | "COLL_P1" | "COLL_P2"
+        ) {
             match s {
                 "ATTEMPTS" => Ok(Self::GDItem(Item::Attempts)),
                 "MAINTIME" => Ok(Self::GDItem(Item::MainTime)),
                 "POINTS" => Ok(Self::GDItem(Item::Points)),
+                "COLL_P_ANY" => Ok(Self::CollBlock(Hitbox::EitherPlayer)),
+                "COLL_P1" => Ok(Self::CollBlock(Hitbox::Player1)),
+                "COLL_P2" => Ok(Self::CollBlock(Hitbox::Player2)),
                 _ => unsafe { unreachable_unchecked() },
             }
+        } else if pref.to_ascii_lowercase() == 'b'
+            && let Ok(n) = remaining_i16
+        {
+            Ok(Self::CollBlock(Hitbox::CollBlock(n)))
         } else if matches!(pref, 'T' | 't' | 'C' | 'c' | 'G' | 'g') {
             // the only possible value here is an item or a string
             let id = if let Ok(id) = remaining_i16 {
@@ -248,6 +289,7 @@ impl TasmValue {
             Self::RoutineRef(_) => TasmPrimitive::RoutineRef,
             Self::ModulePath(_) => TasmPrimitive::ModulePath,
             Self::UnresolvedAlias(_) => TasmPrimitive::String,
+            Self::CollBlock(_) => TasmPrimitive::CollBlock,
         }
     }
 
@@ -331,6 +373,13 @@ impl TasmValue {
     pub fn to_module_path(&self) -> Option<PathBuf> {
         match self {
             Self::ModulePath(m) => Some(m.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn to_collblock(&self) -> Option<Hitbox> {
+        match self {
+            Self::CollBlock(h) => Some(*h),
             _ => None,
         }
     }
