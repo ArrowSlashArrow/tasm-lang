@@ -48,7 +48,7 @@ pub fn compile_tasm_module(
         Ok(t) => t,
         Err(es) => {
             if !args.no_log {
-                print_errors(es, &format!("Unable to compile {:?}", &path));
+                print_errors(es, &format!("[E0044] Unable to compile {:?}", &path));
             }
             return Err(anyhow!("lexing failed"));
         }
@@ -205,8 +205,9 @@ pub fn parse_module(
             {
                 Some(r) => r.clone(),
                 None => {
-                    // TODO: error
-                    return Err(anyhow!("[E00??] todo"));
+                    return Err(anyhow!(
+                        "[E0043] Flag references a routine that does not exist."
+                    ));
                 }
             };
 
@@ -365,7 +366,7 @@ pub fn cache_module(
         Some((_mod, is_done, _deps)) => {
             if !is_done {
                 return Err(anyhow!(
-                    "Circular dependency detected between {} and {dependency}",
+                    "[E0045] Circular dependency detected between {} and {dependency}",
                     parent_module_fname
                 ));
             }
@@ -762,7 +763,7 @@ fn find_handler_for_instr(
                     "Instruction {} has no argument handler for the argset {argtypes:?}",
                     instr.ident
                 ),
-                errcode: 57,
+                errcode: 42,
             })
         }
     }

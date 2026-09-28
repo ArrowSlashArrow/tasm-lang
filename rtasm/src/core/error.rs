@@ -190,18 +190,22 @@ routine/alias to which the symbol points.",
 This error is emitted during post-link processing when the linker tries to resolve an
 unparsed dictionary flag entry as an integer, however it cannot due to the value not 
 being a value integer.",
-    "E0042: Instruction was not properly linked!
+    "E0042: Instruction has no argument handler for the argset
     
-During the linking phase, external symbols which reference groups are attempted to be
-assigned a group (due to being resolved). If this fails, the assigned group will remain
-as the sentinel value given in the lexing stage, which does not correspond to a real group.
-
-This error should never occur normally. It will only be emitted if there is an instruction
-whose arguments were not properly resolved.",
+The linker encountered an instruction with an invalid argset during post-link processing.
+This error is only tripped if the instruction has a bad argset and is in a routine
+in a library file that is only referenced in a flag in the same library file.",
     "E0043: Unable to resolve path for module
     
 The linker was not able to resolve an imported module's path. Similar to E0038, but 
-tends to occur rarely and on niche edge cases."
+tends to occur rarely and on niche edge cases.",
+    "E0044: Unable to compile module
+    
+The linker encountered an error while lexing an imported module.",
+    "E0045: Circular dependency between modules
+    
+The linker encountered a module which indirectly imports itself thorugh another module.
+This happens if module A imports module B, which also imports module A.",
 ];
 
 /// Representative of TASM high-level lexer, parser, and logic errors.

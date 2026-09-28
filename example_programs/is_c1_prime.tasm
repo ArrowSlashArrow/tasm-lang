@@ -1,33 +1,27 @@
 _init:
-    DISPLAY C1 ; checking if this is prime
-    DISPLAY C2 ; check factor
-    DISPLAY C3 ; max factor
-    DISPLAY C4 ; aux mod var
-    DISPLAY C5 ; 1 = prime, 2 = not prime
+    mov c1, 173
+    display c1  ; original number
+    display c2  ; is it prime? (boolean)
 
-next_iteration:
-    ADD C2, 2
-    FLDIV C4, C1, C2
-    MUL C4, C2
-    SUB C4, C1
-    FE not_prime, loop_checker, C4, 0
-
-loop_checker:
-    FGE next_iteration, prime, C3, C2
-
-not_prime:
-    MOV C5, 2
-
-prime:
-    MOV C5, 1
+    alias check_factor, c3
 
 _start:
-    MOV C1, 997 ; move starting values
-    MOV C2, 1
-    DIV C3, C1, 2
+    mov check_factor, 3
+    ise return_not_prime, check_is_prime, c1, c1    | lmod:2.0 lmodop:/ rmod:2.0 rmodop:/ rmode:f ordered:false
 
-    ; c4 = c1 % 2 -> filter out all evens
-    FLDIV C4, C1, 2
-    MUL C4, 2
-    SUB C4, C1
-    FE not_prime, next_iteration, C4, 0
+return_not_prime:
+    mov c2, 0
+
+return_prime:
+    mov c2, 1
+
+check_is_prime:
+    div c4, c1, c3  | resmode:f                                         ; compute c4 = c1 % c3
+    mul c4, c3
+    fe, return_not_prime, continue_loop, c1, c4     | ordered:false     ; check if modulus = 0 
+
+continue_loop:
+    add c3, 2
+    fg, return_prime, check_is_prime, c3, c1        | rmod:2.0 rmodop:/ ordered:false
+
+add c1, c2, c3

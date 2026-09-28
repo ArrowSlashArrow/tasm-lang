@@ -366,7 +366,7 @@ pub fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
 
 /* COMPARES */
 
-pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
+pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16, ordered: bool) -> GDObject {
     GDObject::from_config(
         spawn_cfg.clone(),
         SpawnTrigger {
@@ -374,7 +374,7 @@ pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
             delay: GROUP_SPAWN_DELAY,
             delay_variation: 0.0,
             reset_remap: false,
-            spawn_ordered: true,
+            spawn_ordered: ordered,
             preview_disable: false,
             spawn_remaps: vec![],
         },
@@ -406,6 +406,7 @@ pub fn spawn_compare(
     // lsign: sign
     // rsign: sign
 
+    let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
     let iargs = args.args.as_ref();
     let mut lhs = CompareOperand::from(get_item_spec(&iargs[1]).unwrap());
     lhs.modifier = get_flag_value(&args, "lmod", FlagValue::Float(1.0)).into();
@@ -463,7 +464,7 @@ pub fn spawn_compare(
         // don't use any intermediate triggers if spawning instantly
         vec![compare]
     } else {
-        vec![compare, spawn_trg(&spawn_cfg, spawning_group)]
+        vec![compare, spawn_trg(&spawn_cfg, spawning_group, ordered)]
     }
 }
 
@@ -499,6 +500,8 @@ pub fn fork_compare(
     // rmode: roundsign
 
     let iargs = &args.args.as_ref();
+
+    let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
 
     // set lhs fields
     let mut lhs = CompareOperand::from(get_item_spec(&iargs[2]).unwrap());
@@ -584,8 +587,8 @@ pub fn fork_compare(
     } else {
         vec![
             compare,
-            spawn_trg(&spawn_true_cfg, spawning_true),
-            spawn_trg(&spawn_false_cfg, spawning_false),
+            spawn_trg(&spawn_true_cfg, spawning_true, ordered),
+            spawn_trg(&spawn_false_cfg, spawning_false, ordered),
         ]
     }
 }
@@ -605,11 +608,13 @@ handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 /* RANDOMS */
 
 pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
-    let cfg = args.cfg;
+    let cfg = args.cfg.clone();
     let random_cfg = cfg
         .clone()
         .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
         .with_scale(0.5, 0.5);
+
+    let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
 
     let iargs = args.args.as_ref();
     let spawning_group = iargs[0].to_group_id().unwrap();
@@ -632,17 +637,19 @@ pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
                 target_group2: 0,
             },
         ),
-        spawn_trg(&spawn_cfg, spawning_group),
+        spawn_trg(&spawn_cfg, spawning_group, ordered),
     ])
     .extra_groups(1))
 }
 
 pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
-    let cfg = args.cfg;
+    let cfg = args.cfg.clone();
     let random_cfg = cfg
         .clone()
         .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
         .with_scale(0.5, 0.5);
+
+    let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
 
     let iargs = args.args.as_ref();
     let spawning_group1 = iargs[0].to_group_id().unwrap();
@@ -673,8 +680,8 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
                 target_group2: aux_group2,
             },
         ),
-        spawn_trg(&spawn_cfg1, spawning_group1),
-        spawn_trg(&spawn_cfg2, spawning_group2),
+        spawn_trg(&spawn_cfg1, spawning_group1, ordered),
+        spawn_trg(&spawn_cfg2, spawning_group2, ordered),
     ])
     .extra_groups(2))
 }

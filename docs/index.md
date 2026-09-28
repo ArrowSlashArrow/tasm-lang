@@ -518,8 +518,8 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 
 | Flag    | Usage                                                                                                 | Instructions | Type       |
 | ------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------- |
-| resmode | Rounding and sign config for the item result                                                          | Arithmetic   | Round/Sign |
-| finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |
+| resmode | Rounding and sign config for the item result. This is invoked before `finmode`.                       | Arithmetic   | Round/Sign |
+| finmode | Round and sign config for final computed result. Does something only if `iter` is set.                | Arithmetic   | Round/Sign |
 | itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |
 | divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |
 | iter    | Compund assignment operator to target item. In the case of `+`, it functions like `+=`.               | Arithmetic   | Operator   |
@@ -532,7 +532,8 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | rmode   | Rounding and signing mode of the final right-hand side value.                                         | Compares     | Round/Sign |
 | delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |
 | remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
-| ordered | Use spawn ordered true, don't use spawn ordered if false.                                             | `SPAWN`      | Boolean    |
+| ordered | Use spawn ordered if true, don't use spawn ordered if false. On by default.                           | `SPAWN`      | Boolean    |
+| ordered | Like the `ordered` flag for `SPAWN`, but only for non-instant compares (including `srand`/`frand`). Applies to both supplementary triggers.      | Compares     | Boolean    |
 | noremap | Enables `reset remap` option in the trigger if true.                                                  | `SPAWN`      | Boolean    |
 | tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
