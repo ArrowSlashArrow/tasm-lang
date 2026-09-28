@@ -18,6 +18,20 @@ Which version would you like to install?
 EOF
 )
 
+# stdlib is only bundled in releases newer than v0.3.2
+requires_stdlib() {
+    local v="${1#v}"
+    if [[ "$v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+        # 10# forces base 10 so leading zeros aren't read as octal
+        local n=$(( 10#${BASH_REMATCH[1]} * 1000000000000 + 10#${BASH_REMATCH[2]} * 1000000 + 10#${BASH_REMATCH[3]} ))
+        # 0.3.2 encodes to 3000002
+        (( n > 3000002 ))
+        return
+    fi
+    # unparseable version string: assume it's new enough to ship stdlib
+    return 0
+}
+
 install() {
     local version="$1"
 
@@ -66,10 +80,16 @@ install() {
     rm -rf "$outdir"
 
     mkdir -p "$outdir"
+        mkdir -p "$outdir"
     tar -xzf "$outfile" -C "$outdir"
 
-    # verify stdlib made it into the downloaded archive
-    if [ ! -d "$outdir/stdlib" ]; then
+    local needs_stdlib=false
+    if requires_stdlib "$version"; then
+        needs_stdlib=true
+    fi
+
+    # verify stdlib made it into the downloaded archive (v0.3.2 and older don't ship it)
+    if $needs_stdlib && [ ! -d "$outdir/stdlib" ]; then
         echo -e "\033[31mError: stdlib/ not found in downloaded archive. Installation aborted.\033[0m"
         rm -rf "$outdir" "$outfile"
         return
@@ -80,7 +100,7 @@ install() {
     chmod +x "$TASMDIR/tasmc"
 
     # verify stdlib was actually installed
-    if [ ! -d "$TASMDIR/stdlib" ]; then
+    if $needs_stdlib && [ ! -d "$TASMDIR/stdlib" ]; then
         echo -e "\033[31mError: stdlib/ failed to install to $TASMDIR. Installation may be broken.\033[0m"
         return
     fi

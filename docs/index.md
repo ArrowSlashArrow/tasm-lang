@@ -522,8 +522,14 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | finmode | Round and sign config for final computed result                                                       | Arithmetic   | Round/Sign |
 | itemmod | Modifier in arithmetic instructions. Item result is multiplied by it by default.                      | Arithmetic   | Float      |
 | divmod  | Divides item result by modifier rather than multiplying it.                                           | Arithmetic   | Boolean    |
-| iter    | Compund assignment operator to target item. Akin to `+=`.                                             | Arithmetic   | Operator   |
+| iter    | Compund assignment operator to target item. In the case of `+`, it functions like `+=`.               | Arithmetic   | Operator   |
 | op      | Arithmetic operator between items. Does nothing if there are less than 2 input operands.              | Arithmetic   | Operator   |
+| lmodop  | Operator between the left-hand side value and its assoicated modifier.                                | Compares     | Operator   |
+| rmodop  | Operator between the right-hand side value and its assoicated modifier.                               | Compares     | Operator   |
+| lmod    | Modifier of the left-hand side value.                                                                 | Compares     | Float      |
+| rmod    | Modifier of the right-hand side value.                                                                | Compares     | Float      |
+| lmode   | Rounding and signing mode of the final left-hand side value.                                          | Compares     | Round/Sign |
+| rmode   | Rounding and signing mode of the final right-hand side value.                                         | Compares     | Round/Sign |
 | delay   | Spawn delay in seconds.                                                                               | `SPAWN`      | Float      |
 | remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
 | ordered | Use spawn ordered true, don't use spawn ordered if false.                                             | `SPAWN`      | Boolean    |
@@ -1049,37 +1055,140 @@ Instructions are converted to objects in this manner:
 3. If the group of the entry point is not 0, i.e. that the entry point either exists or has a group, add an IOBlock for it. 
 ## 5.5. Extended Backus-Naur grammar definition
 Note: This grammar is **approximate**. It may allow some things that the compiler doesn't or overshadow details.
-```
-program ::= routine* ;
+```ebnf
+(* Note: This grammar is approximate. Argument/flag *types* are resolved
+   semantically at compile time (see §3.1.2 argsets, §3.3.7), not by this
+   grammar. Where an alternative below could match more than one production,
+   the first matching alternative (top to bottom) wins, mirroring the
+   documented fallback behavior for strings (§3.3.6). *)
 
-routine ::= identifier ":" newline instruction* ;
+program ::= { blank_or_comment_line } { routine } ;
 
-identifier ::= letter [string] ;
+routine ::= label { instruction_stmt | blank_or_comment_line } ;
 
+label ::= identifier ":" line_end ;
+
+instruction_stmt ::= { ws } [ "~" ] instruction [ ws flags ] line_end ;
+
+blank_or_comment_line ::= { ws } [ comment ] newline ;
+
+line_end ::= { ws } [ comment ] newline ;
+
+instruction ::= raw_instruction | import_instruction | normal_instruction ;
+
+(* ---- RAW / RAWTRG: opaque payload, not tokenized as arguments ---- *)
+raw_instruction ::= raw_mnemonic ws raw_object_string ;
+raw_mnemonic ::= "RAW" | "RAWTRG" ;   (* matched case-insensitively *)
+raw_object_string ::= { any_char_except_newline_or_semicolon } ;
+(* Special-cased: unlike every other instruction, the object string is not
+   split on commas into `argument`s — it is captured as a single opaque
+   payload, ending at (but not including) a trailing `;` comment, per
+   §3.1.2.9's description of RAW inserting the string directly according to
+   GDLib's GDObject constructor. Trailing whitespace between the payload and
+   the `;` is presumably trimmed by the compiler rather than treated as part
+   of the object string, though the samples so far don't confirm this either
+   way. *)
+
+(* ---- IMPORT / IMPORTSTD: filesystem-style path, not an identifier ---- *)
+import_instruction ::= import_mnemonic ws import_path ;
+import_mnemonic ::= "IMPORT" | "IMPORTSTD" ;   (* matched case-insensitively *)
+import_path ::= path_segment { "/" path_segment } ;
+path_segment ::= ".." | word ;
+
+(* ---- everything else ---- *)
+normal_instruction ::= mnemonic [ ws argument { "," { ws } argument } ] ;
+
+mnemonic ::= identifier ;
+(* Matched case-insensitively against the fixed instruction set in §3.1.2. *)
+
+argument ::= item
+           | group
+           | hitbox
+           | number
+           | qualified_identifier   (* routine name or alias, e.g. `mem_end`, `mem_8bit::mem_end` *)
+           | escaped_string
+           | bare_string ;
+
+(* ---- flags (§3.1.4) ---- *)
+
+flags ::= "|" { ws } flag { ws flag } ;
+
+flag ::= scalar_flag | dict_flag ;
+
+scalar_flag ::= flag_name ":" scalar_flag_value ;
+(* No whitespace permitted between ':' and the value, per §3.1.4.1. *)
+
+dict_flag ::= flag_name ":" ws dict ;
+(* Exactly one required whitespace between ':' and the opening brace, per
+   §3.1.4.1's documented exception for Dict-typed flags. *)
+
+flag_name ::= identifier ;
+
+scalar_flag_value ::= boolean
+                     | number
+                     | operator
+                     | round_sign
+                     | qualified_identifier ;
+
+boolean ::= "true" | "false" ;
+
+operator ::= "+" | "-" | "*" | "/" ;
+
+round_sign ::= [ round_mode ] [ sign_mode ] ;
+round_mode ::= "round" | "r" | "ceil" | "c" | "floor" | "f" ;
+sign_mode ::= "+" | "-" ;
+
+dict ::= "{" { ws } dict_entry { { ws } "," { ws } dict_entry } { ws } "}" ;
+dict_entry ::= dict_value { ws } "=" { ws } dict_value ;
+dict_value ::= int_literal | qualified_identifier ;
+(* Uses `=`, matching every real remap dict observed (e.g. `{1=129, 2=130}`,
+   `{10001 = 2, ...}`, `{mem_8bit::mem_end = mem_8bit::cread}`). §3.1.4.2
+   currently shows `:` in its Dict example and should be corrected. Spacing
+   around `{`, `=`, and `,` is modeled as optional above since real samples
+   are inconsistent (see point 4 above) — worth pinning down which is
+   actually enforced by the lexer. *)
+
+(* ---- values (§3.3) ---- *)
+
+item ::= counter | timer ;
+counter ::= "C" item_id ;
+timer ::= "T" item_id ;
+group ::= "g" item_id ;
+item_id ::= decimal_id | hex_id ;
+decimal_id ::= digit { digit } ;   (* semantically constrained to [1, 9999] *)
+hex_id ::= "x" hex_digit { hex_digit } ;
+(* Distinct hex convention from the standalone hex number literal below —
+   `Cx56`/`gx56` have no leading "0". *)
+
+hitbox ::= collision_block | qualified_identifier ;  (* alias, e.g. COLL_P1 *)
+collision_block ::= "b" decimal_id ;
+
+number ::= hex_literal | decimal_number ;
+hex_literal ::= "0x" hex_digit { hex_digit } ;   (* fits a 32-bit signed int *)
+decimal_number ::= ["-"] digit { digit }
+                    [ "." digit { digit }
+                      [ ("e" | "E") ["+" | "-"] digit { digit } ] ] ;
+int_literal ::= ["-"] digit { digit } ;
+
+escaped_string ::= "\" word ;
+bare_string ::= word ;   (* fallback: only reached if nothing above matched *)
+
+qualified_identifier ::= identifier [ "::" identifier ] ;
+
+identifier ::= ( letter | "_" ) { letter | digit | "_" } ;
+word ::= { letter | digit | "_" } ;
+
+comment ::= ";" { any_char_except_newline } ;
+
+ws ::= " " | "\t" ;
 newline ::= "\n" | "\r\n" ;
 
-instruction ::= argument { "," { " " } argument } ;
+letter ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+         | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+         | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+         | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
 
-argument ::= string | number | alias | counter | timer ;
+hex_digit ::= digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
 
-alias ::= "MEMREG" | "PTRPOS" ;
-
-counter ::= "C" id ;
-
-timer ::= "T" id ;
-
-id ::= digit
-	| digit digit
-	| digit digit digit
-	| digit digit digit digit ;
-
-string ::= { letter | digit | "_" } ;
-
-letter ::=  "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
-
-number ::= ["-"] digit {digit} [ "." digit {digit} [ ("e" | "E") ["+" | "-"] digit {digit} ] ] ;
-
-int ::= ["-"] digit {digit} ;
-	
 digit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 ```

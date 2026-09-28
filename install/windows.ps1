@@ -23,6 +23,16 @@ Which version would you like to install?
 [1] Using GNU toolchiain 
 "@
 
+# stdlib is only bundled in releases newer than v0.3.2
+function Test-RequiresStdlib ($version) {
+    if ($version -match '^v?(\d+)\.(\d+)\.(\d+)') {
+        $parsed = [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])"
+        return $parsed -gt [version]"0.3.2"
+    }
+    # unparseable version string: assume it's new enough to ship stdlib
+    return $true
+}
+
 function install ($version) {
     # check if there is an installed version already
     $old = [System.Environment]::GetEnvironmentVariable("PATH", "User") -split ";"
@@ -86,8 +96,10 @@ function install ($version) {
     # then update the system
     Expand-Archive -Path $outfile_zip -DestinationPath $outdir -Force
 
-    # verify stdlib made it into the downloaded archive
-    if (-not (Test-Path (Join-Path $outdir "stdlib"))) {
+    $needsStdlib = Test-RequiresStdlib($version)
+
+    # verify stdlib made it into the downloaded archive (v0.3.2 and older don't ship it)
+    if ($needsStdlib -and -not (Test-Path (Join-Path $outdir "stdlib"))) {
         Write-Host "Error: stdlib not found in downloaded archive. Installation aborted." -ForegroundColor Red
         Remove-Item $outdir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $outfile_zip -Force -ErrorAction SilentlyContinue
@@ -100,12 +112,11 @@ function install ($version) {
     Copy-Item -Path (Join-Path $outdir "*") -Destination $tasmdir -Recurse -Force
 
     # verify stdlib was actually installed
-    if (-not (Test-Path (Join-Path $tasmdir "stdlib"))) {
+    if ($needsStdlib -and -not (Test-Path (Join-Path $tasmdir "stdlib"))) {
         Write-Host "Error: stdlib failed to install to $tasmdir. Installation may be broken." -ForegroundColor Red
         return
     }
 
-    Copy-Item -Path (Join-Path $outdir "*") -Destination $tasmdir -Recurse -Force
     $oldpath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
     $newpath = "$oldpath;$tasmdir"
     [System.Environment]::SetEnvironmentVariable("PATH", $newpath, "User")

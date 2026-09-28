@@ -387,7 +387,7 @@ pub fn spawn_compare(
     instant: bool,
     num_2nd_arg: bool,
 ) -> Vec<GDObject> {
-    let cfg = args.cfg;
+    let cfg = args.cfg.clone();
     let scale = match instant {
         false => 0.5,
         true => 1.0,
@@ -397,13 +397,42 @@ pub fn spawn_compare(
         .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
         .with_scale(scale, scale);
 
+    // lmod: f64
+    // rmod: f64
+    // lmodop: op
+    // rmodop: op
+    // lround: round
+    // rround: round
+    // lsign: sign
+    // rsign: sign
+
     let iargs = args.args.as_ref();
-    let lhs = get_item_spec(&iargs[1]).unwrap();
-    let rhs = if num_2nd_arg {
+    let mut lhs = CompareOperand::from(get_item_spec(&iargs[1]).unwrap());
+    lhs.modifier = get_flag_value(&args, "lmod", FlagValue::Float(1.0)).into();
+    lhs.mod_op = get_flag_value(&args, "lmodop", FlagValue::Op(Op::Mul)).into();
+    (lhs.rounding, lhs.sign) = get_flag_value(
+        &args,
+        "lmode",
+        FlagValue::RoundSign((RoundMode::None, SignMode::None)),
+    )
+    .into();
+
+    let existing_rhs_mod = iargs[2].to_float().unwrap();
+    let mut rhs = if num_2nd_arg {
         CompareOperand::number_literal(iargs[2].to_float().unwrap())
     } else {
         get_item_spec(&iargs[2]).unwrap().into()
     };
+
+    // set rhs fields
+    rhs.modifier = get_flag_value(&args, "rmod", FlagValue::Float(existing_rhs_mod)).into();
+    rhs.mod_op = get_flag_value(&args, "rmodop", FlagValue::Op(Op::Mul)).into();
+    (rhs.rounding, rhs.sign) = get_flag_value(
+        &args,
+        "rmode",
+        FlagValue::RoundSign((RoundMode::None, SignMode::None)),
+    )
+    .into();
 
     let target_group = iargs[0].to_group_id().unwrap();
     let spawning_group = if instant {
@@ -452,7 +481,7 @@ pub fn fork_compare(
     num_2nd_arg: bool,
 ) -> Vec<GDObject> {
     // args for a fork compare: true, false, lhs, rhs
-    let cfg = args.cfg;
+    let cfg = args.cfg.clone();
     let scale = match instant {
         false => 0.33,
         true => 1.0,
@@ -462,13 +491,52 @@ pub fn fork_compare(
         .with_pos(cfg.pos.0, cfg.pos.1)
         .with_scale(scale, scale);
 
-    let iargs = args.args.as_ref();
-    let lhs = get_item_spec(&iargs[2]).unwrap();
-    let rhs = if num_2nd_arg {
+    // lmod: f64
+    // rmod: f64
+    // lmodop: op
+    // rmodop: op
+    // lmode: roundsign
+    // rmode: roundsign
+
+    let iargs = &args.args.as_ref();
+
+    // set lhs fields
+    let mut lhs = CompareOperand::from(get_item_spec(&iargs[2]).unwrap());
+    lhs.modifier = get_flag_value(&args, "lmod", FlagValue::Float(1.0)).into();
+    lhs.mod_op = get_flag_value(&args, "lmodop", FlagValue::Op(Op::Mul)).into();
+    (lhs.rounding, lhs.sign) = get_flag_value(
+        &args,
+        "lmode",
+        FlagValue::RoundSign((RoundMode::None, SignMode::None)),
+    )
+    .into();
+
+    let existing_rhs_mod = iargs[2].to_float().unwrap();
+    let mut rhs = if num_2nd_arg {
         CompareOperand::number_literal(iargs[3].to_float().unwrap())
     } else {
         get_item_spec(&iargs[3]).unwrap().into()
     };
+
+    // set rhs fields
+    rhs.modifier = get_flag_value(&args, "rmod", FlagValue::Float(existing_rhs_mod)).into();
+    rhs.mod_op = get_flag_value(&args, "rmodop", FlagValue::Op(Op::Mul)).into();
+    (rhs.rounding, rhs.sign) = get_flag_value(
+        &args,
+        "rmode",
+        FlagValue::RoundSign((RoundMode::None, SignMode::None)),
+    )
+    .into();
+
+    // set rhs fields
+    rhs.modifier = get_flag_value(&args, "rmod", FlagValue::Float(1.0)).into();
+    rhs.mod_op = get_flag_value(&args, "rmodop", FlagValue::Op(Op::Mul)).into();
+    (rhs.rounding, rhs.sign) = get_flag_value(
+        &args,
+        "rmode",
+        FlagValue::RoundSign((RoundMode::None, SignMode::None)),
+    )
+    .into();
 
     let target_true = iargs[0].to_group_id().unwrap();
     let target_false = iargs[1].to_group_id().unwrap();

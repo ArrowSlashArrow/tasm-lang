@@ -1,5 +1,4 @@
 use paste::paste;
-use std::time::Instant;
 
 use crate::core::structs::{TasmPrimitive, TasmValue, fits_arg_signature};
 

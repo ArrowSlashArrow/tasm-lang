@@ -1,15 +1,12 @@
 ; This file contains the standard implementation for the memory controller, which allows the programmer to dynamically access any counter/timer they wish to given any address.
-; This program supports all addresses from 1 - 16384 inclusive, which covers all normal item IDs. Using this program to try to access counters higher than that range may lead to undefined behaviour.
+; This program supports all addresses from 1 - 16384 inclusive. Using this program to try to access counters higher than that range may lead to undefined behaviour.
 ; This file contains five exports:
 ; - `mem`; the routine that is used to access the address in memory.
 ; - `cread`, `cwrite`, `tread`, `twrite`; the four basic functions of this memory: reading/writing to a timer/counter
-; - `end`; placeholder routine that is remapped to a function that will be called
-; The routines in this file must be compiled with a minimum group offest of 8,192 to prevent group and remap collisions. Not doing so may lead to undefined behaviour.
+; - `mem_end`; placeholder routine that is remapped to a function that will be called
 
-; ---- Aliases ----
-; Paste these into your `_init` routine when using this file. These aliases are necessary for this file to work.
-; The values of these aliases may be freely changed, so long as they are all unique. 
-; 
+; The routines in this file must be compiled with a minimum group offest of 8192 to prevent group and remap collisions. Not doing so may lead to undefined behaviour.
+
 ; Each alias is documented below:
 _init:
     ; Temporary counter used to evaluate the address stored in `ptrpos`.

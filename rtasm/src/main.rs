@@ -11,7 +11,7 @@ use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use gdlib::cclocallevels::gdlevel::leveldata::{GDLevelHeaderKey, GDLevelHeaderValue};
 use gdlib::cclocallevels::gdlevel::{CCLocalLevels, GDLevel};
 use gdlib::cclocallevels::gdobj::ids::level_header;
-use gdlib::cclocallevels::gdobj::{GDObject, serialise_objects};
+use gdlib::cclocallevels::gdobj::serialise_objects;
 use gdlib::core::get_cclocallevels_path;
 use tungstenite::{Message, connect};
 
