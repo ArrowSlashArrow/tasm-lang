@@ -1,6 +1,6 @@
-use gdlib::{
-    gdlevel::Level,
-    gdobj::{GDObjConfig, ItemType, misc::text},
+use gdlib::cclocallevels::{
+    gdlevel::{GDLevel, version::GDVersion},
+    gdobj::{meta::GDObjConfig, structs::ItemType, text},
 };
 
 use crate::{
@@ -63,14 +63,15 @@ impl Tasm {
         level_name: &str,
         start_at_group: i16,
         skip_init: bool,
-    ) -> Result<Level, Vec<TasmError>> {
+    ) -> Result<GDLevel, Vec<TasmError>> {
         let spacing = match self.release_mode {
             true => 1.0,
             false => 30.0,
         };
 
         // setup state
-        let mut level = Level::new(level_name, "tasm", None, None);
+        let mut level = GDLevel::new(GDVersion::GD22081);
+        level.identity.name = level_name.to_string();
         self.curr_group = start_at_group;
 
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
@@ -107,7 +108,9 @@ impl Tasm {
             if routine.ident != INIT_ROUTINE {
                 // routine marker
                 level.add_object(text(
-                    &GDObjConfig::new().pos(0.0, rtn_ypos).scale(0.6, 0.6),
+                    &GDObjConfig::new()
+                        .with_pos(0.0, rtn_ypos)
+                        .with_scale(0.6, 0.6),
                     format!("{}: {}", routine.group, routine.ident),
                     0,
                 ));
@@ -167,7 +170,7 @@ impl Tasm {
         obj_pos: &mut f64,
         rtn_ypos: f64,
         spacing: f64,
-        level: &mut Level,
+        level: &mut GDLevel,
     ) {
         // check that any bad assignments aren't happening
         if instr.itype == InstrType::Arithmetic {
@@ -196,7 +199,7 @@ impl Tasm {
             *obj_pos -= *previous_spacing_amount;
         }
 
-        let cfg = if routine.ident == INIT_ROUTINE {
+        let mut cfg = if routine.ident == INIT_ROUTINE {
             if let InstrType::Init = instr.itype {
                 // in the case of a custom init structure,
                 // leave default obj config since it likely wont be used anyways
@@ -205,15 +208,15 @@ impl Tasm {
                 // in the case of a normal position-dependent instruction
                 // negate usual position to place normal triggers in init routine
                 // before the x=0 line to make the instantly execute at the level start
-                GDObjConfig::default().pos(-15.0 - *obj_pos, rtn_ypos)
+                GDObjConfig::default().with_pos(-15.0 - *obj_pos, rtn_ypos)
             }
         } else {
             // normal trigger placement for everything else
             GDObjConfig::default()
-                .pos(105.0 + *obj_pos, rtn_ypos)
-                .groups([routine.group])
+                .with_pos(105.0 + *obj_pos, rtn_ypos)
+                .with_groups([routine.group])
         }
-        .multitrigger(true);
+        .with_multitrigger(true);
 
         let flag_assoc = instr
             .flags
@@ -221,16 +224,14 @@ impl Tasm {
             .map(|f| (f.ident.clone(), f))
             .collect::<HashMap<_, _>>();
 
+        if routine.ident != INIT_ROUTINE {
+            cfg.set_spawnable(true);
+        }
+
         let handler = instr.handler_fn;
         let args = HandlerArgs {
             args: &instr.args[..],
-            cfg: if routine.ident != INIT_ROUTINE {
-                cfg.spawnable(true)
-            } else {
-                // init stuff doesn't get spawned normally
-                // though it is really up to the programmer what they wanna do with it
-                cfg
-            },
+            cfg: cfg,
             curr_group: self.curr_group, // used as auxiliary group
             line: instr.line_number,
             displayed_items: self.displayed_items,

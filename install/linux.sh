@@ -68,9 +68,22 @@ install() {
     mkdir -p "$outdir"
     tar -xzf "$outfile" -C "$outdir"
 
+    # verify stdlib made it into the downloaded archive
+    if [ ! -d "$outdir/stdlib" ]; then
+        echo -e "\033[31mError: stdlib/ not found in downloaded archive. Installation aborted.\033[0m"
+        rm -rf "$outdir" "$outfile"
+        return
+    fi
+
     mkdir -p "$TASMDIR"
     cp -r "$outdir"/. "$TASMDIR/"
     chmod +x "$TASMDIR/tasmc"
+
+    # verify stdlib was actually installed
+    if [ ! -d "$TASMDIR/stdlib" ]; then
+        echo -e "\033[31mError: stdlib/ failed to install to $TASMDIR. Installation may be broken.\033[0m"
+        return
+    fi
 
     # add to PATH in shell config if not already present
     local shell_rc

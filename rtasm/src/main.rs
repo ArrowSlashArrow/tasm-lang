@@ -7,11 +7,12 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::{Error, Result, anyhow};
 use clap::Parser;
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
-use gdlib::{
-    core::get_local_levels_path,
-    gdlevel::{Level, Levels},
-    gdobj::GDObject,
-};
+
+use gdlib::cclocallevels::gdlevel::leveldata::{GDLevelHeaderKey, GDLevelHeaderValue};
+use gdlib::cclocallevels::gdlevel::{CCLocalLevels, GDLevel};
+use gdlib::cclocallevels::gdobj::ids::level_header;
+use gdlib::cclocallevels::gdobj::{GDObject, serialise_objects};
+use gdlib::core::get_cclocallevels_path;
 use tungstenite::{Message, connect};
 
 use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
@@ -93,19 +94,12 @@ struct Args {
     skip_init: bool,
 }
 
-fn get_obj_str(obj: &Vec<GDObject>) -> String {
-    obj.iter()
-        .map(|obj| obj.serialise_to_string())
-        .collect::<Vec<_>>()
-        .join("")
-}
-
-fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
+fn use_wslive(level: GDLevel, port: u16) -> Result<(), Error> {
     let ws_url = format!("ws://127.0.0.1:{}", port);
     let (mut socket, _response) = connect(&ws_url)?;
 
-    let objects_str = match level.get_decrypted_data_ref() {
-        Some(data) => get_obj_str(&data.objects),
+    let objects_str = match level.get_decrypted_data() {
+        Some(data) => serialise_objects(data.objects),
         None => return Ok(()),
     };
 
@@ -124,13 +118,13 @@ fn use_wslive(mut level: Level, port: u16) -> Result<(), Error> {
     Ok(())
 }
 
-fn export_to_savefile(level: Level, logs_enabled: bool) -> Result<(), Error> {
-    if let None = get_local_levels_path() {
+fn export_to_savefile(level: GDLevel, logs_enabled: bool) -> Result<(), Error> {
+    if let None = get_cclocallevels_path() {
         log!(logs_enabled, "Unable to find savefile. Please pass --gmd.");
         return Ok(());
     }
 
-    let mut savefile = Levels::from_local()?;
+    let mut savefile = CCLocalLevels::from_local()?;
     savefile.add_level(level);
     savefile.export_to_savefile()?;
     log!(logs_enabled, "Exported to savefile.");
@@ -243,7 +237,8 @@ fn main() {
 
     log!(!args.no_log, "Encoding level...");
 
-    let level = match main_module.handle_routines_inner(&level_name, curr_group, args.skip_init) {
+    let mut level = match main_module.handle_routines_inner(&level_name, curr_group, args.skip_init)
+    {
         Err(e) => {
             if !args.no_log {
                 print_errors(e, "Unable to compile to level");
@@ -257,9 +252,16 @@ fn main() {
         return;
     }
 
+    if let Some(data) = level.get_decrypted_data_ref() {
+        data.headers.insert(
+            GDLevelHeaderKey::from_id(level_header::PLAFORMER_MODE),
+            GDLevelHeaderValue::Bool(true),
+        );
+    }
+
     if args.clipboard {
         let mut ctx = ClipboardContext::new().unwrap();
-        let obj_str = get_obj_str(&level.get_decrypted_data().unwrap().objects);
+        let obj_str = serialise_objects(level.get_decrypted_data().unwrap().objects);
         match ctx.set_contents(obj_str) {
             Ok(_) => log!(!args.no_log, "Sent to clipboard"),
             Err(e) => log!(!args.no_log, "Failed to send to clipboard: {e}"),

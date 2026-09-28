@@ -120,11 +120,15 @@ impl Tasm {
         // need to take to iteration with mutable references to self in self.push_error
         let instrs = core::mem::take(init_instructions);
         for (line, raw_instr) in instrs.iter() {
-            if !raw_instr.to_uppercase().starts_with("IMPORT ") {
-                continue;
+            let is_std_import: bool;
+            match &raw_instr.to_uppercase() {
+                i if i.starts_with("IMPORT ") => is_std_import = false,
+                i if i.starts_with("IMPORTSTD ") => is_std_import = true,
+                _ => continue, // not an inmport instruction
             }
+
             let args = raw_instr.split('|').next().unwrap();
-            let trimmed = &args[7..] // condition above ensures that this never fails
+            let trimmed = &args[if is_std_import { 10 } else { 7 }..] // condition above ensures that this never fails
                 .split(',')
                 .map(|v| v.trim())
                 .collect::<Vec<_>>();
@@ -158,13 +162,16 @@ impl Tasm {
                 }
 
                 let path = maybe_path.unwrap();
-                // resolve path to be relative to pwd
-                imports.push(
+                imports.push(if is_std_import {
+                    // this module is in tasmdir/stdlib
+                    PathBuf::from(stdlib_dir()).join("stdlib").join(path)
+                } else {
+                    // resolve path to be relative to pwd
                     PathBuf::from(self.fname.clone())
                         .parent()
                         .unwrap()
-                        .join(path),
-                );
+                        .join(path)
+                })
             };
         }
 
@@ -407,7 +414,7 @@ impl Tasm {
                 return;
             }
 
-            if instr.as_str() == "IMPORT" {
+            if instr.as_str() == "IMPORT" || instr.as_str() == "IMPORTSTD" {
                 // why not
                 if curr_routine.ident.as_str() != INIT_ROUTINE {
                     push_error(
@@ -874,4 +881,20 @@ pub fn parse_file<T: AsRef<str>>(
         }
         Err(tasm.errors)
     }
+}
+
+#[cfg(target_os = "windows")]
+fn stdlib_dir() -> PathBuf {
+    PathBuf::from(std::env::var("APPDATA").expect("APPDATA not set"))
+        .join("tasm")
+        .join("stdlib")
+}
+
+#[cfg(not(target_os = "windows"))]
+fn stdlib_dir() -> PathBuf {
+    PathBuf::from(std::env::var("HOME").expect("HOME not set"))
+        .join(".local")
+        .join("bin")
+        .join("tasm")
+        .join("stdlib")
 }

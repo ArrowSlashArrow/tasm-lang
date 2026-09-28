@@ -1,7 +1,7 @@
 extern crate alloc;
 use std::{collections::HashMap, hint::unreachable_unchecked, path::PathBuf};
 
-use gdlib::gdobj::{GDObjConfig, GDObject, Item};
+use gdlib::cclocallevels::gdobj::{GDObject, meta::GDObjConfig, structs::Item};
 
 use crate::core::{
     HandlerFn,

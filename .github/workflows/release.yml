@@ -2,7 +2,7 @@ name: Build and package
 
 on:
   release:
-    types: [ published ]
+    types: [published]
 
 permissions:
   contents: write
@@ -75,6 +75,10 @@ jobs:
           ARCHIVE="tasm-${{ github.ref_name }}-${{ matrix.target }}.$EXT"
 
           cp README.md LICENSE release-${{ matrix.target }}/
+          cp install/windows.ps1 release-${{ matrix.target }}/install.ps1
+          cp install/linux.sh release-${{ matrix.target }}/install.sh
+          cp -r stdlib release-${{ matrix.target }}/stdlib
+
           cd release-${{ matrix.target }}
 
           if [[ "$EXT" == "zip" ]]; then

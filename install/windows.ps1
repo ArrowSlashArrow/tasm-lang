@@ -82,11 +82,29 @@ function install ($version) {
     if (Test-Path $outdir) {
         Remove-Item $outdir -Recurse -Force -ErrorAction SilentlyContinue
     }
+
     # then update the system
     Expand-Archive -Path $outfile_zip -DestinationPath $outdir -Force
+
+    # verify stdlib made it into the downloaded archive
+    if (-not (Test-Path (Join-Path $outdir "stdlib"))) {
+        Write-Host "Error: stdlib not found in downloaded archive. Installation aborted." -ForegroundColor Red
+        Remove-Item $outdir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $outfile_zip -Force -ErrorAction SilentlyContinue
+        return
+    }
+
     if (-not(Test-Path $tasmdir)) {
         mkdir $tasmdir | Out-Null
     }
+    Copy-Item -Path (Join-Path $outdir "*") -Destination $tasmdir -Recurse -Force
+
+    # verify stdlib was actually installed
+    if (-not (Test-Path (Join-Path $tasmdir "stdlib"))) {
+        Write-Host "Error: stdlib failed to install to $tasmdir. Installation may be broken." -ForegroundColor Red
+        return
+    }
+
     Copy-Item -Path (Join-Path $outdir "*") -Destination $tasmdir -Recurse -Force
     $oldpath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
     $newpath = "$oldpath;$tasmdir"

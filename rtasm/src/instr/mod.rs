@@ -1,7 +1,4 @@
-use gdlib::gdobj::{
-    Item,
-    triggers::{CompareOp, Op},
-};
+use gdlib::cclocallevels::gdobj::structs::{CompareOp, Item, Op};
 
 use phf::phf_map;
 
@@ -435,12 +432,13 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         &[argset!((String) => raw_trigger)],
         InstrType::Misc,
     ),
-    // collision triggers
+    // instant collision check between two hitboxes. spawns first group if colliding, spawns second if not
     "INSTCOLL" => (
         false,
         &[argset!((Group, Group, CollBlock, CollBlock) => instcoll)],
         InstrType::Process
     ),
+    // collision event listener
     "COLL" => (
         true,
         &[argset!((Group, CollBlock, CollBlock) => coll)],

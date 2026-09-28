@@ -74,7 +74,7 @@ Note that instruction argsets are typed to ensure that valid arguments are passe
 All instructions in this section are expected to be fully functional. Any deprecated instructions will not be listed as of the next minor release.
 
 If an instruction does not have a specified execution time, assume that it is a 1-tick instruction.
-#### 3.1.2.1 Arithmetic
+#### 3.1.2.1. Arithmetic
 All arithmetic instructions are 1-tick.  
 By convention, the counter that stores the result of an arithmetic operation is usually specified as the first argument.
 ##### Argument format
@@ -165,6 +165,7 @@ All available instant compare instructions:
 - ISRAND, IFRAND
 
 All instant compare instructions take the same arguments as their base counterparts.
+Execution time: 1 tick.
 
 ##### Random Spawns
 `SRAND <routine> <number>`
@@ -184,19 +185,22 @@ SRAND do_stuff, 42.8
 ```
 The routine `do_stuff` has a 42.8% chance of being spawned.
 
-<!-- deprecated -->
+Execution time: 2 ticks.
+
 #### 3.1.2.3. Collision checkers
 These instructions check collisions between two hitboxes. They primarily use the collision and instant collision triggers.
 ##### INSTCOLL
 Arguments: `INSTCOLL <group> <group> <hitbox> <hitbox>`
-Spawns the first group if the hitboxes are colliding at the instant that this instruction runs; spawns the second group if that is not the case. Leave either group as `0` to not spawn anything.
+Spawns the first group if the hitboxes are colliding at the instant that this instruction runs; spawns the second group if that is not the case. Leave either group as `0` to not spawn anything. This instruction compiles to an instant collision trigger.
 
-See #[this section](#3341-valid-hitbox-cominations) for valid combinations of the third and fourth arguments.
+Unlike compare instructions, this instruction *does not* use intermediate spawn triggers to ensure spawn order. Consider spawning an intermediate routine for each routine to make them spawn-ordered or stoppable/killable. 
+
+See #(this section)[#3341-valid-hitbox-combinations] for valid combinations of the third and fourth arguments.
 ##### COLL
 Arguments: `COLL <group> <hitbox> <hitbox>`
 Spawns the target group when the two hitboxes collide. Leave the target group as `0` to not spawn anything. This trigger will spawn the group whenever the two hitboxes collide.
 
-See #[this section](#3341-valid-hitbox-cominations) for valid combinations of the second and third arguments.  
+See #(this section)[#3341-valid-hitbox-combinations] for valid combinations of the second and third arguments.  
 Supported flags: `nospawn`, `onexit`.  
 Only allowed in the `_init` routine.
 #### 3.1.2.4. Process
@@ -206,7 +210,7 @@ These instructions are responsible for managing running groups. This includes sp
 Arguments: `SPAWN <routine>`
 
 Spawns the corresponding routine. Does not pause the current group.  
-By default, the generated spawn trigger has `spawn ordered` set to `true`. This can be changed by setting the `ordered` to true. More on flags #[here](#314-instruction-flags).
+By default, the generated spawn trigger has `spawn ordered` set to `true`. This can be changed by setting the `ordered` to true. More on flags #(here)[#314-instruction-flags].
 
 Execution time: 1 tick.  
 
@@ -369,7 +373,7 @@ One may obtain an object string by using the BetterEdit mod for Geode, and simpl
 > Please double-check and comment usages of this instruction thoroughly. Object strings are notoriously opaque and difficult to read, which makes them very prone to accidental misformatting.
 
 Execution time: 0 ticks.
-#### 3.1.2.9.1. The `RAWTRG` instruction
+##### 3.1.2.9.1. The `RAWTRG` instruction
 Much like the `RAW` instruction, the `RAWTRG` instruction takes an object string and inserts it into the level, except that all given objects are treated as part of the routine. This has the follow implications: 
 - All given objects are placed the compiler-assigned position in the respective routine, in the respective instruction position. 
 - All given objects are appended to the group of routine
@@ -402,7 +406,40 @@ _init:
 
 For more documentation on the module system, refer to [this section](#34-external-symbols-and-the-module-system).
 
-#### 3.1.2.11. Excluded instructions
+#### 3.1.2.11. Importing from the standard library (`IMPORTSTD`)
+The IMPORTSTD instruction behaves identically to the IMPORT instruction, except that the given path is resolved relative to the `stdlib` directory of the standard TASM installation, rather than relative to the current file's location. This instruction expects only one argument: a path to the library file, relative to the installation's stdlib directory and without the .tasm extension.
+
+To ensure that this instruction works properly, please install TASM via the provided install scripts (`install.ps1` on windows; `install.sh` on linux)
+
+Like IMPORT, this instruction is exclusive to the _init routine.
+
+##### 3.1.2.11.1. Example standard import
+Assuming a standard TASM installation with the following stdlib structure:
+
+```
+<tasm install dir>/
+	stdlib/
+		math.tasm
+		collections/
+			list.tasm
+```
+
+A program can pull in symbols from math.tasm and collections/list.tasm as follows:
+
+```x86asm
+_init:
+	; imports stdlib/math.tasm
+	importstd math
+
+	; imports stdlib/collections/list.tasm
+	importstd collections/list
+
+; now, we can use symbols from both library files.
+; ...
+```
+For more documentation on the module system, refer to #(this section)[#34-external-symbols-and-the-module-system].
+
+#### 3.1.2.12. Excluded instructions (not part of the ISA)
 Some instructions were left out in the design process of the ISA that arguably could be very useful, like the `MOD` instruction. Initially the `MOD` instruction was intended as a supplement to the arithmetic set of instructions as a utility. However, this instruction was eventually excluded for the instruction set due to consisting of existing instructions. As seen in the [prime number check example](#prime-checker), a modulus is necessary to compute to determine whether a number is factorable by some other number.  
 It is clear in that example that the MOD instruction is just a constituent of other arithmetic operations, which is why it was excluded. The primary goal of TASM is to be a direct representation of GD triggers as code. Since there is no trigger that computes the modulus of a number, this operation is excluded.  
 Likewise, all bitwise instructions were left out of the TASM instruction set because there are no built-in operations to compute, for instance, a & b.
@@ -423,8 +460,9 @@ Below is a list of instructions and their corresponding structures:
 - `IOBLOCK`: An [IOBlock](#121-ioblock) that is put at y=75 and some specified x-position that acts as a debug group spawn. The x-position is processed such that it translates to a block position, e.g. 5 becomes 5 blocks (+ 2 for margin) to the right of the y-axis, centered on a cell.
 - `PERS`: Adds a persistent item trigger for the specified item.
 - `DISPLAY`: Displays a counter at some specified height and x=0 of the given counter.
-- `ALIAS`: See #[this documentation](#3128-the-alias-instruction)
-- `IMPORT`: See #[this documentation](#31210-the-import-instruction)
+- `ALIAS`: See #(this documentation)[#3128-the-alias-instruction]
+- `IMPORT`: See #(this documentation)[#31210-the-import-instruction]
+- `IMPORTSTD`: See #(this documentation)[#31211-importing-from-the-standard-library-importstd]
 ### 3.1.4. Instruction flags
 The function of a given instructions is usually simple/single-purposed, and only uses a handful of parameters within the trigger that it compiles to. However, triggers are remarkably configurable, and in some cases may simplify otherwise needlessly complex setups.  
 A common example is the implementation of getting the absolute value of a number. The old implementation required a comparison of the target (C1) against 0 to determine its sign, which determined whether it should be negatied. This is much more complex and wasteful of groups than simply using the absolute rounding mode.
@@ -682,7 +720,7 @@ There are two ways to declare a hitbox:
 1. `b{id}` where `id` is the ID of a collision block
 2. [Using an alias](#335-aliases).
 
-#### 3.3.4.1. Valid hitbox cominations
+#### 3.3.4.1. Valid hitbox combinations
 When using a collision instruction, the two hitboxes can only be one of the below pairs.
 Any other combination is not supported in GD and will cause the compiler to throw an error.
 
@@ -722,9 +760,15 @@ The module system exists to allow for the reuse of code without needing to dupli
 
 Due to not being able to import triggers, all imported routines are statically linked into the original program. Names are automatically mangled by the compiler, so there is no need to try to account for name conflicts.
 
+Across files, the compiler internally mangles each symbol by joining the file's path with the symbol name, guaranteeing a globally unique internal name regardless of how many files reuse the same local identifier (e.g., two different libraries can each define a routine called multiply without conflict). This mangling is an internal linker detail - authors always refer to symbols with the module::symbol syntax and never see or need to construct the mangled form themselves in TASM. Note that mangled symbol labels are inserted into the generated level instead of the original identifier of that symbol.
+
 ### 3.4.1. Using external symbols
 When importing a module, the objective is to use symbols defined in that module. This is done by importing the module wherein the desired symbol is defined and then referencing that symbol in the main program.
 An external symbol is declared with the syntax `module::symbol`, where `module` is the module where the `symbol` lives. This symbol can be either a routine or an alias.
+
+A library file may define its own `_init` routine. When that file is imported elsewhere, only its `ALIAS` and `IMPORT`/`IMPORTSTD` declarations take effect - those contribute aliases and further nested imports to the importing program, as shown above. Any other `_init`-exclusive instructions the library defines (`PERS`, `DISPLAY`, `IOBLOCK`) are ignored entirely when the file is used as an import; they are only meaningful if that file is compiled directly as the program's entry point.
+
+Additional, library files are not expected to have an entry point. They serve as collections of useful consts/functions that other files can import. The `_start` routine is only necessary when the file is compiled directly. 
 
 ### 3.4.2. Module usage examples 
 #### Basic usage example
@@ -758,7 +802,7 @@ _start: (1)
 ```
 The reference to `library::multiply` is replaced with its assigned group.
 
-The linker will not insert all routines from a file, only the ones necessary for the program. If a module is imported but not used, it is not considered by the linker except in the case of a circular import.
+Import resolution is lazy: the linker only parses and links symbols that are actually reachable from the program. An imported module that is never referenced is never parsed at all.
 
 #### Nested imports
 Suppose we have a library file which uses another dependency:
@@ -804,9 +848,8 @@ _start: (1)
 
 ### 3.4.3. Edge cases
 Diamond dependencies are supported in TASM. The linker uses a module cache to keep track of all seen modules which also prevents any duplicate parsing and allows for faster compilation times.
-
-Circular imports are not allowed. Due to the linker needing to resolve all referenced symbols, recursively evaluating each module will lead to infinite recursion. This is caught by the linker's module cache early and prevented.
-There is always better way than a circular import. 
+The linker's module cache ensures each module's code is linked into the output exactly once, no matter how many other modules import it. If both `A` and `B` import `C`, `C` is only copied into the final program a single time - not once per importer.
+If the linker encounters a circular chain of imports, it raises a compile error rather than attempting to resolve the cycle (which would lead to infinite recursion). Prefer extracting the shared symbols both sides need into a common module that each imports independently, rather than having two modules import each other.
 
 ## 3.5. Group usage 
 Some instructions use a group or two to sustain the intended functionality of the instruction. Please be mindful of this when working on a project that may take a lot of groups.

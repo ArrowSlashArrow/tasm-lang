@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gdlib::gdobj::triggers::{Op, RoundMode, SignMode};
+use gdlib::cclocallevels::gdobj::structs::{Op, RoundMode, SignMode};
 
 use crate::core::structs::{SymbolPath, SymbolValue, split_at_str_once};
 

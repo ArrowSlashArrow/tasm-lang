@@ -1,13 +1,14 @@
-use gdlib::gdobj::{
-    GDObjConfig, GDObject, GDValue, Group, ItemType, ZLayer,
-    ids::properties::{ACTIVATE_GROUP, TARGET_ITEM, TARGET_ITEM_2, TRIGGER_ON_EXIT},
-    misc::{default_block, text},
-    triggers::{
-        ColliderConfig, CompareOp, CompareOperand, ItemAlign, Op, RoundMode, SignMode, StopMode,
-        TimeTriggerConfig, collision_trigger, counter_object, instant_coll_trigger, item_compare,
-        item_edit, persistent_item, random_trigger, spawn_trigger, stop_trigger, time_control,
-        time_trigger, toggle_trigger,
+use gdlib::cclocallevels::gdobj::{
+    CollisionTrigger, CounterLabel, GDObject, InstantCollTrigger, ItemCompareTrigger,
+    ItemEditTrigger, PersistentItemTrigger, RandomTrigger, SpawnTrigger, StopTrigger,
+    TimeControlTrigger, TimeTrigger, ToggleTrigger,
+    ids::objects::BLACK_GRADIENT_SQUARE,
+    meta::GDObjConfig,
+    structs::{
+        CompareOp, CompareOperand, Group, ItemAlign, ItemType, Op, RoundMode, SignMode, StopMode,
+        ZLayer,
     },
+    text,
 };
 
 use paste::paste;
@@ -124,21 +125,23 @@ pub fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
     );
     flag_override(&mut finmode, "finmode", &args);
 
-    vec![item_edit(
-        &args.cfg,
-        Some(operand),
-        None,
-        result,
-        modifier,
-        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
-            .to_bool()
-            .unwrap(),
-        get_flag_value_opt(&args, "op").map(|f| f.to_op().unwrap()),
-        resmode.0,
-        finmode.0,
-        resmode.1,
-        finmode.1,
+    vec![GDObject::from_config(
+        args.cfg.clone(),
+        ItemEditTrigger {
+            operand1: Some(operand),
+            operand2: None,
+            target: result,
+            modifier,
+            assign_op: get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+                .to_bool()
+                .unwrap(),
+            id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
+            id_rounding: resmode.0,
+            result_rounding: finmode.0,
+            id_sign: resmode.1,
+            result_sign: finmode.1,
+        },
     )]
 }
 pub fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
@@ -160,21 +163,23 @@ pub fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
     let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
 
-    vec![item_edit(
-        &args.cfg,
-        Some(op1),
-        Some(op2),
-        res,
-        modifier,
-        get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
-            .to_bool()
-            .unwrap(),
-        Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
-        resmode.0,
-        finmode.0,
-        resmode.1,
-        finmode.1,
+    vec![GDObject::from_config(
+        args.cfg.clone(),
+        ItemEditTrigger {
+            operand1: Some(op1),
+            operand2: Some(op2),
+            target: res,
+            modifier,
+            assign_op: get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+                .to_bool()
+                .unwrap(),
+            id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
+            id_rounding: resmode.0,
+            result_rounding: finmode.0,
+            id_sign: resmode.1,
+            result_sign: finmode.1,
+        },
     )]
 }
 pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
@@ -194,21 +199,25 @@ pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GD
     );
     flag_override(&mut finmode, "finmode", &args);
 
-    vec![item_edit(
-        &args.cfg,
-        None,
-        None,
-        res,
-        modifier,
-        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
-            .to_bool()
-            .unwrap(),
-        get_flag_value_opt(&args, "op").map(|f| f.to_op().unwrap()),
-        resmode.0,
-        finmode.0,
-        resmode.1,
-        finmode.1,
+    vec![GDObject::from_config(
+        args.cfg.clone(),
+        ItemEditTrigger {
+            operand1: None,
+            operand2: None,
+            target: res,
+            modifier,
+            assign_op: get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+                .to_bool()
+                .unwrap(),
+            id_op: get_flag_value_opt(&args, "op")
+                .map(|f| f.to_op().unwrap())
+                .unwrap_or(op),
+            id_rounding: resmode.0,
+            result_rounding: finmode.0,
+            id_sign: resmode.1,
+            result_sign: finmode.1,
+        },
     )]
 }
 pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
@@ -227,22 +236,24 @@ pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<
     flag_override(&mut resmode, "resmode", &args);
     let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
-    vec![item_edit(
-        &args.cfg,
-        Some(op1),
-        None,
-        res,
-        modifier,
-        get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
-        // since we know this is only used for mul and div instructions, this is fine.
-        !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
-            .to_bool()
-            .unwrap(),
-        Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
-        resmode.0,
-        finmode.0,
-        resmode.1,
-        finmode.1,
+    vec![GDObject::from_config(
+        args.cfg.clone(),
+        ItemEditTrigger {
+            operand1: Some(op1),
+            operand2: None,
+            target: res,
+            modifier,
+            assign_op: get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
+            // since we know this is only used for mul and div instructions, this is fine.
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+                .to_bool()
+                .unwrap(),
+            id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
+            id_rounding: resmode.0,
+            result_rounding: finmode.0,
+            id_sign: resmode.1,
+            result_sign: finmode.1,
+        },
     )]
 }
 
@@ -262,21 +273,23 @@ pub fn arithmetic_with_mod_2items_num(args: HandlerArgs, op: Op, mul: bool) -> V
     let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
 
-    vec![item_edit(
-        &args.cfg,
-        Some(op1),
-        None,
-        res,
-        modifier,
-        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(mul))
-            .to_bool()
-            .unwrap(),
-        get_flag_value_opt(&args, "op").map(|f| f.into()),
-        resmode.0,
-        finmode.0,
-        resmode.1,
-        finmode.1,
+    vec![GDObject::from_config(
+        args.cfg.clone(),
+        ItemEditTrigger {
+            operand1: Some(op1),
+            operand2: None,
+            target: res,
+            modifier,
+            assign_op: get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(mul))
+                .to_bool()
+                .unwrap(),
+            id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
+            id_rounding: resmode.0,
+            result_rounding: finmode.0,
+            id_sign: resmode.1,
+            result_sign: finmode.1,
+        },
     )]
 }
 pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> Vec<GDObject> {
@@ -291,22 +304,24 @@ pub fn arithmetic_with_mod_3items_num(args: HandlerArgs, op: Op, mul: bool) -> V
     let mut finmode = (RoundMode::None, SignMode::None);
     flag_override(&mut finmode, "finmode", &args);
 
-    vec![item_edit(
-        &args.cfg,
-        Some(op1),
-        Some(op2),
-        res,
-        modifier,
-        get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-        !get_flag_value(&args, "divmod", FlagValue::Bool(mul))
-            .to_bool()
-            .unwrap(),
-        // id op should be the same as assign op
-        Some(get_flag_value(&args, "op", FlagValue::Op(op)).into()),
-        RoundMode::None,
-        RoundMode::None,
-        SignMode::None,
-        SignMode::None,
+    vec![GDObject::from_config(
+        args.cfg.clone(),
+        ItemEditTrigger {
+            operand1: Some(op1),
+            operand2: Some(op2),
+            target: res,
+            modifier,
+            assign_op: get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(mul))
+                .to_bool()
+                .unwrap(),
+            // id op should be the same as assign op
+            id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
+            id_rounding: RoundMode::None,
+            result_rounding: RoundMode::None,
+            id_sign: SignMode::None,
+            result_sign: SignMode::None,
+        },
     )]
 }
 
@@ -352,15 +367,17 @@ pub fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
 /* COMPARES */
 
 pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16) -> GDObject {
-    spawn_trigger(
-        spawn_cfg,
-        group,
-        GROUP_SPAWN_DELAY,
-        0.0,
-        false,
-        true,
-        false,
-        vec![],
+    GDObject::from_config(
+        spawn_cfg.clone(),
+        SpawnTrigger {
+            spawn_id: group,
+            delay: GROUP_SPAWN_DELAY,
+            delay_variation: 0.0,
+            reset_remap: false,
+            spawn_ordered: true,
+            preview_disable: false,
+            spawn_remaps: vec![],
+        },
     )
 }
 
@@ -377,8 +394,8 @@ pub fn spawn_compare(
     };
     let compare_cfg = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 - 7.5)
-        .scale(scale, scale);
+        .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
+        .with_scale(scale, scale);
 
     let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[1]).unwrap();
@@ -388,27 +405,32 @@ pub fn spawn_compare(
         get_item_spec(&iargs[2]).unwrap().into()
     };
 
-    let spawning_group = iargs[0].to_group_id().unwrap();
+    let target_group = iargs[0].to_group_id().unwrap();
+    let spawning_group = if instant {
+        target_group
+    } else {
+        args.curr_group
+    };
     let spawn_cfg = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 + 7.5)
-        .scale(0.5, 0.5)
-        .groups([args.curr_group])
-        .set_control_id(spawning_group); // use auxiliary group for spawn trigger
+        .with_pos(cfg.pos.0, cfg.pos.1 + 7.5)
+        .with_scale(0.5, 0.5)
+        .with_groups([args.curr_group])
+        .with_control_id(target_group); // use auxiliary group for spawn trigger
 
-    let mut compare = item_compare(
-        &compare_cfg,
-        args.curr_group, // spawn auxiliary group (spawn trigger)
-        0,
-        lhs.into(),
-        rhs,
-        op,
-        0.0,
+    let compare = GDObject::from_config(
+        compare_cfg,
+        ItemCompareTrigger {
+            true_id: spawning_group, // spawn auxiliary group (spawn trigger)
+            false_id: 0,
+            lhs: lhs.into(),
+            rhs,
+            compare_op: op,
+            tolerance: 0.0,
+        },
     );
 
     if instant {
-        // override spawn group
-        compare.set_property(TARGET_ITEM, GDValue::Group(spawning_group));
         // don't use any intermediate triggers if spawning instantly
         vec![compare]
     } else {
@@ -435,7 +457,10 @@ pub fn fork_compare(
         false => 0.33,
         true => 1.0,
     };
-    let compare_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1).scale(scale, scale);
+    let compare_cfg = cfg
+        .clone()
+        .with_pos(cfg.pos.0, cfg.pos.1)
+        .with_scale(scale, scale);
 
     let iargs = args.args.as_ref();
     let lhs = get_item_spec(&iargs[2]).unwrap();
@@ -445,36 +470,47 @@ pub fn fork_compare(
         get_item_spec(&iargs[3]).unwrap().into()
     };
 
-    let spawning_true = iargs[0].to_group_id().unwrap();
-    let spawning_false = iargs[1].to_group_id().unwrap();
+    let target_true = iargs[0].to_group_id().unwrap();
+    let target_false = iargs[1].to_group_id().unwrap();
+
+    let spawning_true = if instant {
+        target_true
+    } else {
+        args.curr_group
+    };
+    let spawning_false = if instant {
+        target_false
+    } else {
+        args.curr_group + 1
+    };
+
     let spawn_true_cfg = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 + 10.0)
-        .scale(0.33, 0.33)
-        .groups([args.curr_group])
-        .set_control_id(spawning_true); // use auxiliary group for spawn trigger
+        .with_pos(cfg.pos.0, cfg.pos.1 + 10.0)
+        .with_scale(0.33, 0.33)
+        .with_groups([args.curr_group])
+        .with_control_id(target_true); // use auxiliary group for spawn trigger
 
     let spawn_false_cfg = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 - 10.0)
-        .scale(0.33, 0.33)
-        .groups([args.curr_group + 1])
-        .set_control_id(spawning_false); // use auxiliary group for spawn trigger
+        .with_pos(cfg.pos.0, cfg.pos.1 - 10.0)
+        .with_scale(0.33, 0.33)
+        .with_groups([args.curr_group + 1])
+        .with_control_id(target_false); // use auxiliary group for spawn trigger
 
-    let mut compare = item_compare(
-        &compare_cfg,
-        args.curr_group,     // spawn auxiliary group (true trigger)
-        args.curr_group + 1, // spawn 2nd aux group (false trigger)
-        lhs.into(),
-        rhs,
-        op,
-        0.0,
+    let compare = GDObject::from_config(
+        compare_cfg,
+        ItemCompareTrigger {
+            true_id: spawning_true,
+            false_id: spawning_false,
+            lhs: lhs.into(),
+            rhs,
+            compare_op: op,
+            tolerance: 0.0,
+        },
     );
 
     if instant {
-        // override spawn group
-        compare.set_property(TARGET_ITEM, GDValue::Group(spawning_true));
-        compare.set_property(TARGET_ITEM_2, GDValue::Group(spawning_false));
         // don't use any intermediate triggers if spawning instantly
         vec![compare]
     } else {
@@ -502,7 +538,10 @@ handlers!([eq, ne, le, leq, ge, geq] + 2 => fork_item_item);
 
 pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
-    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
+    let random_cfg = cfg
+        .clone()
+        .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
+        .with_scale(0.5, 0.5);
 
     let iargs = args.args.as_ref();
     let spawning_group = iargs[0].to_group_id().unwrap();
@@ -511,13 +550,20 @@ pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
     let aux_group = args.curr_group;
     let spawn_cfg = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 + 7.5)
-        .scale(0.5, 0.5)
-        .groups([aux_group])
-        .set_control_id(spawning_group); // use auxiliary group for spawn trigger
+        .with_pos(cfg.pos.0, cfg.pos.1 + 7.5)
+        .with_scale(0.5, 0.5)
+        .with_groups([aux_group])
+        .with_control_id(spawning_group); // use auxiliary group for spawn trigger
 
     Ok(HandlerData::from_objects(vec![
-        random_trigger(&random_cfg, chance, aux_group, 0),
+        GDObject::from_config(
+            random_cfg,
+            RandomTrigger {
+                chance,
+                target_group1: aux_group,
+                target_group2: 0,
+            },
+        ),
         spawn_trg(&spawn_cfg, spawning_group),
     ])
     .extra_groups(1))
@@ -525,7 +571,10 @@ pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
 
 pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
-    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5).scale(0.5, 0.5);
+    let random_cfg = cfg
+        .clone()
+        .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
+        .with_scale(0.5, 0.5);
 
     let iargs = args.args.as_ref();
     let spawning_group1 = iargs[0].to_group_id().unwrap();
@@ -536,19 +585,26 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
     let aux_group2 = args.curr_group + 1;
     let spawn_cfg1 = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 + 7.5)
-        .scale(0.5, 0.5)
-        .groups([aux_group1])
-        .set_control_id(spawning_group1); // use auxiliary group for spawn trigger
+        .with_pos(cfg.pos.0, cfg.pos.1 + 7.5)
+        .with_scale(0.5, 0.5)
+        .with_groups([aux_group1])
+        .with_control_id(spawning_group1); // use auxiliary group for spawn trigger
     let spawn_cfg2 = cfg
         .clone()
-        .pos(cfg.pos.0, cfg.pos.1 - 7.5)
-        .scale(0.5, 0.5)
-        .groups([aux_group2])
-        .set_control_id(spawning_group2); // use auxiliary group for spawn trigger
+        .with_pos(cfg.pos.0, cfg.pos.1 - 7.5)
+        .with_scale(0.5, 0.5)
+        .with_groups([aux_group2])
+        .with_control_id(spawning_group2); // use auxiliary group for spawn trigger
 
     Ok(HandlerData::from_objects(vec![
-        random_trigger(&random_cfg, chance, aux_group1, aux_group2),
+        GDObject::from_config(
+            random_cfg,
+            RandomTrigger {
+                chance,
+                target_group1: aux_group1,
+                target_group2: aux_group2,
+            },
+        ),
         spawn_trg(&spawn_cfg1, spawning_group1),
         spawn_trg(&spawn_cfg2, spawning_group2),
     ])
@@ -557,34 +613,38 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
 
 pub fn instant_spawn_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
-    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5);
+    let random_cfg = cfg.clone().with_pos(cfg.pos.0, cfg.pos.1 - 7.5);
 
     let iargs = args.args.as_ref();
     let spawning_group = iargs[0].to_group_id().unwrap();
     let chance = iargs[1].to_float().unwrap();
 
-    Ok(HandlerData::from_objects(vec![random_trigger(
-        &random_cfg,
-        chance,
-        spawning_group,
-        0,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        random_cfg,
+        RandomTrigger {
+            chance,
+            target_group1: spawning_group,
+            target_group2: 0,
+        },
     )]))
 }
 
 pub fn instant_fork_random(args: HandlerArgs) -> HandlerReturn {
     let cfg = args.cfg;
-    let random_cfg = cfg.clone().pos(cfg.pos.0, cfg.pos.1 - 7.5);
+    let random_cfg = cfg.clone().with_pos(cfg.pos.0, cfg.pos.1 - 7.5);
 
     let iargs = args.args.as_ref();
     let spawning_group1 = iargs[0].to_group_id().unwrap();
     let spawning_group2 = iargs[1].to_group_id().unwrap();
     let chance = iargs[2].to_float().unwrap();
 
-    Ok(HandlerData::from_objects(vec![random_trigger(
-        &random_cfg,
-        chance,
-        spawning_group1,
-        spawning_group2,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        random_cfg,
+        RandomTrigger {
+            chance,
+            target_group1: spawning_group1,
+            target_group2: spawning_group2,
+        },
     )]))
 }
 
@@ -592,61 +652,74 @@ pub fn instant_fork_random(args: HandlerArgs) -> HandlerReturn {
 
 pub fn spawn(args: HandlerArgs) -> HandlerReturn {
     let spawning_group = args.args[0].to_group_id().unwrap();
-    let cfg = args.cfg.clone().set_control_id(spawning_group);
-    wrap_objs!(vec![spawn_trigger(
-        &cfg,
-        spawning_group,
-        get_flag_value(&args, "delay", FlagValue::Float(GROUP_SPAWN_DELAY)).into(),
-        0.0,
-        get_flag_value(&args, "noremap", FlagValue::Bool(false)).into(),
-        get_flag_value(&args, "ordered", FlagValue::Bool(true)).into(),
-        false,
-        get_flag_value(&args, "remap", FlagValue::Dict(vec![])).into()
+    let cfg = args.cfg.clone().with_control_id(spawning_group);
+
+    wrap_objs!(vec![GDObject::from_config(
+        cfg,
+        SpawnTrigger {
+            spawn_id: spawning_group,
+            delay: get_flag_value(&args, "delay", FlagValue::Float(GROUP_SPAWN_DELAY)).into(),
+            delay_variation: 0.0,
+            reset_remap: get_flag_value(&args, "noremap", FlagValue::Bool(false)).into(),
+            spawn_ordered: get_flag_value(&args, "ordered", FlagValue::Bool(true)).into(),
+            preview_disable: false,
+            spawn_remaps: get_flag_value(&args, "remap", FlagValue::Dict(vec![])).into(),
+        }
     )])
 }
 
 pub fn pause(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![stop_trigger(
-        &args.cfg,
-        args.args[0].to_group_id().unwrap(),
-        StopMode::Pause,
-        true,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        StopTrigger {
+            target_group: args.args[0].to_group_id().unwrap(),
+            stop_mode: StopMode::Pause,
+            use_control_id: true,
+        },
     )]))
 }
 
 pub fn resume(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![stop_trigger(
-        &args.cfg,
-        args.args[0].to_group_id().unwrap(),
-        StopMode::Resume,
-        true,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        StopTrigger {
+            target_group: args.args[0].to_group_id().unwrap(),
+            stop_mode: StopMode::Resume,
+            use_control_id: true,
+        },
     )]))
 }
 
 pub fn stop(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![stop_trigger(
-        &args.cfg,
-        args.args[0].to_group_id().unwrap(),
-        StopMode::Stop,
-        true,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        StopTrigger {
+            target_group: args.args[0].to_group_id().unwrap(),
+            stop_mode: StopMode::Stop,
+            use_control_id: true,
+        },
     )]))
 }
 
 /* TIMERS */
 
 pub fn tstart(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![time_control(
-        &args.cfg,
-        get_item_spec(&args.args[0]).unwrap().id(),
-        false,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        TimeControlTrigger {
+            id: get_item_spec(&args.args[0]).unwrap().id(),
+            stop: false,
+        },
     )]))
 }
 
 pub fn tstop(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![time_control(
-        &args.cfg,
-        get_item_spec(&args.args[0]).unwrap().id(),
-        true,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        TimeControlTrigger {
+            id: get_item_spec(&args.args[0]).unwrap().id(),
+            stop: true,
+        },
     )]))
 }
 
@@ -654,19 +727,19 @@ pub fn tspawn(args: HandlerArgs) -> HandlerReturn {
     let timer = args.args[0].to_timer_id().unwrap();
     let start_time = args.args[1].to_float().unwrap();
     let stop_time = args.args[2].to_float().unwrap();
-    Ok(HandlerData::from_objects(vec![time_trigger(
-        &args.cfg,
-        TimeTriggerConfig {
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg.clone(),
+        TimeTrigger {
             start_time,
             stop_time,
             pause_when_reached: get_flag_value(&args, "tstop", FlagValue::Bool(false)).into(),
             time_mod: get_flag_value(&args, "tmod", FlagValue::Float(1.0)).into(),
             timer_id: timer,
+            target_group: args.args[3].to_group_id().unwrap(),
             ignore_timewarp: false,
             start_paused: get_flag_value(&args, "tpaused", FlagValue::Bool(false)).into(),
             dont_override: get_flag_value(&args, "nover", FlagValue::Bool(false)).into(),
         },
-        args.args[3].to_group_id().unwrap(),
     )]))
 }
 
@@ -675,10 +748,17 @@ pub fn tspawn(args: HandlerArgs) -> HandlerReturn {
 pub fn display(args: HandlerArgs) -> HandlerReturn {
     let item = get_item_spec(&args.args[0]).unwrap();
     let cfg = GDObjConfig::new()
-        .pos(-75.0, 75.0 + 30.0 * args.displayed_items as f64)
-        .scale(0.5, 0.5);
+        .with_pos(-75.0, 75.0 + 30.0 * args.displayed_items as f64)
+        .with_scale(0.5, 0.5);
 
-    let obj = counter_object(&cfg, item, ItemAlign::Center, false);
+    let obj = GDObject::from_config(
+        cfg,
+        CounterLabel {
+            item,
+            align: ItemAlign::Center,
+            seconds_only: false,
+        },
+    );
 
     Ok(HandlerData::from_objects(vec![obj])
         .skip_spaces(0)
@@ -689,25 +769,27 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
     let spawn_group = args.args[0].to_group_id().unwrap();
     let position = args.args[1].to_int().unwrap();
     let msg = args.args[2].to_string().unwrap();
-    let cfg = GDObjConfig::new().pos(75.0 + position as f64 * 30.0, 75.0);
-    let text_cfg = cfg.clone().scale(0.25, 0.25).set_z_layer(ZLayer::T2);
+    let cfg = GDObjConfig::new().with_pos(75.0 + position as f64 * 30.0, 75.0);
+    let text_cfg = cfg.clone().with_scale(0.25, 0.25).with_z_layer(ZLayer::T2);
     let spawn_cfg = cfg
         .clone()
-        .touchable(true)
-        .multitrigger(true)
-        .set_control_id(spawn_group);
+        .with_touchable(true)
+        .with_multitrigger(true)
+        .with_control_id(spawn_group);
 
     Ok(HandlerData::from_objects(vec![
-        default_block(&cfg),
-        spawn_trigger(
-            &spawn_cfg,
-            spawn_group,
-            GROUP_SPAWN_DELAY,
-            0.0,
-            false,
-            true,
-            false,
-            vec![],
+        GDObject::new(BLACK_GRADIENT_SQUARE, &cfg, vec![]),
+        GDObject::from_config(
+            spawn_cfg,
+            SpawnTrigger {
+                spawn_id: spawn_group,
+                delay: GROUP_SPAWN_DELAY,
+                delay_variation: 0.0,
+                reset_remap: false,
+                spawn_ordered: true,
+                preview_disable: false,
+                spawn_remaps: vec![],
+            },
         ),
         text(&text_cfg, msg, 0),
     ])
@@ -716,53 +798,75 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
 
 pub fn pers(args: HandlerArgs) -> HandlerReturn {
     let item = get_item_spec(&args.args[0]).unwrap();
-    Ok(HandlerData::from_objects(vec![persistent_item(
-        &args.cfg,
-        item.id(),
-        item.get_type() == ItemType::Timer,
-        true,
-        false,
-        false,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        PersistentItemTrigger {
+            item_id: item.id(),
+            timer: item.get_type() == ItemType::Timer,
+            persistent: true,
+            target_all: false,
+            reset: false,
+        },
     )]))
 }
 
 pub fn unpers(args: HandlerArgs) -> HandlerReturn {
     let item = get_item_spec(&args.args[0]).unwrap();
-    Ok(HandlerData::from_objects(vec![persistent_item(
-        &args.cfg,
-        item.id(),
-        item.get_type() == ItemType::Timer,
-        false,
-        false,
-        false,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        PersistentItemTrigger {
+            item_id: item.id(),
+            timer: item.get_type() == ItemType::Timer,
+            persistent: false,
+            target_all: false,
+            reset: false,
+        },
     )]))
 }
 
 pub fn unpersall(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![persistent_item(
-        &args.cfg, 0, false, false, true, false,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        PersistentItemTrigger {
+            item_id: 0,
+            timer: false,
+            persistent: false,
+            target_all: true,
+            reset: false,
+        },
     )]))
 }
 
 pub fn rpersall(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![persistent_item(
-        &args.cfg, 0, false, true, true, true,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        PersistentItemTrigger {
+            item_id: 0,
+            timer: false,
+            persistent: true,
+            target_all: true,
+            reset: true,
+        },
     )]))
 }
 
 pub fn ton(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![toggle_trigger(
-        &args.cfg,
-        args.args[0].to_group_id().unwrap(),
-        true,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        ToggleTrigger {
+            target_group: args.args[0].to_group_id().unwrap(),
+            activate_group: true,
+        },
     )]))
 }
 
 pub fn toff(args: HandlerArgs) -> HandlerReturn {
-    Ok(HandlerData::from_objects(vec![toggle_trigger(
-        &args.cfg,
-        args.args[0].to_group_id().unwrap(),
-        false,
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg,
+        ToggleTrigger {
+            target_group: args.args[0].to_group_id().unwrap(),
+            activate_group: false,
+        },
     )]))
 }
 
@@ -790,7 +894,11 @@ pub fn raw_trigger(args: HandlerArgs) -> HandlerReturn {
         .map(|obj| {
             // inherit assigned position and group
             let mut o = obj;
-            o.config = o.config.pos(x, y).spawnable(true).multitrigger(true);
+            o.config = o
+                .config
+                .with_pos(x, y)
+                .with_spawnable(true)
+                .with_multitrigger(true);
             o.config.add_group(*group);
             o
         })
@@ -816,12 +924,10 @@ pub fn instcoll(args: HandlerArgs) -> HandlerReturn {
         });
     }
 
-    let mut coll_cfg = ColliderConfig {
-        collider1: 0,
-        collider2: 0,
-        collide_player1: false,
-        collide_player2: false,
-        collide_both_players: true,
+    let mut coll_cfg = InstantCollTrigger {
+        true_id: g1,
+        false_id: g2,
+        ..Default::default()
     };
 
     if let Hitbox::Player2 = c2 {
@@ -839,8 +945,8 @@ pub fn instcoll(args: HandlerArgs) -> HandlerReturn {
         }
     }
 
-    return Ok(HandlerData::from_objects(vec![instant_coll_trigger(
-        &args.cfg, coll_cfg, g1, g2,
+    return Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg, coll_cfg,
     )]));
 }
 
@@ -860,12 +966,15 @@ pub fn coll(args: HandlerArgs) -> HandlerReturn {
         });
     }
 
-    let mut coll_cfg = ColliderConfig {
-        collider1: 0,
-        collider2: 0,
-        collide_player1: false,
-        collide_player2: false,
-        collide_both_players: true,
+    let mut coll_cfg = CollisionTrigger {
+        target_id: g1,
+        activate_group: !<FlagValue as Into<bool>>::into(get_flag_value(
+            &args,
+            "nospawn",
+            FlagValue::Bool(false),
+        )),
+        on_trigger_exit: get_flag_value(&args, "onexit", FlagValue::Bool(false)).into(),
+        ..Default::default()
     };
 
     if let Hitbox::Player2 = c2 {
@@ -882,11 +991,8 @@ pub fn coll(args: HandlerArgs) -> HandlerReturn {
             }
         }
     }
-    return Ok(HandlerData::from_objects(vec![collision_trigger(
-        &args.cfg,
-        coll_cfg,
-        g1,
-        !<FlagValue as Into<bool>>::into(get_flag_value(&args, "nospawn", FlagValue::Bool(false))),
-        get_flag_value(&args, "onexit", FlagValue::Bool(false)).into(),
+
+    return Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg, coll_cfg,
     )]));
 }
