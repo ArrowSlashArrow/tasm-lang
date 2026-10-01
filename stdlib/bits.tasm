@@ -38,18 +38,18 @@ xnor:
 slow_shift_right:
     ; copy c2
     mov core::c3_temp, c2
-    ifg __slow_shift_right_loop, core::placeholder_return, core::c3_temp, 0    | ordered:false
+    ifg __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
 __slow_shift_right_loop:
     div c1, 2   | resmode:f
     sub core::c3_temp, 1
-    ifg __slow_shift_right_loop, core::placeholder_return, core::c3_temp, 0    | ordered:false
+    ifg __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
 
 ; shifts c1 right by c2 bits.
 slow_shift_left:
     ; copy c2
     mov core::c3_temp, c2
-    ifg __slow_shift_left_loop, core::placeholder_return, core::c3_temp, 0     | ordered:false
+    ifg __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0     | ordered:false
 __slow_shift_left_loop:
     mul c1, 2
     sub core::c3_temp, 1
-    ifg __slow_shift_left_loop, core::placeholder_return, core::c3_temp, 0     | ordered:false
+    ifg __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0     | ordered:false
