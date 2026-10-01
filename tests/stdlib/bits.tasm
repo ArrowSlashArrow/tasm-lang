@@ -1,0 +1,17 @@
+; tests
+; 587432 >> 3 == 73429
+; 2 << 16 == 131072
+; 3 >> 2 == 0
+; 0 << 50 == 0
+
+_init:
+    import ../../stdlib/bits
+    import ../../stdlib/debug
+
+; --release
+_start:
+    mov c1, 587432    
+    mov c2, 3    
+    mov c3, 73429
+    ; issue: we don't know when this returns
+    spawn bits::slow_shift_right    | ordered:false

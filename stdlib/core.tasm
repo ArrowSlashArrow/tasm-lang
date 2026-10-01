@@ -1,0 +1,45 @@
+_init:
+    ; all items defined here should be considered usable wherever.
+    ; these items temporarily store values to produce some other output
+    ; and should not be kept long-term.
+    alias c1_temp, c9991
+    alias c2_temp, c9992
+    alias c3_temp, c9993
+    alias c4_temp, c9994
+    alias c5_temp, c9995
+    alias c6_temp, c9996
+    alias c7_temp, c9997
+    alias c8_temp, c9998
+    alias c9_temp, c9999
+    ; special alias for signaling wait_until to return
+    alias return_signal, c9990
+    alias SPAWN_NOFLAGS, 1
+    alias SPAWN_ORDERED, 2
+    alias SPAWN_NOREMAP, 3
+    alias SPAWN_ORDERED_NOREMAP, 4
+
+; this routine exists to provide an early return point for branches in routines
+; spawned with spawn ordered enabled.
+; this routine kills the process at `g1` (remap).
+ordered_return:
+    kill g1
+
+
+; this routine exists as a place holder that you can branch to to return early.
+; this routine does nothing.
+placeholder_return:
+    nop
+
+; Sometimes, we don't know when a routine will finish. Since the call site
+; continues running even though it needs to capture the finished result of
+; the spawned routine, it needs to wait until the spawned routine signals
+; to continue execution. 
+;
+; Calling this requires remapping `core::return_signal` to the routine's
+; return signal counter item. Spawning modes can be set with `core::SPAWN_<mode>`.
+wait_until:
+    ; param: signal counter (must be a counter)
+    ; todo
+
+
+;* TODO: add spawning modes *;

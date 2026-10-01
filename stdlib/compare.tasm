@@ -1,0 +1,41 @@
+; This module defines implementations for branchless compares.
+
+; todo:
+; equals, nequals
+; less, less_equals
+; greater, greater_equals
+; and float<comp>
+
+; x > y: 
+;   d = x - y
+;   return abs(d)/2d + 0.5
+
+; x: c1
+; y: c2
+; return: c3
+greater:
+    sub c3, c1, c2  ; d
+    ; expected result: c3 = c3 / abs(c3 * 2)
+    div c3, c3, 2   | resmode:a op:* 
+    add c3, 0.5
+
+; x: c1
+; y: c2
+; return: c3
+less:
+    sub c3, c1, c2  ; d
+    ; expected result: c3 = c3 / abs(c3 * -2)
+    div c3, c3, -2  | resmode:a op:* 
+    add c3, 0.5
+
+; <=    ceil(0.5 - (abs(d) / 2d))
+; x: c1
+; y: c2
+; return: c3
+less_eq:
+    sub c3, c1, c2  ; d
+    ; expected result: c3 = c3 / abs(c3 * 2)
+    div c3, c3, 2   | resmode:a op:*
+    mov c4, 0.5
+    sub c3, c4, c3  | resmode:c 
+    
