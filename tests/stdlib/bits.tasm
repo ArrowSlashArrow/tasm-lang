@@ -14,4 +14,9 @@ _start:
     mov c2, 3    
     mov c3, 73429
     ; issue: we don't know when this returns
-    spawn bits::slow_shift_right    | ordered:false
+    spawn bits::slow_shift_right    | ordered:false remap: {core::return_signal = c5001}
+    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5001, g2 = continue_test}
+
+continue_test:
+    ; flashes green if we got here
+    spawn debug::__true

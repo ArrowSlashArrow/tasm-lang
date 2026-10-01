@@ -13,10 +13,7 @@ _init:
     alias c9_temp, c9999
     ; special alias for signaling wait_until to return
     alias return_signal, c9990
-    alias SPAWN_NOFLAGS, 1
-    alias SPAWN_ORDERED, 2
-    alias SPAWN_NOREMAP, 3
-    alias SPAWN_ORDERED_NOREMAP, 4
+    alias RETURN_SIGNAL_VALUE, 0xabcde
 
 ; this routine exists to provide an early return point for branches in routines
 ; spawned with spawn ordered enabled.
@@ -30,16 +27,25 @@ ordered_return:
 placeholder_return:
     nop
 
+; exit point for routines to also set the return signal.
+return_with_signal:
+    mov return_signal, RETURN_SIGNAL_VALUE
+
 ; Sometimes, we don't know when a routine will finish. Since the call site
 ; continues running even though it needs to capture the finished result of
 ; the spawned routine, it needs to wait until the spawned routine signals
 ; to continue execution. 
 ;
+; This routine will call the given routine
+;
 ; Calling this requires remapping `core::return_signal` to the routine's
-; return signal counter item. Spawning modes can be set with `core::SPAWN_<mode>`.
+; return signal counter item. This spawns the group with no additional modifiers.
+; @param `core::return_signal` counter that will have return signal. 
+; @param `g2` group that will be spawned when `return_signal` has `core::RETURN_SIGNAL_VALUE`.
+
+; call other routine in a loop to ensure return_signal is being checked every tick
 wait_until:
-    ; param: signal counter (must be a counter)
-    ; todo
+    fle __wait_until_other, g2, return_signal, RETURN_SIGNAL_VALUE
 
-
-;* TODO: add spawning modes *;
+__wait_until_other:
+    fle wait_until, g2, return_signal, RETURN_SIGNAL_VALUE
