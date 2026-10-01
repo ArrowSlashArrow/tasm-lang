@@ -1,6 +1,40 @@
-; returns c3 = c1 % c2
-mod:
-    fldiv c3, c1, c2
+_init:
+    import core
+
+; Returns a mod b.
+; @param C1 a
+; @param C2 b
+; @returns C3
+; @0tick
+modulo:
+    div c3, c1, c2  | resmode:f
     mul c3, c2
     sub c3, c1, c3
 
+; Spawns `g1` if a mod b == 0, spawns `g2` if not.
+; @param C1 a
+; @param C2 b
+; @param g3 spawned if a mod b == 0
+; @param g4 spawned if a mod b != 0
+; @0tick
+modulo_fork:
+    div c3, c1, c2  | resmode:f
+    mul c3, c2  ; c1 == c3 is equivalent to c1 - c3 == 0 (c1 - c3 is a mod b)
+    fe g1, g2, c1, c3
+
+
+; TODO: implement these in branchless
+; Returns the sign of `C1`. This function is branchless and uses 0 extra groups.
+; @param C1 the value to get the sign of
+; @returns The sign is returned in C2.
+sign:
+    ; load temp_regs (c2 = 0 for compares)
+    mov c2, 0
+    spawn compare::greater  | ordered:false ;   no remap needed here; c1 => c1, c2 => c2
+    mov c4, c3  ; save result
+    spawn compare::less     | ordered:false ;   no remap needed here; c1 => c1, c2 => c2
+    sub c2, c4, c3  ; c2 = (0 < val) - (val < 0)
+
+; T1 to T2 = e^(ln(base) * exponent)
+; Returns `T1` raised to `C2`
+exponent:

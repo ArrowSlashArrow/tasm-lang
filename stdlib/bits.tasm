@@ -1,0 +1,55 @@
+_init:
+    import core
+
+; bitwise ops for boolean values. both inputs must be a boolean.
+
+; returns (c3): c1 & c2
+and:
+    mul c3, c1, c2
+
+; returns (c3): c1 | c2
+or:
+    add c3, c1, c2  | mod:2 divmod:true resmode:c
+
+; returns (c3): !c1
+not:
+    sub c3, c1, 1   | resmode:+
+
+; returns (c3): !(c1 & c2)
+nand:
+    spawn and       | ordered:false
+    spawn not       | ordered:false remap: {1 = 3}
+
+; returns (c3): c1 ^ c2
+xor:
+    sub c3, c1, c2  | resmode:+
+
+nor:
+    spawn or        | ordered:false
+    spawn not       | ordered:false remap: {1 = 3}
+
+xnor:
+    spawn xor       | ordered:false
+    spawn not       | ordered:false remap: {1 = 3}
+
+; todo: shift right, shift left
+
+; shifts c1 right by c2 bits.
+slow_shift_right:
+    ; copy c2
+    mov core::c3_temp, c2
+    ifg __slow_shift_right_loop, core::placeholder_return, core::c3_temp, 0    | ordered:false
+__slow_shift_right_loop:
+    div c1, 2   | resmode:f
+    sub core::c3_temp, 1
+    ifg __slow_shift_right_loop, core::placeholder_return, core::c3_temp, 0    | ordered:false
+
+; shifts c1 right by c2 bits.
+slow_shift_left:
+    ; copy c2
+    mov core::c3_temp, c2
+    ifg __slow_shift_left_loop, core::placeholder_return, core::c3_temp, 0     | ordered:false
+__slow_shift_left_loop:
+    mul c1, 2
+    sub core::c3_temp, 1
+    ifg __slow_shift_left_loop, core::placeholder_return, core::c3_temp, 0     | ordered:false
