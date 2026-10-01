@@ -63,6 +63,7 @@ impl Tasm {
         level_name: &str,
         start_at_group: i16,
         skip_init: bool,
+        unordered_start: bool,
     ) -> Result<GDLevel, Vec<TasmError>> {
         let spacing = match self.release_mode {
             true => 1.0,
@@ -143,6 +144,7 @@ impl Tasm {
                 cfg: GDObjConfig::new(),
                 displayed_items: self.displayed_items,
                 curr_group: self.curr_group,
+                unordered_start,
                 ..Default::default()
             })
             .unwrap();
@@ -236,6 +238,7 @@ impl Tasm {
             line: instr.line_number,
             displayed_items: self.displayed_items,
             flag_by_ident: flag_assoc,
+            unordered_start: false,
         };
 
         let data = match handler(args) {

@@ -92,6 +92,10 @@ struct Args {
     /// Disables the compiler from inserting the _init routine's triggers into the level. Does not skip parsing it. Useful when the _init routine is already in the level
     #[arg(long)]
     skip_init: bool,
+
+    /// Makes the spawn trigger of the ioblock for the _start routine have `spawn ordered` disabled.
+    #[arg(long, short)]
+    unordered_start: bool,
 }
 
 fn use_wslive(level: GDLevel, port: u16) -> Result<(), Error> {
@@ -195,7 +199,7 @@ fn main() {
         Err(_) => return,
     };
 
-    if args.linker_output {
+    if args.linker_output && !args.no_log {
         println!("------- linker output -------");
         for routine in main_module.routines.iter() {
             println!("{}: ({})", routine.ident, routine.group);
@@ -228,17 +232,14 @@ fn main() {
         None => args.infile.unwrap(),
     };
 
-    log!(
-        !args.no_log,
-        "Using groups {} - {}",
-        args.group_offset + 1,
-        curr_group
-    );
-
     log!(!args.no_log, "Encoding level...");
 
-    let mut level = match main_module.handle_routines_inner(&level_name, curr_group, args.skip_init)
-    {
+    let mut level = match main_module.handle_routines_inner(
+        &level_name,
+        curr_group,
+        args.skip_init,
+        args.unordered_start,
+    ) {
         Err(e) => {
             if !args.no_log {
                 print_errors(e, "Unable to compile to level");
@@ -247,6 +248,13 @@ fn main() {
         }
         Ok(l) => l,
     };
+
+    log!(
+        !args.no_log,
+        "Using groups {} - {}",
+        args.group_offset + 1,
+        curr_group
+    );
 
     if args.no_export {
         return;

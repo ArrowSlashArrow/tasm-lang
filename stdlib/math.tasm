@@ -1,0 +1,6 @@
+; returns c3 = c1 % c2
+mod:
+    fldiv c3, c1, c2
+    mul c3, c2
+    sub c3, c1, c3
+

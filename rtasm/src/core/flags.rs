@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use gdlib::cclocallevels::gdobj::structs::{Op, RoundMode, SignMode};
 
-use crate::core::structs::{SymbolPath, SymbolValue, split_at_str_once};
+use crate::core::structs::{SymbolPath, SymbolValue, TasmValue, split_at_str_once};
 
 #[derive(Debug, Clone)]
 pub struct Flag {
@@ -148,11 +148,20 @@ impl FlagValue {
                 let mut invalid_dict = false;
                 let resolve_int = |s: &str| -> Option<i16> {
                     if s.starts_with("0x") {
-                        i16::from_str_radix(&s[2..], 16)
+                        i16::from_str_radix(&s[2..], 16).ok()
                     } else {
-                        s.parse::<i16>()
+                        match TasmValue::to_value(s) {
+                            Ok(v) => match v {
+                                TasmValue::CollBlock(b) => b.get_id(),
+                                TasmValue::Counter(c) => Some(c),
+                                TasmValue::GDItem(i) => Some(i.id()),
+                                TasmValue::Group(g) => Some(g),
+                                TasmValue::Timer(t) => Some(t),
+                                _ => None,
+                            },
+                            Err(_) => None,
+                        }
                     }
-                    .ok()
                     // .or_else(|| unparsed_pairs.push(group_map.get(s).copied()))
                 };
 

@@ -48,7 +48,10 @@ pub fn compile_tasm_module(
         Ok(t) => t,
         Err(es) => {
             if !args.no_log {
-                print_errors(es, &format!("[E0044] Unable to compile {:?}", &path));
+                print_errors(
+                    es,
+                    &format!("[E0044] Unable to compile {:?}", &path.to_string_lossy()),
+                );
             }
             return Err(anyhow!("lexing failed"));
         }

@@ -285,6 +285,7 @@ Execution time: 1 tick.
 #### 3.1.2.7. Miscellaneous
 All instructions in this section provide functionality that does not neatly fit into any other category. 
 ##### 3.1.2.7.1. Persistent item trigger
+All instructions in this section have an execution time of 1 tick.
 ###### PERS
 Arguments: `PERS <item>`
 
@@ -300,7 +301,7 @@ Resets all currently persistent items to 0.
 ###### UNPERSALL
 Arguments: `UNPERSALL`
 
-Revmoes the persistence of all currently persistent items.
+Removes the persistence of all currently persistent items.
 
 ##### DISPLAY
 Arguments: `DISPLAY <item>`
@@ -534,6 +535,7 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | remap   | ID remap descriptor. Each key-value pair represents the old ID and the new ID respectively.           | `SPAWN`      | Dict       |
 | ordered | Use spawn ordered if true, don't use spawn ordered if false. On by default.                           | `SPAWN`      | Boolean    |
 | ordered | Like the `ordered` flag for `SPAWN`, but only for non-instant compares (including `srand`/`frand`). Applies to both supplementary triggers.      | Compares     | Boolean    |
+| ordered | Functions exactly like `ordered` for spawn; affects the spawn trigger in the ioblock.                 | `IOBLOCK`    | Boolean    |
 | noremap | Enables `reset remap` option in the trigger if true.                                                  | `SPAWN`      | Boolean    |
 | tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
@@ -755,7 +757,8 @@ As of TASM v0.3.2, these are the built-in aliases:
 - `COLL_P_ANY`: enables the option to check for collision with player 1 or player 2 (for collision instructions)
 
 ### 3.3.6. Strings
-A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, `\g123` will compile into the string literal `"g123"`.   
+A string may be denoted with the escape character `\` to designate it as a string literal where it may otherwise be parsed as a value of a different type. For example, `g123` will compile to Group 123; however, 
+`\g123` will compile into the string literal `"g123"`.   
 If a value was not parsed as any of the above, it is left as a string. Strings are rarely used in the language, but a notable use is as a label for an IOBlock.  
 **Note: Since strings are the fallback, values that maybe be interpreted as another type are NOT parsed as strings. Please be mindful of this when trying to pass a string argument which may, for example, also be a routine name, and thus will get parsed as a Group if not escaped.**
 ### 3.3.7. Argsets 

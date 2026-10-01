@@ -418,7 +418,7 @@ pub fn spawn_compare(
     )
     .into();
 
-    let existing_rhs_mod = iargs[2].to_float().unwrap();
+    let existing_rhs_mod = iargs[2].to_float().unwrap_or(1.0);
     let mut rhs = if num_2nd_arg {
         CompareOperand::number_literal(iargs[2].to_float().unwrap())
     } else {
@@ -464,7 +464,7 @@ pub fn spawn_compare(
         // don't use any intermediate triggers if spawning instantly
         vec![compare]
     } else {
-        vec![compare, spawn_trg(&spawn_cfg, spawning_group, ordered)]
+        vec![compare, spawn_trg(&spawn_cfg, target_group, ordered)]
     }
 }
 
@@ -514,7 +514,7 @@ pub fn fork_compare(
     )
     .into();
 
-    let existing_rhs_mod = iargs[2].to_float().unwrap();
+    let existing_rhs_mod = iargs[2].to_float().unwrap_or(1.0);
     let mut rhs = if num_2nd_arg {
         CompareOperand::number_literal(iargs[3].to_float().unwrap())
     } else {
@@ -547,7 +547,7 @@ pub fn fork_compare(
     let spawning_true = if instant {
         target_true
     } else {
-        args.curr_group
+        args.curr_group + 2
     };
     let spawning_false = if instant {
         target_false
@@ -559,7 +559,7 @@ pub fn fork_compare(
         .clone()
         .with_pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .with_scale(0.33, 0.33)
-        .with_groups([args.curr_group])
+        .with_groups([args.curr_group + 2])
         .with_control_id(target_true); // use auxiliary group for spawn trigger
 
     let spawn_false_cfg = cfg
@@ -587,8 +587,8 @@ pub fn fork_compare(
     } else {
         vec![
             compare,
-            spawn_trg(&spawn_true_cfg, spawning_true, ordered),
-            spawn_trg(&spawn_false_cfg, spawning_false, ordered),
+            spawn_trg(&spawn_true_cfg, target_true, ordered),
+            spawn_trg(&spawn_false_cfg, target_false, ordered),
         ]
     }
 }
@@ -854,17 +854,14 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
 
     Ok(HandlerData::from_objects(vec![
         GDObject::new(BLACK_GRADIENT_SQUARE, &cfg, vec![]),
-        GDObject::from_config(
-            spawn_cfg,
-            SpawnTrigger {
-                spawn_id: spawn_group,
-                delay: GROUP_SPAWN_DELAY,
-                delay_variation: 0.0,
-                reset_remap: false,
-                spawn_ordered: true,
-                preview_disable: false,
-                spawn_remaps: vec![],
-            },
+        spawn_trg(
+            &spawn_cfg,
+            spawn_group,
+            <FlagValue as Into<bool>>::into(get_flag_value(
+                &args,
+                "ordered",
+                FlagValue::Bool(true),
+            )) & !args.unordered_start,
         ),
         text(&text_cfg, msg, 0),
     ])

@@ -439,7 +439,7 @@ pub struct HandlerArgs<'a> {
     pub curr_group: i16,
     pub displayed_items: usize,
     pub flag_by_ident: HashMap<String, &'a Flag>,
-
+    pub unordered_start: bool,
     pub line: usize,
 }
 

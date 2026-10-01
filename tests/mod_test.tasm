@@ -1,0 +1,13 @@
+_init:
+    import ../stdlib/math
+    import ../stdlib/debug
+    display c1
+    display c2
+    display c3
+    mov c1, 5
+    mov c2, 3
+
+_start:
+    spawn math::mod             | ordered:false
+    mov c4, 2
+    spawn debug::assert_eq_int  | ordered:false remap: {c1 = c3, c2 = c4}
