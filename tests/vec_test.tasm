@@ -1,10 +1,12 @@
 _init:
     import ../stdlib/vec
+    import ../stdlib/mem_8bit   ; due to this program using memory, it has to be cmopiled with --group-offset 260
     ; the first three elements of the vector
     display C1
     display C2
     display C3
-    display C4
+    display mem_8bit::cmemreg
+    display mem_8bit::ptrpos
     display C14
     display C15
     display C16
@@ -28,14 +30,16 @@ _start:
     mov C16, 0
 
     ; read vec[0] to C1
-    spawn vec::get_nth_item | remap: {1 = 14, 2 = 15, 3 = 16}
+    spawn vec::get_nth_item | ordered:true remap: {1 = 14, 2 = 15, 3 = 16}
     wait 4
+    mov c11, c4
     mov C16, 1
     ; read vec[1] to C1
-    spawn vec::get_nth_item | remap: {1 = 14, 2 = 15, 3 = 16}
+    spawn vec::get_nth_item | ordered:true remap: {1 = 14, 2 = 15, 3 = 16}
     wait 4
+    mov c12, c4
     mov C16, 2
     ; read vec[2] to C1
-    spawn vec::get_nth_item | remap: {1 = 14, 2 = 15, 3 = 16}
-    wait 4
+    spawn vec::get_nth_item | ordered:true remap: {1 = 14, 2 = 15, 3 = 16}
+    mov c13, c4
     
