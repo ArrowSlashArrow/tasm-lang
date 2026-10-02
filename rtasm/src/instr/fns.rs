@@ -529,7 +529,7 @@ pub fn fork_compare(
     )
     .into();
 
-    let existing_rhs_mod = iargs[2].to_float().unwrap_or(1.0);
+    let existing_rhs_mod = iargs[3].to_float().unwrap_or(1.0);
     let mut rhs = if num_2nd_arg {
         CompareOperand::number_literal(iargs[3].to_float().unwrap())
     } else {
@@ -538,16 +538,6 @@ pub fn fork_compare(
 
     // set rhs fields
     rhs.modifier = get_flag_value(&args, "rmod", FlagValue::Float(existing_rhs_mod)).into();
-    rhs.mod_op = get_flag_value(&args, "rmodop", FlagValue::Op(Op::Mul)).into();
-    (rhs.rounding, rhs.sign) = get_flag_value(
-        &args,
-        "rmode",
-        FlagValue::RoundSign((RoundMode::None, SignMode::None)),
-    )
-    .into();
-
-    // set rhs fields
-    rhs.modifier = get_flag_value(&args, "rmod", FlagValue::Float(1.0)).into();
     rhs.mod_op = get_flag_value(&args, "rmodop", FlagValue::Op(Op::Mul)).into();
     (rhs.rounding, rhs.sign) = get_flag_value(
         &args,

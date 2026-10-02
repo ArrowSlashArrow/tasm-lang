@@ -2,14 +2,14 @@
 
 ; assert that c1 == c2
 assert_eq_int:
-    ife __true, __false, c1, c2
+    ife __ok, __fail, c1, c2
 
 ; assert that t1 == t2
 assert_eq_float:
-    ife __true, __false, t1, t2
+    ife __ok, __fail, t1, t2
 
-__true:   ; pulse green
+__ok:   ; pulse green
     rawtrg 1,1006,2,105,3,255,36,1,51,1000,47,0.2,210,1,7,0,8,255,9,0
 
-__false:  ; pulse red
+__fail:  ; pulse red
     rawtrg 1,1006,2,105,3,255,36,1,51,1000,47,0.2,210,1,7,255,8,0,9,0
