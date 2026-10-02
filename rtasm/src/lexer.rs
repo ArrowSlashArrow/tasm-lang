@@ -627,10 +627,7 @@ impl Tasm {
 
                     // HashMap<K, V>.insert() returns None if the value was not already defined.
                     // If we don't get a none, the routine was already declared.
-                    if seen_routines
-                        .insert(routine_ident.clone(), line_idx)
-                        .is_some()
-                    {
+                    if let Some(line) = seen_routines.insert(routine_ident.clone(), line_idx) {
                         verbose_log!(self, "Routine was already declared.");
                         push_error(
                             &mut self.errors,
@@ -641,7 +638,7 @@ impl Tasm {
                             format!(
                                 "Routine {} was already declared on line {}",
                                 routine_ident.clone(),
-                                seen_routines.get(&routine_ident).unwrap_or(&0)
+                                line + 1
                             ),
                             28,
                         );

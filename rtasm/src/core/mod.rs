@@ -239,6 +239,7 @@ impl Tasm {
             displayed_items: self.displayed_items,
             flag_by_ident: flag_assoc,
             unordered_start: false,
+            is_release: self.release_mode,
         };
 
         let data = match handler(args) {

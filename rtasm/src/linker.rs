@@ -6,7 +6,7 @@ use crate::{
         error::{TasmError, TasmErrorType},
         flags::{
             FlagValue::{self, ExternRefsDict},
-            UnparsedDictFlagEntry,
+            UnparsedDictFlagEntry, resolve_flag_int,
         },
         print_errors,
         structs::{
@@ -422,7 +422,12 @@ pub fn resolve_dependency_path(
                 }
             }
         }
-        None => return Err(anyhow!("[E0038] Unable to find module {dependency}.")),
+        None => {
+            return Err(anyhow!(
+                "[E0038] Unable to find module {dependency} (imported at {}).",
+                parent_module_path.to_string_lossy()
+            ));
+        }
     };
 
     Ok((dependency_path, dependency))
@@ -562,6 +567,7 @@ pub fn index_routine_deps(
 
 pub fn post_link_processing(
     module: &mut Tasm,
+    module_path: PathBuf,
     module_cache: HashMap<PathBuf, (Tasm, bool, Vec<usize>)>,
     dependency_map: HashMap<String, PathBuf>,
 ) -> Result<(), Vec<String>> {
@@ -586,7 +592,10 @@ pub fn post_link_processing(
                 let dep_path = match dependency_map.get(dep_name) {
                     Some(dep) => dep,
                     None => {
-                        errors.push(format!("[E0039] Unable to find dependency {dep_name}"));
+                        errors.push(format!(
+                            "{} [E0039] Unable to find dependency {dep_name}",
+                            module_path.to_string_lossy()
+                        ));
                         return 0;
                     }
                 };
@@ -595,9 +604,7 @@ pub fn post_link_processing(
                 let dep_module = module_cache.get(dep_path).unwrap();
 
                 let resolve_int = |s: &str| -> Option<i16> {
-                    s.parse::<i16>()
-                        .ok()
-                        .or_else(|| dep_module.0.routine_group_map.get(s).copied())
+                    resolve_flag_int(s).or_else(|| dep_module.0.routine_group_map.get(s).copied())
                 };
 
                 // (group, false) if ok, (0, true) if err
@@ -629,15 +636,17 @@ pub fn post_link_processing(
                                 let mut err = false;
                                 let group = parse_int(alias, &mut err);
                                 if err {
-                                    errors
-                                        .push(format!("[E0041] Invalid external alias dict value"));
+                                    errors.push(format!(
+                                        "{} [E0041] Invalid external alias dict value",
+                                        module_path.to_string_lossy()
+                                    ));
                                     0
                                 } else {
                                     group
                                 }
                             }
                             None => {
-                                errors.push(format!("[E0040] Could not find external symbol {dep_name}::{symbol_name}"));
+                                errors.push(format!("{} [E0040] Could not find external symbol {dep_name}::{symbol_name}", module_path.to_string_lossy()));
                                 0
                             }
                         }

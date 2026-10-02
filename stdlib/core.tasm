@@ -42,10 +42,9 @@ return_with_signal:
 ; return signal counter item. This spawns the group with no additional modifiers.
 ; @param `core::return_signal` counter that will have return signal. 
 ; @param `g2` group that will be spawned when `return_signal` has `core::RETURN_SIGNAL_VALUE`.
-
-; call other routine in a loop to ensure return_signal is being checked every tick
 wait_until:
-    fle __wait_until_other, g2, return_signal, RETURN_SIGNAL_VALUE
+    ; call other routine to ensure the condition is checked every tick
+    fle __wait_until_other, g2, return_signal, RETURN_SIGNAL_VALUE      | rnoremap:true 
 
 __wait_until_other:
-    fle wait_until, g2, return_signal, RETURN_SIGNAL_VALUE
+    fle wait_until, g2, return_signal, RETURN_SIGNAL_VALUE              | rnoremap:true
