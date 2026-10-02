@@ -16,7 +16,7 @@
 greater:
     sub c3, c1, c2  ; d
     ; expected result: c3 = c3 / abs(c3 * 2)
-    div c3, c3, 2   | resmode:a op:* 
+    div c3, c3, 2   | resmode:+ iter:/
     add c3, 0.5
 
 ; x: c1
@@ -25,7 +25,7 @@ greater:
 less:
     sub c3, c1, c2  ; d
     ; expected result: c3 = c3 / abs(c3 * -2)
-    div c3, c3, -2  | resmode:a op:* 
+    div c3, c3, -2  | resmode:+ iter:/
     add c3, 0.5
 
 ; <=    ceil(0.5 - (abs(d) / 2d))
@@ -35,7 +35,7 @@ less:
 less_eq:
     sub c3, c1, c2  ; d
     ; expected result: c3 = c3 / abs(c3 * 2)
-    div c3, c3, 2   | resmode:a op:*
+    div c3, c3, 2   | resmode:+ iter:/
     mov c4, 0.5
     sub c3, c4, c3  | resmode:c 
     

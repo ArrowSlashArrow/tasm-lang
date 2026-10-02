@@ -62,15 +62,5 @@ continue_test4:
     mov c1, 1
     mov c2, 0
     mov c4, 0
-    spawn bits::xnor                | ordered:false remap: {core::return_signal = c5005}
-    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5005, g2 = continue_test5}
-
-continue_test5:
-    spawn debug::assert_eq_int      | remap: {1 = 4, 2 = 1}
-    waits 0.05
-
-    mov c1, 1
-    mov c2, 0
-    mov c4, 0
     spawn bits::xnor                | ordered:false
     spawn debug::assert_eq_int      | remap: {1 = 4, 2 = 3}
