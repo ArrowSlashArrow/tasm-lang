@@ -101,7 +101,10 @@ pub fn wait(args: HandlerArgs) -> HandlerReturn {
 }
 
 pub fn waits(args: HandlerArgs) -> HandlerReturn {
-    wait_internal((args.args[0].to_float().unwrap() * 240.0) as i32, args.line)
+    wait_internal(
+        (args.args[0].to_float().unwrap() * if args.is_release { 240.0 } else { 8.0 }) as i32,
+        args.line,
+    )
 }
 
 /* ARITHMETIC */
@@ -366,14 +369,19 @@ pub fn fldiv_2items_num(args: HandlerArgs) -> HandlerReturn {
 
 /* COMPARES */
 
-pub fn spawn_trg(spawn_cfg: &GDObjConfig, group: i16, ordered: bool) -> GDObject {
+pub fn spawn_trg(
+    spawn_cfg: &GDObjConfig,
+    group: i16,
+    ordered: bool,
+    reset_remap: bool,
+) -> GDObject {
     GDObject::from_config(
         spawn_cfg.clone(),
         SpawnTrigger {
             spawn_id: group,
             delay: GROUP_SPAWN_DELAY,
             delay_variation: 0.0,
-            reset_remap: false,
+            reset_remap,
             spawn_ordered: ordered,
             preview_disable: false,
             spawn_remaps: vec![],
@@ -407,6 +415,8 @@ pub fn spawn_compare(
     // rsign: sign
 
     let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
+    let noremap: bool = get_flag_value(&args, "noremap", FlagValue::Bool(false)).into();
+
     let iargs = args.args.as_ref();
     let mut lhs = CompareOperand::from(get_item_spec(&iargs[1]).unwrap());
     lhs.modifier = get_flag_value(&args, "lmod", FlagValue::Float(1.0)).into();
@@ -464,7 +474,10 @@ pub fn spawn_compare(
         // don't use any intermediate triggers if spawning instantly
         vec![compare]
     } else {
-        vec![compare, spawn_trg(&spawn_cfg, target_group, ordered)]
+        vec![
+            compare,
+            spawn_trg(&spawn_cfg, target_group, ordered, noremap),
+        ]
     }
 }
 
@@ -502,6 +515,8 @@ pub fn fork_compare(
     let iargs = &args.args.as_ref();
 
     let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
+    let lnoremap: bool = get_flag_value(&args, "lnoremap", FlagValue::Bool(false)).into();
+    let rnoremap: bool = get_flag_value(&args, "rnoremap", FlagValue::Bool(false)).into();
 
     // set lhs fields
     let mut lhs = CompareOperand::from(get_item_spec(&iargs[2]).unwrap());
@@ -587,8 +602,8 @@ pub fn fork_compare(
     } else {
         vec![
             compare,
-            spawn_trg(&spawn_true_cfg, target_true, ordered),
-            spawn_trg(&spawn_false_cfg, target_false, ordered),
+            spawn_trg(&spawn_true_cfg, target_true, ordered, lnoremap),
+            spawn_trg(&spawn_false_cfg, target_false, ordered, rnoremap),
         ]
     }
 }
@@ -615,6 +630,7 @@ pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
         .with_scale(0.5, 0.5);
 
     let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
+    let noremap: bool = get_flag_value(&args, "noremap", FlagValue::Bool(false)).into();
 
     let iargs = args.args.as_ref();
     let spawning_group = iargs[0].to_group_id().unwrap();
@@ -637,7 +653,7 @@ pub fn spawn_random(args: HandlerArgs) -> HandlerReturn {
                 target_group2: 0,
             },
         ),
-        spawn_trg(&spawn_cfg, spawning_group, ordered),
+        spawn_trg(&spawn_cfg, spawning_group, ordered, noremap),
     ])
     .extra_groups(1))
 }
@@ -650,6 +666,8 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
         .with_scale(0.5, 0.5);
 
     let ordered: bool = get_flag_value(&args, "ordered", FlagValue::Bool(true)).into();
+    let lnoremap: bool = get_flag_value(&args, "lnoremap", FlagValue::Bool(false)).into();
+    let rnoremap: bool = get_flag_value(&args, "rnoremap", FlagValue::Bool(false)).into();
 
     let iargs = args.args.as_ref();
     let spawning_group1 = iargs[0].to_group_id().unwrap();
@@ -680,8 +698,8 @@ pub fn fork_random(args: HandlerArgs) -> HandlerReturn {
                 target_group2: aux_group2,
             },
         ),
-        spawn_trg(&spawn_cfg1, spawning_group1, ordered),
-        spawn_trg(&spawn_cfg2, spawning_group2, ordered),
+        spawn_trg(&spawn_cfg1, spawning_group1, ordered, lnoremap),
+        spawn_trg(&spawn_cfg2, spawning_group2, ordered, rnoremap),
     ])
     .extra_groups(2))
 }
@@ -862,6 +880,7 @@ pub fn ioblock(args: HandlerArgs) -> HandlerReturn {
                 "ordered",
                 FlagValue::Bool(true),
             )) & !args.unordered_start,
+            false,
         ),
         text(&text_cfg, msg, 0),
     ])

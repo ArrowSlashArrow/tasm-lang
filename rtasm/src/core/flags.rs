@@ -118,6 +118,26 @@ impl From<FlagValue> for (RoundMode, SignMode) {
     }
 }
 
+pub fn resolve_flag_int(s: &str) -> Option<i16> {
+    if s.starts_with("0x") {
+        i16::from_str_radix(&s[2..], 16).ok()
+    } else if let Ok(n) = s.parse::<i16>() {
+        Some(n)
+    } else {
+        match TasmValue::to_value(s) {
+            Ok(v) => match v {
+                TasmValue::CollBlock(b) => b.get_id(),
+                TasmValue::Counter(c) => Some(c),
+                TasmValue::GDItem(i) => Some(i.id()),
+                TasmValue::Group(g) => Some(g),
+                TasmValue::Timer(t) => Some(t),
+                _ => None,
+            },
+            Err(_) => None,
+        }
+    }
+}
+
 impl FlagValue {
     fn try_from(
         value: &str,
@@ -146,28 +166,10 @@ impl FlagValue {
             },
             FlagValueType::Dict => {
                 let mut invalid_dict = false;
-                let resolve_int = |s: &str| -> Option<i16> {
-                    if s.starts_with("0x") {
-                        i16::from_str_radix(&s[2..], 16).ok()
-                    } else {
-                        match TasmValue::to_value(s) {
-                            Ok(v) => match v {
-                                TasmValue::CollBlock(b) => b.get_id(),
-                                TasmValue::Counter(c) => Some(c),
-                                TasmValue::GDItem(i) => Some(i.id()),
-                                TasmValue::Group(g) => Some(g),
-                                TasmValue::Timer(t) => Some(t),
-                                _ => None,
-                            },
-                            Err(_) => None,
-                        }
-                    }
-                    // .or_else(|| unparsed_pairs.push(group_map.get(s).copied()))
-                };
 
                 let parse_int = |s: &str, invalid_dict: &mut bool| -> i16 {
-                    resolve_int(s)
-                        .or_else(|| aliases.get(s).and_then(|a| resolve_int(a)))
+                    resolve_flag_int(s)
+                        .or_else(|| aliases.get(s).and_then(|a| resolve_flag_int(a)))
                         .unwrap_or_else(|| {
                             *invalid_dict = true;
                             0
@@ -295,6 +297,8 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "remap" => FlagValueType::Dict,
         "ordered" => FlagValueType::Bool,
         "noremap" => FlagValueType::Bool,
+        "lnoremap" => FlagValueType::Bool,
+        "rnoremap" => FlagValueType::Bool,
         "tpaused" => FlagValueType::Bool,
         "tmod" => FlagValueType::Float,
         "tstop" => FlagValueType::Bool,

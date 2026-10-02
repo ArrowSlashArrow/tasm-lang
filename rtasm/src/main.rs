@@ -169,7 +169,8 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         }
     }
 
-    if let Err(e) = post_link_processing(&mut main_module, module_cache, dependency_map) {
+    if let Err(e) = post_link_processing(&mut main_module, main_path, module_cache, dependency_map)
+    {
         if !args.no_log {
             println!("Unable to compile to level");
             for err in e {

@@ -441,6 +441,7 @@ pub struct HandlerArgs<'a> {
     pub flag_by_ident: HashMap<String, &'a Flag>,
     pub unordered_start: bool,
     pub line: usize,
+    pub is_release: bool,
 }
 
 #[derive(Debug)]

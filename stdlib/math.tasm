@@ -1,5 +1,6 @@
 _init:
     import core
+    import compare
 
 ; Returns a mod b.
 ; @param C1 a

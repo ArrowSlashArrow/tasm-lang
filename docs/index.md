@@ -537,6 +537,9 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | ordered | Like the `ordered` flag for `SPAWN`, but only for non-instant compares (including `srand`/`frand`). Applies to both supplementary triggers.      | Compares     | Boolean    |
 | ordered | Functions exactly like `ordered` for spawn; affects the spawn trigger in the ioblock.                 | `IOBLOCK`    | Boolean    |
 | noremap | Enables `reset remap` option in the trigger if true.                                                  | `SPAWN`      | Boolean    |
+| noremap | Like the `noremap` flag for `SPAWN`, but only for non-instant compares (including `srand`/`frand`). Applies to both supplementary triggers.      | Spawn Compares | Boolean    |
+| noremapl | Like the `noremap` flag for compares, but only applies to the left branch's trigger (truthy).        | Fork Compares | Boolean    |
+| noremapr | Like the `noremap` flag for compares, but only applies to the right branch's trigger (falsy).        | Fork Compares | Boolean    |
 | tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
 | tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |

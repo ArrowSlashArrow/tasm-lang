@@ -7,16 +7,70 @@
 _init:
     import ../../stdlib/bits
     import ../../stdlib/debug
+    import ../../stdlib/core
+    display c1
+    display c2
+    display c3
+    display c4
 
 ; --release
 _start:
-    mov c1, 587432    
-    mov c2, 3    
-    mov c3, 73429
-    ; issue: we don't know when this returns
-    spawn bits::slow_shift_right    | ordered:false remap: {core::return_signal = c5001}
-    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5001, g2 = continue_test}
+    spawn continue_test0
 
-continue_test:
-    ; flashes green if we got here
-    spawn debug::__true
+continue_test0:
+    ; 587432 >> 3 == 73429
+    mov c1, 587432    
+    mov c2, 3
+    mov c3, 73429
+    spawn bits::slow_shift_right    | ordered:false remap: {core::return_signal = c5001}
+    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5001, g2 = continue_test1}
+
+continue_test1:
+    spawn debug::assert_eq_int      | remap: {1 = 3, 2 = 1}
+    waits 0.05
+
+    mov c1, 2    
+    mov c2, 16
+    mov c3, 131072
+    spawn bits::slow_shift_left     | ordered:false remap: {core::return_signal = c5002}
+    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5002, g2 = continue_test2}
+
+continue_test2:
+    spawn debug::assert_eq_int      | remap: {1 = 3, 2 = 1}
+    waits 0.05
+
+    mov c1, 3    
+    mov c2, 2
+    mov c3, 0
+    spawn bits::slow_shift_right    | ordered:false remap: {core::return_signal = c5003}
+    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5003, g2 = continue_test3}
+
+continue_test3:
+    spawn debug::assert_eq_int      | remap: {1 = 3, 2 = 1}
+    waits 0.05
+
+    mov c1, 0
+    mov c2, 50
+    mov c3, 0
+    spawn bits::slow_shift_left     | ordered:false remap: {core::return_signal = c5004}
+    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5004, g2 = continue_test4}
+
+continue_test4:
+    spawn debug::assert_eq_int      | remap: {1 = 3, 2 = 1}
+    waits 0.05
+
+    mov c1, 1
+    mov c2, 0
+    mov c4, 0
+    spawn bits::xnor                | ordered:false remap: {core::return_signal = c5005}
+    spawn core::wait_until          | ordered:false remap: {core::return_signal = c5005, g2 = continue_test5}
+
+continue_test5:
+    spawn debug::assert_eq_int      | remap: {1 = 4, 2 = 1}
+    waits 0.05
+
+    mov c1, 1
+    mov c2, 0
+    mov c4, 0
+    spawn bits::xnor                | ordered:false
+    spawn debug::assert_eq_int      | remap: {1 = 4, 2 = 3}

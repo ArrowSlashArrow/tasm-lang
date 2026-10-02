@@ -1,7 +1,8 @@
 _init:
     import core
 
-; bitwise ops for boolean values. both inputs must be a boolean.
+; bitwise ops provided by @xtreme420 on discord.
+; thread: https://discord.com/channels/1271838464702283796/1486082799546138834
 
 ; returns (c3): c1 & c2
 and:
@@ -9,11 +10,12 @@ and:
 
 ; returns (c3): c1 | c2
 or:
-    add c3, c1, c2  | mod:2 divmod:true resmode:c
+    add c3, c1, c2  | itemmod:2 divmod:true resmode:c
 
 ; returns (c3): !c1
 not:
-    sub c3, c1, 1   | resmode:+
+    mov c3, c1
+    sub c3, 1       | resmode:+
 
 ; returns (c3): !(c1 & c2)
 nand:
@@ -38,18 +40,18 @@ xnor:
 slow_shift_right:
     ; copy c2
     mov core::c3_temp, c2
-    ifg __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
+    ifge __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0   | ordered:false
 __slow_shift_right_loop:
     div c1, 2   | resmode:f
     sub core::c3_temp, 1
-    ifg __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
+    fge __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
 
 ; shifts c1 right by c2 bits.
 slow_shift_left:
     ; copy c2
     mov core::c3_temp, c2
-    ifg __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0     | ordered:false
+    ifge __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
 __slow_shift_left_loop:
     mul c1, 2
     sub core::c3_temp, 1
-    ifg __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0     | ordered:false
+    fge __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0     | ordered:false
