@@ -136,7 +136,7 @@ pub fn arithmetic_2items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
             target: result,
             modifier,
             assign_op: get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(false))
                 .to_bool()
                 .unwrap(),
             id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
@@ -174,7 +174,7 @@ pub fn arithmetic_3items(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDOb
             target: res,
             modifier,
             assign_op: get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
-            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(false))
                 .to_bool()
                 .unwrap(),
             id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
@@ -210,7 +210,7 @@ pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GD
             target: res,
             modifier,
             assign_op: get_flag_value(&args, "iter", FlagValue::Op(op)).into(),
-            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(false))
                 .to_bool()
                 .unwrap(),
             id_op: get_flag_value_opt(&args, "op")
@@ -248,7 +248,7 @@ pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<
             modifier,
             assign_op: get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
             // since we know this is only used for mul and div instructions, this is fine.
-            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(false))
                 .to_bool()
                 .unwrap(),
             id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
