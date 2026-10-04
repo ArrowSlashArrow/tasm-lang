@@ -17,9 +17,11 @@ use tungstenite::{Message, connect};
 
 use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
 
+use crate::decomp::decompile_gmd;
 use crate::linker::{parse_module, post_link_processing};
 
 mod core;
+mod decomp;
 mod instr;
 mod lexer;
 mod linker;
@@ -82,7 +84,7 @@ struct Args {
     error_help: usize,
 
     /// Displays all dependencies of the program being compiled
-    #[arg(long, short)]
+    #[arg(long, short = 'D')]
     dependencies: bool,
 
     /// Show intermediate linker output. Used primarily for debugging.
@@ -96,6 +98,10 @@ struct Args {
     /// Makes the spawn trigger of the ioblock for the _start routine have `spawn ordered` disabled.
     #[arg(long, short)]
     unordered_start: bool,
+
+    /// Decompiles the given .gmd file and dumps it into stdout.
+    #[arg(long, short)]
+    decompile: bool,
 }
 
 fn use_wslive(level: GDLevel, port: u16) -> Result<(), Error> {
@@ -190,6 +196,11 @@ fn main() {
             Some(s) => println!("{s}"),
             None => println!("No documentation for E{:0>4}.", args.error_help),
         };
+        return;
+    }
+
+    if args.decompile {
+        decompile_gmd(&args);
         return;
     }
 

@@ -696,6 +696,10 @@ A number literal is any string that may be parsed as a float. Unless specified t
 It is important to make the distinction between number literals and numbers stored in items. While both are numbers, number literals are used more as specific values, while items represent containers for values in the actual program/level.  
 It is also important to recognize that all floats in GD are 32-bit floats. This means that any integer values above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself.
 
+The compiler uses `input_string.parse::<f64>()` to parse a number literal, which supports these numbers (case-insensitive):
+- Infinity: `inf`, `infinity`. Represents values higher than the maximum representible `f64`, `1.7e308`. 
+- NaN: `nan`. Represents a value that does not have a real representation (e.g. `1 / 0`). Note that dividing by zero in GD does not actually yield NaN, but sets the quotient to zero instead.
+
 #### 3.3.1.2. Hex literals
 A hexadecimal integer literal may be written starting with the prefix `0x`, followed by a number that will fit into a 32-bit signed integer. Any value that starts with `0x` will be parsed as a hexadecimal literal, and will emit an error if it is not parsed instead of falling back to being parsed as a different type of value.
 If a value starts with `0x` is intended to be a string, prefix it instead with `\`. 

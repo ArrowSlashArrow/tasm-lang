@@ -304,7 +304,7 @@ impl Tasm {
                     &self.fname,
                     match etype {
                         ParseErrorType::BadID => TasmErrorType::BadID,
-                        ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
+                        // ParseErrorType::InvalidNumber => TasmErrorType::InvalidNumber,
                         ParseErrorType::TrailingComma => TasmErrorType::TrailingComma,
                         ParseErrorType::BadHexLiteral => TasmErrorType::BadHexLiteral,
                     },
