@@ -238,21 +238,7 @@ impl TasmValue {
                 },
             }
         } else if let Ok(n) = s.parse::<f64>() {
-            // sanity checks
-            if !n.is_finite() {
-                return Err((
-                    ParseErrorType::InvalidNumber,
-                    "Infinity is not allowed.".into(),
-                    18,
-                ));
-            } else if n.is_nan() {
-                return Err((
-                    ParseErrorType::InvalidNumber,
-                    "NaN is not allowed.".into(),
-                    19,
-                ));
-            }
-
+            /* errcode 18 and 19 are defunct */
             Ok(Self::Number(n))
         } else if s.len() > 2 && s.starts_with("0x") {
             // check for hex int literal

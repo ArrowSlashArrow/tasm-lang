@@ -92,10 +92,12 @@ of the line, causing the compiler to parse an extra string argument, which may t
 This error is emitted if a counter/timer has an invalid ID.",
     "E0018: Infinity is not allowed.
     
-This error is emitted if a number is parsed as either positive or negative infinity.",
+This error is emitted if a number is parsed as either positive or negative infinity.
+Note: This error code is defunct and is no longer emitted.",
     "E0019: NaN is not allowed.
     
-This error is emitted if a number is parsed as NaN.",
+This error is emitted if a number is parsed as NaN.
+Note: This error code is defunct and is no longer emitted.",
     "E0020: Could not parse hexadecimal number.
     
 This error is emitted if the compiler tries to parse an invalid hexadecimal value.",
@@ -238,7 +240,7 @@ pub enum TasmErrorType {
     BadFlag,
     BadHexLiteral,
     NoEntryPoint,
-    InvalidNumber,
+    // InvalidNumber,
     ExceedsGroupLimit,
     InitRoutineSpawnError,
     MultipleAliasDefinitions,
@@ -283,6 +285,6 @@ impl Display for TasmError {
 pub(crate) enum ParseErrorType {
     BadID,
     TrailingComma,
-    InvalidNumber,
+    // InvalidNumber,
     BadHexLiteral,
 }
