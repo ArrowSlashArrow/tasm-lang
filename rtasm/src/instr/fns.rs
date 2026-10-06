@@ -1,12 +1,12 @@
 use gdlib::cclocallevels::gdobj::{
-    CollisionTrigger, CounterLabel, GDObject, InstantCollTrigger, ItemCompareTrigger,
+    CollisionTrigger, CounterLabel, EventTrigger, GDObject, InstantCollTrigger, ItemCompareTrigger,
     ItemEditTrigger, PersistentItemTrigger, RandomTrigger, SpawnTrigger, StopTrigger,
     TimeControlTrigger, TimeTrigger, ToggleTrigger,
     ids::objects::BLACK_GRADIENT_SQUARE,
     meta::GDObjConfig,
     structs::{
-        CompareOp, CompareOperand, Group, ItemAlign, ItemType, Op, RoundMode, SignMode, StopMode,
-        ZLayer,
+        CompareOp, CompareOperand, Event, ExtraID2, Group, ItemAlign, ItemType, Op, RoundMode,
+        SignMode, StopMode, ZLayer,
     },
     text,
 };
@@ -1076,4 +1076,37 @@ pub fn coll(args: HandlerArgs) -> HandlerReturn {
     return Ok(HandlerData::from_objects(vec![GDObject::from_config(
         args.cfg, coll_cfg,
     )]));
+}
+
+pub fn event(args: HandlerArgs) -> HandlerReturn {
+    let event = match Event::from(args.args[1].to_int().unwrap()) {
+        Event::Unrecognized(e) => {
+            return HandlerReturn::Err(TasmError {
+                etype: TasmErrorType::InvalidInstruction,
+                file: String::new(),
+                routine: String::new(),
+                line: args.line,
+                details: format!("Event ID {e} is not a valid event ID."),
+                errcode: 19,
+            });
+        }
+        e => e,
+    };
+
+    Ok(HandlerData::from_objects(vec![GDObject::from_config(
+        args.cfg.clone(),
+        EventTrigger {
+            events: vec![event],
+            target_group: args.args[0].to_group_id().unwrap(),
+            extra_id: get_flag_value(&args, "extra1", FlagValue::Float(0.0))
+                .to_float()
+                .unwrap() as i16,
+            extra_id2: ExtraID2::try_from(
+                get_flag_value(&args, "extra2", FlagValue::Float(0.0))
+                    .to_float()
+                    .unwrap() as i32,
+            )
+            .unwrap_or_default(),
+        },
+    )]))
 }

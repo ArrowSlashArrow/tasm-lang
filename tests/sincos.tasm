@@ -1,0 +1,107 @@
+; sincos.tasm
+; Reconstruction of the sin/cos calculator.
+;
+; Input:   T5 = angle in degrees
+; Output:  T4 = sin(T5)
+;          T3 = cos(T5)
+; Scratch: T1, T2, T3, C100
+;
+; Method: cos(theta) is computed by folding theta into [-90, 90] degrees,
+; converting to radians, and running a Taylor series for sin(x)/x.
+; sin(T5) is computed as cos(T5 - 90), so the same routine is used twice.
+
+_init:
+    ALIAS phase, C100          ; 0 = computing sin, 1 = computing cos
+    DISPLAY T5
+    DISPLAY T4
+    DISPLAY T3
+
+; ---------------------------------------------------------------
+; Computes cos(T1 degrees) into T3, then branches on `phase`.
+; ---------------------------------------------------------------
+cos_deg:
+    ; --- range reduction: fold T1 into [-90, 90] ---
+    FLDIV T2, T1, 360          ; T2 = floor(T1 / 360)
+    MUL T3, T2, 360            ; T3 = T2 * 360
+    SUB T3, T1, T3             ; T3 = T1 mod 360, in [0, 360)
+    ; T3 = |T3 - 180|, one trigger: the compound assignment does T3 - 180,
+    ; and the result sign mode takes the absolute value.
+    ; If your compiler ignores finmode here, use `SUB T3, 180` followed by
+    ; `MOV T3, T3 | resmode:+`.
+    SUB T3, 180 | finmode:+
+    ~MOV T2, 90                ; same tick as the abs above (different item)
+    SUB T1, T3, T2             ; T1 = |T3 - 180| - 90, in [-90, 90]
+
+    ; --- degrees to radians: T1 *= pi/180 ---
+    ; pi/180 is built as (1 + 35643.2 / 1e7) / 57.5 = 0.0174532930...
+    MOV T2, 35643.2
+    DIV T2, 10000000
+    ADD T2, 1
+    DIV T2, 57.5
+    MOV T3, 1                  ; series accumulator starts at 1
+    MUL T1, T2                 ; T1 = x (radians)
+
+    ; --- sin(x)/x = 1 - x^2/3! + x^4/5! - x^6/7! + x^8/9! - x^10/11! ---
+    ; term x^2 / 6
+    MUL T2, T1, T1
+    DIV T2, 6
+    SUB T3, T2
+
+    ; term x^4 / 120
+    MUL T2, T1, T1
+    MUL T2, T2
+    DIV T2, 120
+    ADD T3, T2
+
+    ; term x^6 / 5040
+    MUL T2, T1, T1
+    MUL T2, T2                 ; x^4
+    MUL T2, T1
+    MUL T2, T1                 ; x^6
+    DIV T2, 5040
+    SUB T3, T2
+
+    ; term x^8 / 362880
+    MUL T2, T1, T1
+    MUL T2, T2
+    MUL T2, T2                 ; x^8
+    DIV T2, 362880
+    ADD T3, T2
+
+    ; term x^10 / 39916800 (split as 3991680 * 10 to fit the modifier)
+    MUL T2, T1, T1
+    MUL T2, T2
+    MUL T2, T2                 ; x^8
+    MUL T2, T1, T1 | iter:*    ; T2 = T2 * (T1 * T1) = x^10
+    DIV T2, 3991680
+    DIV T2, 10
+    SUB T3, T2
+
+    ; sin(x)/x  ->  sin(x)
+    MUL T3, T1
+
+    ; --- continuation: no fixed wait needed, branch on phase ---
+    FE after_sin, after_cos, phase, 0
+
+; ---------------------------------------------------------------
+; Public entry point: spawn this to compute both values.
+; ---------------------------------------------------------------
+sincos:
+    MOV phase, 0
+    MOV T1, T5
+    SUB T1, 90                 ; sin(t) = cos(t - 90)
+    SPAWN cos_deg
+
+after_sin:
+    MOV T4, T3                 ; T4 = sin(T5)
+    MOV T1, T5
+    MOV phase, 1
+    SPAWN cos_deg
+
+after_cos:
+    NOP                        ; T3 = cos(T5); hook for follow-up code
+
+; ---------------------------------------------------------------
+_start:
+    MOV T5, 30                 ; test input: expect T4 = 0.5, T3 = 0.866
+    SPAWN sincos

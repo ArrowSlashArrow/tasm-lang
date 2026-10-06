@@ -7,7 +7,7 @@ _init:
 
 _start:
     mov check_factor, 3
-    ise return_not_prime, check_is_prime, c1, c1    | lmod:2.0 lmodop:/ rmod:2.0 rmodop:/ rmode:f ordered:false
+    ife return_not_prime, check_is_prime, c1, c1    | lmod:2.0 lmodop:/ rmod:2.0 rmodop:/ rmode:f ordered:false
 
 return_not_prime:
     mov c2, 0
@@ -18,10 +18,8 @@ return_prime:
 check_is_prime:
     div c4, c1, c3  | resmode:f                                         ; compute c4 = c1 % c3
     mul c4, c3
-    fe, return_not_prime, continue_loop, c1, c4     | ordered:false     ; check if modulus = 0 
+    fe return_not_prime, continue_loop, c1, c4     | ordered:false     ; check if modulus = 0 
 
 continue_loop:
     add c3, 2
-    fg, return_prime, check_is_prime, c3, c1        | rmod:2.0 rmodop:/ ordered:false
-
-add c1, c2, c3
+    fg return_prime, check_is_prime, c3, c1        | rmod:2.0 rmodop:/ ordered:false
