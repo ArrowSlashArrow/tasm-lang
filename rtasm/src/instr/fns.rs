@@ -1086,7 +1086,7 @@ pub fn event(args: HandlerArgs) -> HandlerReturn {
                 file: String::new(),
                 routine: String::new(),
                 line: args.line,
-                details: format!("Event ID {:?} is not a valid event ID.", args.args[1]),
+                details: format!("Event ID {e} is not a valid event ID."),
                 errcode: 19,
             });
         }

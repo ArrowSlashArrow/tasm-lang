@@ -1,7 +1,3 @@
-use gdlib::cclocallevels::{
-    gdlevel::version::GDVersion,
-    gdobj::{meta::GDObjConfig, text},
-};
 use paste::paste;
 
 use crate::core::structs::{TasmPrimitive, TasmValue, fits_arg_signature};
