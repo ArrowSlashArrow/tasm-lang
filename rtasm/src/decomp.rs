@@ -42,8 +42,11 @@ pub fn decompile_gmd(args: &Args) {
     decomp(&data);
 }
 
-fn group_ident(id: i16) -> String {
-    format!("group_{id}")
+fn group_ident(id: i16, name_map: &HashMap<i16, String>) -> String {
+    match name_map.get(&id) {
+        Some(name) => name.clone(),
+        None => format!("group_{id}"),
+    }
 }
 
 fn decomp(objects: &Vec<GDObject>) {
@@ -62,17 +65,41 @@ fn decomp(objects: &Vec<GDObject>) {
             }
         }
     });
+
+    let mut object_name_map: HashMap<i16, String> = HashMap::new();
+    for key in groups.keys() {
+        let _ = object_name_map.insert(*key, format!("group_{key}"));
+    }
+
+    for object in groups.get(&0).unwrap_or(&vec![]) {
+        if object.id == TEXT && object.config.groups.is_empty() {
+            let text = if let Some(GDValue::String(s)) = object.get_property(BASE64ENCODED_TEXT) {
+                String::from_utf8_lossy_owned(b64_decode(s).unwrap_or(vec![]))
+            } else {
+                continue;
+            };
+            let mut iter = text.split(": ");
+            if let Ok(g) = iter.next().unwrap().parse::<i16>() {
+                object_name_map.insert(g, iter.collect::<Vec<&str>>().join(":"));
+            }
+        }
+    }
+
     let mut g = groups.into_iter().collect::<Vec<(i16, Vec<GDObject>)>>();
     g.sort_by_key(|k| k.0);
     for (gid, objects) in g {
-        println!("{}:", group_ident(gid));
+        println!("{}:", group_ident(gid, &object_name_map));
         for obj in objects {
             let obj_expr = match obj.id {
                 ITEM_EDIT_TRIGGER => get_item_edit_expr(&from_item_edit_object(&obj).unwrap()),
-                ITEM_COMPARE_TRIGGER => {
-                    get_item_compare_expr(&ItemCompareTrigger::from_object(&obj).unwrap())
-                }
-                SPAWN_TRIGGER => get_spawn_trigger_expr(&SpawnTrigger::from_object(&obj).unwrap()),
+                ITEM_COMPARE_TRIGGER => get_item_compare_expr(
+                    &ItemCompareTrigger::from_object(&obj).unwrap(),
+                    &object_name_map,
+                ),
+                SPAWN_TRIGGER => get_spawn_trigger_expr(
+                    &SpawnTrigger::from_object(&obj).unwrap(),
+                    &object_name_map,
+                ),
                 TEXT => {
                     // get object text (base-64 encoded)
                     let bytes = b64_decode(
@@ -87,7 +114,7 @@ fn decomp(objects: &Vec<GDObject>) {
                     )
                     .unwrap_or(vec![]);
                     let str = String::from_utf8_lossy(&bytes[..]);
-                    format!("Label: {str}")
+                    format!("; Label: {str}")
                 }
                 n => format!("<unknown object {n}>"),
             };
@@ -150,7 +177,7 @@ fn get_item_edit_expr(trg: &ItemEditTrigger) -> String {
     format!("{} = {id_result}", item_str(trg.target))
 }
 
-fn get_item_compare_expr(trg: &ItemCompareTrigger) -> String {
+fn get_item_compare_expr(trg: &ItemCompareTrigger, name_map: &HashMap<i16, String>) -> String {
     let format_side = |c: CompareOperand| -> String {
         let mut item = if c.operand_item == Item::Counter(0) {
             c.modifier.to_string()
@@ -185,10 +212,10 @@ fn get_item_compare_expr(trg: &ItemCompareTrigger) -> String {
     let mut conf_str = String::new();
 
     if trg.true_id != 0 {
-        conf_str += &format!("true: {} ", group_ident(trg.true_id));
+        conf_str += &format!("true: {} ", group_ident(trg.true_id, name_map));
     }
     if trg.false_id != 0 {
-        conf_str += &format!("false: {} ", group_ident(trg.false_id));
+        conf_str += &format!("false: {} ", group_ident(trg.false_id, name_map));
     }
     if trg.tolerance != 0.0 {
         conf_str += &format!("tolerance: {} ", trg.tolerance);
@@ -197,7 +224,7 @@ fn get_item_compare_expr(trg: &ItemCompareTrigger) -> String {
     format!("{comp_str} [{conf_str}]")
 }
 
-fn get_spawn_trigger_expr(trg: &SpawnTrigger) -> String {
+fn get_spawn_trigger_expr(trg: &SpawnTrigger, name_map: &HashMap<i16, String>) -> String {
     let mut conf_str = String::new();
     if trg.reset_remap {
         conf_str += "noremap "
@@ -208,7 +235,7 @@ fn get_spawn_trigger_expr(trg: &SpawnTrigger) -> String {
 
     format!(
         "Spawn {} {} {} | remap: {{ {}}}",
-        group_ident(trg.spawn_id),
+        group_ident(trg.spawn_id, name_map),
         if trg.spawn_ordered { "ordered" } else { "" },
         if conf_str.len() == 0 {
             String::new()
