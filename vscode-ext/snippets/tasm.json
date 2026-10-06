@@ -1,0 +1,24 @@
+{
+    "Routine": {
+        "prefix": "routine",
+        "body": [
+            "${1:name}:",
+            "\t$0"
+        ],
+        "description": "New routine"
+    },
+    "Entry point": {
+        "prefix": "_start",
+        "body": [
+            "_start:",
+            "\t$0"
+        ]
+    },
+    "Init block": {
+        "prefix": "_init",
+        "body": [
+            "_init:",
+            "\t$0"
+        ]
+    }
+}

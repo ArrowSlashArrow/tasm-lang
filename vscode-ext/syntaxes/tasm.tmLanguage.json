@@ -1,0 +1,482 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "TASM",
+	"scopeName": "source.tasm",
+	"patterns": [
+		{
+			"include": "#comment"
+		},
+		{
+			"include": "#routine-label"
+		},
+		{
+			"include": "#instruction"
+		}
+	],
+	"repository": {
+		"comment": {
+			"match": "(;).*$",
+			"name": "comment.line.semicolon.tasm",
+			"captures": {
+				"1": {
+					"name": "punctuation.definition.comment.tasm"
+				}
+			}
+		},
+		"routine-label": {
+			"patterns": [
+				{
+					"match": "^(_start|_init)[ \\t]*(:)(?!:)",
+					"name": "meta.routine.special.tasm",
+					"captures": {
+						"1": {
+							"name": "entity.name.function.special.tasm"
+						},
+						"2": {
+							"name": "punctuation.separator.label.tasm"
+						}
+					}
+				},
+				{
+					"match": "^([A-Za-z_][A-Za-z0-9_]*)[ \\t]*(:)(?!:)",
+					"name": "meta.routine.tasm",
+					"captures": {
+						"1": {
+							"name": "entity.name.function.tasm"
+						},
+						"2": {
+							"name": "punctuation.separator.label.tasm"
+						}
+					}
+				}
+			]
+		},
+		"instruction": {
+			"patterns": [
+				{
+					"include": "#raw-instruction"
+				},
+				{
+					"include": "#import-instruction"
+				},
+				{
+					"include": "#alias-instruction"
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(add|sub|mul|div|fldiv|mov|addm|subm|addd|subd))\\b",
+					"end": "$",
+					"name": "meta.instruction.arithmetic.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "keyword.other.arithmetic.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(se|sne|sl|sle|sg|sge|fe|fne|fl|fle|fg|fge|ise|isne|isl|isle|isg|isge|ife|ifne|ifl|ifle|ifg|ifge|srand|frand|isrand|ifrand))\\b",
+					"end": "$",
+					"name": "meta.instruction.compare.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "keyword.control.conditional.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(spawn|pause|resume|kill|toggleon|toggleoff|event))\\b",
+					"end": "$",
+					"name": "meta.instruction.process.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "keyword.control.process.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(nop|wait|waits))\\b",
+					"end": "$",
+					"name": "meta.instruction.wait.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "keyword.other.wait.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(tspawn|tstart|tstop))\\b",
+					"end": "$",
+					"name": "meta.instruction.time.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "keyword.other.time.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(instcoll|coll))\\b",
+					"end": "$",
+					"name": "meta.instruction.collision.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "keyword.control.collision.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?(?i:(pers|unpers|rpersall|unpersall|display|ioblock))\\b",
+					"end": "$",
+					"name": "meta.instruction.misc.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "support.function.misc.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				},
+				{
+					"begin": "^[ \\t]+(~)?([A-Za-z_]\\w*)",
+					"end": "$",
+					"name": "meta.instruction.unknown.tasm",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.concurrent.tasm"
+						},
+						"2": {
+							"name": "variable.function.unknown-instruction.tasm"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#instruction-body"
+						}
+					]
+				}
+			]
+		},
+		"raw-instruction": {
+			"begin": "^[ \\t]+(~)?(?i:(rawtrg|raw))\\b",
+			"end": "$",
+			"name": "meta.instruction.raw.tasm",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.concurrent.tasm"
+				},
+				"2": {
+					"name": "keyword.other.raw.tasm"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#comment"
+				},
+				{
+					"match": "[^;\\n]+",
+					"name": "string.unquoted.raw-object.tasm"
+				}
+			]
+		},
+		"import-instruction": {
+			"begin": "^[ \\t]+(~)?(?i:(importstd|import))\\b",
+			"end": "$",
+			"name": "meta.instruction.import.tasm",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.concurrent.tasm"
+				},
+				"2": {
+					"name": "keyword.control.import.tasm"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#comment"
+				},
+				{
+					"match": "[A-Za-z0-9_.\\-]+(?:/[A-Za-z0-9_.\\-]+)*",
+					"name": "string.unquoted.path.tasm"
+				}
+			]
+		},
+		"alias-instruction": {
+			"begin": "^[ \\t]+(~)?(?i:(alias))\\b[ \\t]*([A-Za-z_]\\w*)?",
+			"end": "$",
+			"name": "meta.instruction.alias.tasm",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.concurrent.tasm"
+				},
+				"2": {
+					"name": "storage.type.alias.tasm"
+				},
+				"3": {
+					"name": "variable.other.constant.alias-definition.tasm"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#instruction-body"
+				}
+			]
+		},
+		"instruction-body": {
+			"patterns": [
+				{
+					"include": "#comment"
+				},
+				{
+					"include": "#flags"
+				},
+				{
+					"include": "#arguments"
+				}
+			]
+		},
+		"arguments": {
+			"patterns": [
+				{
+					"match": ",",
+					"name": "punctuation.separator.comma.tasm"
+				},
+				{
+					"include": "#escaped-string"
+				},
+				{
+					"include": "#builtin-alias"
+				},
+				{
+					"include": "#number"
+				},
+				{
+					"include": "#special-number"
+				},
+				{
+					"include": "#item-group-hitbox"
+				},
+				{
+					"include": "#qualified-identifier"
+				},
+				{
+					"include": "#identifier"
+				}
+			]
+		},
+		"flags": {
+			"begin": "\\|",
+			"end": "(?=;)|$",
+			"name": "meta.flags.tasm",
+			"beginCaptures": {
+				"0": {
+					"name": "keyword.operator.flags.tasm"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#flag-dict"
+				},
+				{
+					"include": "#flag-name"
+				},
+				{
+					"include": "#boolean"
+				},
+				{
+					"include": "#round-mode"
+				},
+				{
+					"include": "#number"
+				},
+				{
+					"include": "#special-number"
+				},
+				{
+					"include": "#builtin-alias"
+				},
+				{
+					"include": "#item-group-hitbox"
+				},
+				{
+					"include": "#qualified-identifier"
+				},
+				{
+					"include": "#identifier"
+				},
+				{
+					"include": "#operator"
+				}
+			]
+		},
+		"flag-name": {
+			"match": "(?<!\\w)(?<!::)([A-Za-z_]\\w*)(:)(?!:)",
+			"captures": {
+				"1": {
+					"name": "variable.parameter.flag.tasm"
+				},
+				"2": {
+					"name": "punctuation.separator.key-value.tasm"
+				}
+			}
+		},
+		"flag-dict": {
+			"begin": "\\{",
+			"end": "\\}|(?=;)|$",
+			"name": "meta.dict.tasm",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.section.dict.begin.tasm"
+				}
+			},
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.dict.end.tasm"
+				}
+			},
+			"patterns": [
+				{
+					"match": "[=:]",
+					"name": "keyword.operator.assignment.tasm"
+				},
+				{
+					"match": ",",
+					"name": "punctuation.separator.comma.tasm"
+				},
+				{
+					"include": "#number"
+				},
+				{
+					"include": "#qualified-identifier"
+				},
+				{
+					"include": "#identifier"
+				}
+			]
+		},
+		"boolean": {
+			"match": "(?<!\\w)(?<!::)(?:true|false)(?![\\w:])",
+			"name": "constant.language.boolean.tasm"
+		},
+		"round-mode": {
+			"match": "(?<!\\w)(?<!::)(?:round|ceil|floor|r|c|f)[+-]?(?![\\w:])",
+			"name": "constant.language.round-mode.tasm"
+		},
+		"operator": {
+			"match": "[+\\-*/]",
+			"name": "keyword.operator.arithmetic.tasm"
+		},
+		"escaped-string": {
+			"match": "(\\\\)(\\w+)",
+			"captures": {
+				"1": {
+					"name": "constant.character.escape.tasm"
+				},
+				"2": {
+					"name": "string.unquoted.tasm"
+				}
+			}
+		},
+		"builtin-alias": {
+			"match": "(?<!\\w)(?<!::)(?:ATTEMPTS|POINTS|MAINTIME|COLL_P1|COLL_P2|COLL_P_ANY)(?![\\w:])",
+			"name": "support.constant.builtin-alias.tasm"
+		},
+		"number": {
+			"match": "(?<![\\w.])(?:0[xX][0-9A-Fa-f]+|-?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)(?![\\w.])",
+			"name": "constant.numeric.tasm"
+		},
+		"special-number": {
+			"match": "(?i)(?<!\\w)(?<!::)-?(?:inf(?:inity)?|nan)(?![\\w:])",
+			"name": "constant.numeric.special.tasm"
+		},
+		"item-group-hitbox": {
+			"patterns": [
+				{
+					"match": "(?<!\\w)(?<!::)[Cc](?:[xX][0-9A-Fa-f]+|\\d+)(?![\\w:])",
+					"name": "variable.other.counter.tasm"
+				},
+				{
+					"match": "(?<!\\w)(?<!::)[Tt](?:[xX][0-9A-Fa-f]+|\\d+)(?![\\w:])",
+					"name": "variable.other.timer.tasm"
+				},
+				{
+					"match": "(?<!\\w)(?<!::)[Gg](?:[xX][0-9A-Fa-f]+|\\d+)(?![\\w:])",
+					"name": "entity.name.type.group.tasm"
+				},
+				{
+					"match": "(?<!\\w)(?<!::)[Bb]\\d+(?![\\w:])",
+					"name": "entity.name.type.hitbox.tasm"
+				}
+			]
+		},
+		"qualified-identifier": {
+			"match": "(?<!\\w)(?<!::)([A-Za-z_]\\w*)(::)([A-Za-z_]\\w*)(?![\\w:])",
+			"captures": {
+				"1": {
+					"name": "entity.name.namespace.tasm"
+				},
+				"2": {
+					"name": "punctuation.separator.namespace.tasm"
+				},
+				"3": {
+					"name": "variable.other.tasm"
+				}
+			}
+		},
+		"identifier": {
+			"match": "(?<!\\w)(?<!::)[A-Za-z_]\\w*",
+			"name": "variable.other.tasm"
+		}
+	}
+}

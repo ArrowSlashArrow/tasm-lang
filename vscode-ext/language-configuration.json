@@ -1,0 +1,28 @@
+{
+    "comments": {
+        "lineComment": ";"
+    },
+    "brackets": [
+        [
+            "{",
+            "}"
+        ]
+    ],
+    "autoClosingPairs": [
+        {
+            "open": "{",
+            "close": "}"
+        }
+    ],
+    "surroundingPairs": [
+        [
+            "{",
+            "}"
+        ]
+    ],
+    "indentationRules": {
+        "increaseIndentPattern": "^[A-Za-z_]\\w*\\s*:\\s*(;.*)?$",
+        "decreaseIndentPattern": "(?!)"
+    },
+    "wordPattern": "(-?\\d*\\.\\d\\w*)|([A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)?)"
+}

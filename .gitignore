@@ -6,3 +6,7 @@ pytasm/namespace.json
 # docs stuff
 .retype/
 retype.manifest
+# extension
+node_modules
+*.vsix
+.env

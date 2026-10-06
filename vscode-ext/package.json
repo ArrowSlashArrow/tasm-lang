@@ -1,0 +1,40 @@
+{
+  "name": "TASM",
+  "displayName": ".tasm",
+  "description": "VSCode support for Trigger Assembly (TASM) -- not Borland Turbo Assembler.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.140.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "tasm",
+        "aliases": [
+          "Trigger Assembly",
+          "tasm"
+        ],
+        "extensions": [
+          ".tasm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tasm",
+        "scopeName": "source.tasm",
+        "path": "./syntaxes/tasm.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "tasm",
+        "path": "./snippets/tasm.json"
+      }
+    ]
+  }
+}
