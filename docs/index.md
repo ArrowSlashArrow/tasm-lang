@@ -245,7 +245,16 @@ Arguments: `TOGGLEOFF <group>`
 Toggles the argument group off via toggle trigger.  
 Execution time: 1 tick.
 
+##### EVENT
+Arguments: `EVENT <group> <event>`
+
+Spawns the target group when the event ID happens. This trigger will always listen for events once started and cannot be turned off.
+The `<event>` argument must be an integer that corresponds to one of the event IDs in GD.
+
+Only allowed in `_init` routine.
 #### 3.1.2.5. Wait
+> [!NOTE]
+> These instructions wait only if the routine that they are in is spawned with spawn ordered. They do nothing otherwise.
 ##### NOP
 Arguments: `NOP`
 
@@ -465,7 +474,8 @@ Below is a list of instructions and their corresponding structures:
 - `IMPORT`: See #(this documentation)[#31210-the-import-instruction]
 - `IMPORTSTD`: See #(this documentation)[#31211-importing-from-the-standard-library-importstd]
 ### 3.1.4. Instruction flags
-The function of a given instructions is usually simple/single-purposed, and only uses a handful of parameters within the trigger that it compiles to. However, triggers are remarkably configurable, and in some cases may simplify otherwise needlessly complex setups.  
+Instructions flags extend the functionality of certain instructions.  
+The function of a given instruction is usually simple/single-purposed, and only uses a handful of parameters within the trigger that it compiles to. However, triggers are remarkably configurable, and in some cases may simplify otherwise needlessly complex setups.  
 A common example is the implementation of getting the absolute value of a number. The old implementation required a comparison of the target (C1) against 0 to determine its sign, which determined whether it should be negatied. This is much more complex and wasteful of groups than simply using the absolute rounding mode.
   
 Old method:
@@ -538,14 +548,16 @@ Flags are written as `flag:value`. The TASM flag parser is very particular, so b
 | ordered | Functions exactly like `ordered` for spawn; affects the spawn trigger in the ioblock.                 | `IOBLOCK`    | Boolean    |
 | noremap | Enables `reset remap` option in the trigger if true.                                                  | `SPAWN`      | Boolean    |
 | noremap | Like the `noremap` flag for `SPAWN`, but only for non-instant compares (including `srand`/`frand`). Applies to both supplementary triggers.      | Spawn Compares | Boolean    |
-| noremapl | Like the `noremap` flag for compares, but only applies to the left branch's trigger (truthy).        | Fork Compares | Boolean    |
-| noremapr | Like the `noremap` flag for compares, but only applies to the right branch's trigger (falsy).        | Fork Compares | Boolean    |
+| lnoremap | Like the `noremap` flag for compares, but only applies to the left branch's trigger (truthy).        | Fork Compares | Boolean    |
+| rnoremap | Like the `noremap` flag for compares, but only applies to the right branch's trigger (falsy).        | Fork Compares | Boolean    |
 | tpaused | Starts target timer paused.                                                                           | `TSPAWN`     | Boolean    |
 | tstop   | Stops target timer once the target time has been reached.                                             | `TSPAWN`     | Boolean    |
 | tmod    | Time multiplier for timer. Can be negative.                                                           | `TSPAWN`     | Float      |
 | nover   | Only activate if the target timer is not running, or it is at 0.00, or the `tpaused` flag is enabled. | `TSPAWN`     | Boolean    |
 | nospawn | Toggle the target group off instead of activating it.                                                 | `COLL`       | Boolean    |
 | onexit  | Spawn the target group when the two hitboxes stop colliding vs when they start colliding.             | `COLL`       | Boolean    |
+| extra1  | "Extra 1" option in event triggers.                                                                   | `EVENT`      | Float      |
+| extra1  | "Extra 2" option in event triggers. See https://docs.rs/gdlib/latest/gdlib/cclocallevels/gdobj/structs/enum.ExtraID2.html | `EVENT`      | Float      |
 #### 3.1.4.2. Flag types
 ##### Round/Sign
 Rounding and sign (absolute/negative) configuration string.  

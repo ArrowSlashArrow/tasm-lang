@@ -440,8 +440,14 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
     ),
     // collision event listener
     "COLL" => (
-        true,
+        false,
         &[argset!((Group, CollBlock, CollBlock) => coll)],
+        InstrType::Process
+    ),
+    // event listener
+    "EVENT" => (
+        true,
+        &[argset!((Group, Int) => event)],
         InstrType::Process
     )
 };

@@ -303,6 +303,8 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "tmod" => FlagValueType::Float,
         "tstop" => FlagValueType::Bool,
         "nover" => FlagValueType::Bool,
+        "extra1" => FlagValueType::Float,
+        "extra2" => FlagValueType::Float,
         _ => return None,
     })
 }
