@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fs::read_to_string};
 
-use crate::Args;
+use crate::{
+    Args,
+    core::structs::{Instruction, Routine},
+};
 
 use gdlib::{
     cclocallevels::{
@@ -87,41 +90,28 @@ fn decomp(objects: &Vec<GDObject>) {
 
     let mut g = groups.into_iter().collect::<Vec<(i16, Vec<GDObject>)>>();
     g.sort_by_key(|k| k.0);
-    for (gid, objects) in g {
-        println!("{}:", group_ident(gid, &object_name_map));
-        for obj in objects {
-            let obj_expr = match obj.id {
-                ITEM_EDIT_TRIGGER => get_item_edit_expr(&from_item_edit_object(&obj).unwrap()),
-                ITEM_COMPARE_TRIGGER => get_item_compare_expr(
-                    &ItemCompareTrigger::from_object(&obj).unwrap(),
-                    &object_name_map,
-                ),
-                SPAWN_TRIGGER => get_spawn_trigger_expr(
-                    &SpawnTrigger::from_object(&obj).unwrap(),
-                    &object_name_map,
-                ),
-                TEXT => {
-                    // get object text (base-64 encoded)
-                    let bytes = b64_decode(
-                        if let GDValue::String(s) = obj
-                            .get_property(BASE64ENCODED_TEXT)
-                            .unwrap_or(GDValue::String(String::new()))
-                        {
-                            s
-                        } else {
-                            String::new()
-                        },
-                    )
-                    .unwrap_or(vec![]);
-                    let str = String::from_utf8_lossy(&bytes[..]);
-                    format!("; Label: {str}")
-                }
-                n => format!("<unknown object {n}>"),
-            };
 
-            println!("    {obj_expr}");
+    // // objects as expression
+    // for (gid, objects) in g.iter() {
+    //     println!("{}:", group_ident(*gid, &object_name_map));
+    //     for obj in objects {
+    //         println!("    {}", gd_obj_expr(&obj, &object_name_map));
+    //     }
+    // }
+
+    // convert to instructions
+    let mut parsed_instructions: HashMap<i16, Routine> = HashMap::new();
+    for (gid, objects) in g.iter() {
+        let mut rtn = Routine::empty()
+            .ident(&format!("{}:", group_ident(*gid, &object_name_map)))
+            .group(*gid);
+        for obj in objects {
+            rtn.add_instruction(to_tasm_instruction(obj));
         }
     }
+
+    // once we have instructions, we can display them
+    // todo: implement to_source(), to_gd_expr()
 }
 
 fn item_str(i: Item) -> String {
@@ -355,4 +345,37 @@ fn from_item_edit_object(obj: &GDObject) -> Option<ItemEditTrigger> {
         id_sign,
         result_sign,
     })
+}
+
+fn gd_obj_expr(obj: &GDObject, name_map: &HashMap<i16, String>) -> String {
+    match obj.id {
+        ITEM_EDIT_TRIGGER => get_item_edit_expr(&from_item_edit_object(&obj).unwrap()),
+        ITEM_COMPARE_TRIGGER => {
+            get_item_compare_expr(&ItemCompareTrigger::from_object(&obj).unwrap(), name_map)
+        }
+        SPAWN_TRIGGER => {
+            get_spawn_trigger_expr(&SpawnTrigger::from_object(&obj).unwrap(), &name_map)
+        }
+        TEXT => {
+            // get object text (base-64 encoded)
+            let bytes = b64_decode(
+                if let GDValue::String(s) = obj
+                    .get_property(BASE64ENCODED_TEXT)
+                    .unwrap_or(GDValue::String(String::new()))
+                {
+                    s
+                } else {
+                    String::new()
+                },
+            )
+            .unwrap_or(vec![]);
+            let str = String::from_utf8_lossy(&bytes[..]);
+            format!("; Label: {str}")
+        }
+        n => format!("<unknown object {n}>"),
+    }
+}
+
+fn to_tasm_instruction(object: &GDObject) -> Instruction {
+    todo!()
 }
