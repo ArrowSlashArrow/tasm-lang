@@ -36,23 +36,21 @@
 //! All lines are stripped for whitespace on the right-hand side before tokenisation.
 //! Following that, all routines are indexed and their group determined.
 //! Finally, all instructions are parsed in each group sequentially.
-use crate::{
-    core::{
-        consts::{ENTRY_POINT, INIT_ROUTINE},
-        error::{ParseErrorType, TasmError, TasmErrorType},
-        flags::{Flag, FlagValueType, get_flag_type},
-        push_error, push_error_lineless,
-        structs::{
-            Instruction, Routine, RoutineData, SymbolPath, SymbolValue, Tasm, TasmValue,
-            fits_arg_signature,
-        },
-    },
-    instr::{INSTR_SPEC, placeholder_panic_fn},
-    verbose_log,
-};
+use crate::instr::{INSTR_SPEC, placeholder_panic_fn};
+use crate::structs::Tasm;
 use std::{
     collections::{HashMap, hash_map},
     path::PathBuf,
+};
+use tasm_core::{
+    consts::{ENTRY_POINT, INIT_ROUTINE},
+    error::{ParseErrorType, TasmError, TasmErrorType},
+    flags::{Flag, FlagValueType, get_flag_type},
+    push_error, push_error_lineless,
+    structs::{
+        Instruction, Routine, RoutineData, SymbolPath, SymbolValue, TasmValue, fits_arg_signature,
+    },
+    verbose_log,
 };
 
 const INIT_PLACEHOLDER_GROUP: i16 = -1i16;

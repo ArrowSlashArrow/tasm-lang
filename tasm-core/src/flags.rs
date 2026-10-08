@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use gdlib::cclocallevels::gdobj::structs::{Op, RoundMode, SignMode};
 
-use crate::core::structs::{SymbolPath, SymbolValue, TasmValue, split_at_str_once};
+use crate::structs::{SymbolPath, SymbolValue, TasmValue, split_at_str_once};
 
 #[derive(Debug, Clone)]
 pub struct Flag {

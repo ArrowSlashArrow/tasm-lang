@@ -2,14 +2,12 @@ use gdlib::cclocallevels::gdobj::structs::{CompareOp, Item, Op};
 
 use phf::phf_map;
 
-use crate::{
-    core::{
-        HandlerFn, HandlerReturn,
-        error::{TasmError, TasmErrorType},
-        flags::FlagValue,
-        structs::{HandlerArgs, InstrType, TasmPrimitive, TasmValue},
-    },
-    instr::fns::*,
+use crate::instr::fns::*;
+use tasm_core::{
+    HandlerFn, HandlerReturn,
+    error::{TasmError, TasmErrorType},
+    flags::FlagValue,
+    structs::{HandlerArgs, InstrType, TasmPrimitive, TasmValue},
 };
 
 pub mod fns;
@@ -44,7 +42,7 @@ pub fn placeholder_panic_fn(args: HandlerArgs) -> HandlerReturn {
 
 pub type HandlerAssoc = (&'static [TasmPrimitive], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
-pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
+pub static INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
     // inits
     "PERS" => (false, &[argset!((Item) => pers)], InstrType::Misc),
     "UNPERS" => (false, &[argset!((Item) => unpers)], InstrType::Misc),

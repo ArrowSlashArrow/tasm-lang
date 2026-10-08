@@ -1,48 +1,38 @@
+use std::{collections::HashMap, path::PathBuf};
+
 use gdlib::cclocallevels::{
     gdlevel::{GDLevel, version::GDVersion},
     gdobj::{meta::GDObjConfig, structs::ItemType, text},
 };
-
-use crate::{
-    core::{
-        consts::{ENTRY_POINT, GROUP_LIMIT, INIT_ROUTINE},
-        error::{TasmError, TasmErrorType},
-        structs::{HandlerArgs, HandlerData, InstrType, Instruction, Routine, Tasm, TasmValue},
-    },
-    instr::{fns::ioblock, get_item_spec},
+use tasm_core::{
+    consts::{ENTRY_POINT, GROUP_LIMIT, INIT_ROUTINE},
+    error::{TasmError, TasmErrorType},
+    push_error, push_error_lineless,
+    structs::{HandlerArgs, InstrType, Instruction, Routine, RoutineData, TasmValue},
 };
 
-extern crate alloc;
-use std::collections::HashMap;
+use crate::instr::{fns::ioblock, get_item_spec};
 
-pub mod consts {
-    pub const ENTRY_POINT: &str = "_start";
-    pub const INIT_ROUTINE: &str = "_init";
-    pub const GROUP_LIMIT: i16 = 9_999;
-}
-pub mod error;
-pub mod flags;
-pub mod structs;
-
-pub type HandlerReturn = Result<HandlerData, TasmError>;
-pub type HandlerFn = for<'a> fn(HandlerArgs<'a>) -> HandlerReturn;
-
-#[macro_export]
-macro_rules! verbose_log {
-    ($this:expr, $($arg:tt)*) => {
-        if $this.logs_enabled {
-            println!($($arg)*);
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! log {
-    ($on:expr, $($t:tt)*) => {
-        if $on {
-            println!($($t)*);
-        }
-    };
+#[derive(Debug, Default, Clone)]
+pub struct Tasm {
+    pub routines: Vec<Routine>,
+    pub errors: Vec<TasmError>,
+    /// (line_idx, routine_ident, group_id, lines as (line_idx, line_content))
+    pub routine_data: Vec<RoutineData>,
+    pub routine_group_map: HashMap<String, i16>, // routine ident => group id
+    pub group_offset: i16,
+    pub has_entry_point: bool,
+    pub lines: Vec<String>,
+    pub curr_group: i16,
+    pub displayed_items: usize,
+    pub start_rtn_group: i16,
+    // aliases get resolved through the map:
+    pub logs_enabled: bool,
+    pub release_mode: bool,
+    pub defined_aliases: HashMap<String, String>, // alias => value
+    pub fname: String,
+    // list of modules that were imported here
+    pub imports: Vec<PathBuf>,
 }
 
 impl Tasm {
@@ -263,48 +253,5 @@ impl Tasm {
         if data.added_item_display {
             self.displayed_items += 1;
         }
-    }
-}
-
-pub fn push_error(
-    errors: &mut Vec<TasmError>,
-    file: &str,
-    etype: TasmErrorType,
-    line: usize,
-    rtn: String,
-    details: String,
-    errcode: i32,
-) {
-    errors.push(TasmError {
-        etype,
-        file: file.to_string(),
-        routine: rtn,
-        errcode,
-        line,
-        details,
-    })
-}
-
-pub fn push_error_lineless(
-    errors: &mut Vec<TasmError>,
-    file: &str,
-    etype: TasmErrorType,
-    details: String,
-    errcode: i32,
-) {
-    errors.push(TasmError {
-        etype,
-        file: file.to_string(),
-        routine: String::new(),
-        errcode,
-        line: 0,
-        details,
-    })
-}
-
-pub fn print_errors(es: Vec<TasmError>, err_msg: &str) {
-    println!("{err_msg} with {} errors:", es.len());
-    for e in es {
-        println!("{e}");
     }
 }

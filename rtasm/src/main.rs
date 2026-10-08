@@ -13,18 +13,20 @@ use gdlib::cclocallevels::gdlevel::{CCLocalLevels, GDLevel};
 use gdlib::cclocallevels::gdobj::ids::level_header;
 use gdlib::cclocallevels::gdobj::serialise_objects;
 use gdlib::core::get_cclocallevels_path;
+use tasm_core::log;
 use tungstenite::{Message, connect};
 
-use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
+use crate::structs::Tasm;
+use tasm_core::{error::ERROR_DOCS, print_errors};
 
 use crate::decomp::decompile_gmd;
 use crate::linker::{parse_module, post_link_processing};
 
-mod core;
 mod decomp;
 mod instr;
 mod lexer;
 mod linker;
+mod structs;
 #[cfg(test)]
 mod tests;
 

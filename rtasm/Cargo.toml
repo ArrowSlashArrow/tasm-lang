@@ -13,3 +13,4 @@ paste = "1.0.15"
 phf = { version = "0.14.0", features = ["macros"] }
 tungstenite = "0.24"
 url = "2.5"
+tasm_core = { path = "../tasm-core" }

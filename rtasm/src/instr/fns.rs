@@ -13,17 +13,16 @@ use gdlib::cclocallevels::gdobj::{
 
 use paste::paste;
 
-use crate::{
-    core::{
-        HandlerReturn,
-        error::{TasmError, TasmErrorType},
-        flags::FlagValue,
-        structs::{HandlerArgs, HandlerData, Hitbox, validate_hitboxes},
-    },
-    instr::{
-        GROUP_SPAWN_DELAY, LowerCompOp, LowerOp, flag_override, get_flag_value, get_flag_value_opt,
-        get_item_spec,
-    },
+use tasm_core::{
+    HandlerReturn,
+    error::{TasmError, TasmErrorType},
+    flags::FlagValue,
+    structs::{HandlerArgs, HandlerData, Hitbox, validate_hitboxes},
+};
+
+use crate::instr::{
+    GROUP_SPAWN_DELAY, LowerCompOp, LowerOp, flag_override, get_flag_value, get_flag_value_opt,
+    get_item_spec,
 };
 
 macro_rules! handlers {

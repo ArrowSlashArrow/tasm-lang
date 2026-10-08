@@ -1,23 +1,24 @@
 use std::{collections::HashMap, fs, path::PathBuf};
 
 use crate::{
-    core::{
-        HandlerFn,
-        error::{TasmError, TasmErrorType},
-        flags::{
-            FlagValue::{self, ExternRefsDict},
-            UnparsedDictFlagEntry, resolve_flag_int,
-        },
-        print_errors,
-        structs::{
-            Instruction, Routine, SymbolPath, SymbolPathIdentifier, SymbolValue, Tasm, TasmValue,
-            fits_arg_signature,
-        },
-    },
     instr::{INSTR_SPEC, placeholder_panic_fn},
     lexer, log,
+    structs::Tasm,
 };
 use anyhow::{Result, anyhow};
+use tasm_core::{
+    HandlerFn,
+    error::{TasmError, TasmErrorType},
+    flags::{
+        FlagValue::{self, ExternRefsDict},
+        UnparsedDictFlagEntry, resolve_flag_int,
+    },
+    print_errors,
+    structs::{
+        Instruction, Routine, SymbolPath, SymbolPathIdentifier, SymbolValue, TasmValue,
+        fits_arg_signature,
+    },
+};
 
 use crate::Args;
 

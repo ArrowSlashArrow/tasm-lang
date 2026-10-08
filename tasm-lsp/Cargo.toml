@@ -1,0 +1,10 @@
+[package]
+name = "tasm-lsp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tasmc = { path = "../rtasm" }
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+dashmap = "6"

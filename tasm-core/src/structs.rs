@@ -3,11 +3,8 @@ use std::{collections::HashMap, hint::unreachable_unchecked, path::PathBuf};
 
 use gdlib::cclocallevels::gdobj::{GDObject, meta::GDObjConfig, structs::Item};
 
-use crate::core::{
-    HandlerFn,
-    consts::GROUP_LIMIT,
-    error::{ParseErrorType, TasmError},
-    flags::Flag,
+use crate::{
+    HandlerFn, consts::GROUP_LIMIT, error::ParseErrorType, flags::Flag,
     structs::SymbolValue::NotFound,
 };
 
@@ -150,7 +147,7 @@ pub enum TasmPrimitive {
 }
 
 impl TasmValue {
-    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String, i32)> {
+    pub fn to_value(s: &str) -> Result<Self, (ParseErrorType, String, i32)> {
         let mut iter = s.chars();
         let pref = match iter.next() {
             Some(c) => c,
@@ -448,28 +445,6 @@ pub struct RoutineData {
     pub routine_ident: String,       // legacy: 1
     pub group_id: i16,               // legacy: 2
     pub lines: Vec<(usize, String)>, // legacy: 3
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Tasm {
-    pub routines: Vec<Routine>,
-    pub errors: Vec<TasmError>,
-    /// (line_idx, routine_ident, group_id, lines as (line_idx, line_content))
-    pub routine_data: Vec<RoutineData>,
-    pub routine_group_map: HashMap<String, i16>, // routine ident => group id
-    pub group_offset: i16,
-    pub has_entry_point: bool,
-    pub lines: Vec<String>,
-    pub curr_group: i16,
-    pub displayed_items: usize,
-    pub start_rtn_group: i16,
-    // aliases get resolved through the map:
-    pub logs_enabled: bool,
-    pub release_mode: bool,
-    pub defined_aliases: HashMap<String, String>, // alias => value
-    pub fname: String,
-    // list of modules that were imported here
-    pub imports: Vec<PathBuf>,
 }
 
 #[derive(Debug, Default, Clone)]

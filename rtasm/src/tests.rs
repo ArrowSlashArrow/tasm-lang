@@ -1,6 +1,6 @@
 use paste::paste;
 
-use crate::core::structs::{TasmPrimitive, TasmValue, fits_arg_signature};
+use tasm_core::structs::{TasmPrimitive, TasmValue, fits_arg_signature};
 
 use super::*;
 
