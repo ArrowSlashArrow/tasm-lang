@@ -1,0 +1,29 @@
+; A stopwatch built on a timer item, controlled with IOBlocks.
+_init:
+    alias seconds, T1
+    alias minutes, C1
+
+    display minutes
+    display seconds
+
+    ioblock pause_watch, 2, pause
+    ioblock resume_watch, 3, resume
+    ioblock reset_watch, 4, reset
+
+_start:
+    ; start T1 at 0 and spawn `next_minute` when it reaches 60
+    tspawn seconds, 0, 60, next_minute
+
+next_minute:
+    add minutes, 1
+    tspawn seconds, 0, 60, next_minute
+
+pause_watch:
+    tstop seconds
+
+resume_watch:
+    tstart seconds
+
+reset_watch:
+    mov minutes, 0
+    tspawn seconds, 0, 60, next_minute

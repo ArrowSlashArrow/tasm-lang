@@ -1,0 +1,23 @@
+; Two routines run at the same time, each counting at its own speed.
+; Touch the `stop` block to kill both of them.
+_init:
+    display C1
+    display C2
+    ioblock stop_all, 2, stop   | ordered:false
+
+_start:
+    spawn fast
+    spawn slow
+
+fast:
+    add C1, 1
+    spawn fast      ; loop: spawn this routine again
+
+slow:
+    add C2, 1
+    wait 6          ; sleep for 6 ticks before looping
+    spawn slow
+
+stop_all:
+    kill fast
+    kill slow

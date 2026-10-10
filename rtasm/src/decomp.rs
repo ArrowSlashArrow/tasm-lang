@@ -1,19 +1,19 @@
 use std::{collections::HashMap, fs::read_to_string};
 
 use crate::{
-    Args,
     core::structs::{Instruction, Routine},
+    Args,
 };
 
 use gdlib::{
     cclocallevels::{
-        gdlevel::{GDLevel, leveldata::parse_objects},
+        gdlevel::{leveldata::parse_objects, GDLevel},
         gdobj::{
-            GDObject, ItemCompareTrigger, ItemEditTrigger, ObjectProperties, SpawnTrigger,
             ids::{objects::*, properties::*},
             structs::{
                 CompareOp, CompareOperand, GDValue, Group, Item, ItemType, Op, RoundMode, SignMode,
             },
+            GDObject, ItemCompareTrigger, ItemEditTrigger, ObjectProperties, SpawnTrigger,
         },
     },
     core::b64_decode,
@@ -77,7 +77,8 @@ fn decomp(objects: &Vec<GDObject>) {
     for object in groups.get(&0).unwrap_or(&vec![]) {
         if object.id == TEXT && object.config.groups.is_empty() {
             let text = if let Some(GDValue::String(s)) = object.get_property(BASE64ENCODED_TEXT) {
-                String::from_utf8_lossy_owned(b64_decode(s).unwrap_or(vec![]))
+                let bytes = b64_decode(s).unwrap_or(vec![]);
+                String::from_utf8_lossy(&bytes).into_owned()
             } else {
                 continue;
             };
@@ -88,6 +89,7 @@ fn decomp(objects: &Vec<GDObject>) {
         }
     }
 
+    // sort groups by group id
     let mut g = groups.into_iter().collect::<Vec<(i16, Vec<GDObject>)>>();
     g.sort_by_key(|k| k.0);
 
@@ -100,14 +102,16 @@ fn decomp(objects: &Vec<GDObject>) {
     // }
 
     // convert to instructions
-    let mut parsed_instructions: HashMap<i16, Routine> = HashMap::new();
+    let mut parsed_instructions = vec![];
     for (gid, objects) in g.iter() {
         let mut rtn = Routine::empty()
             .ident(&format!("{}:", group_ident(*gid, &object_name_map)))
             .group(*gid);
         for obj in objects {
+            // todo: this needs to be either a gdobject or instr/object enum
             rtn.add_instruction(to_tasm_instruction(obj));
         }
+        parsed_instructions.push(rtn);
     }
 
     // once we have instructions, we can display them

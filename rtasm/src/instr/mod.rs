@@ -108,38 +108,6 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
         ],
         InstrType::Arithmetic,
     ),
-    "ADDM" => (
-        false,
-        &[
-            argset!((Item, Item, Number) => add_mod_2items_num),
-            argset!((Item, Item, Item, Number) => add_mod_3items_num),
-        ],
-        InstrType::Arithmetic,
-    ),
-    "SUBM" => (
-        false,
-        &[
-            argset!((Item, Item, Number) => sub_mod_2items_num),
-            argset!((Item, Item, Item, Number) => sub_mod_3items_num),
-        ],
-        InstrType::Arithmetic,
-    ),
-    "ADDD" => (
-        false,
-        &[
-            argset!((Item, Item, Number) => add_div_2items_num),
-            argset!((Item, Item, Item, Number) => add_div_3items_num),
-        ],
-        InstrType::Arithmetic,
-    ),
-    "SUBD" => (
-        false,
-        &[
-            argset!((Item, Item, Number) => sub_div_2items_num),
-            argset!((Item, Item, Item, Number) => sub_div_3items_num),
-        ],
-        InstrType::Arithmetic,
-    ),
     "MUL" => (
         false,
         &[

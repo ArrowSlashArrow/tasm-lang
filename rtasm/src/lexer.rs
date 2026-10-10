@@ -164,7 +164,7 @@ impl Tasm {
                 let path = maybe_path.unwrap();
                 imports.push(if is_std_import {
                     // this module is in tasmdir/stdlib
-                    PathBuf::from(stdlib_dir()).join("stdlib").join(path)
+                    PathBuf::from(stdlib_dir()).join(path)
                 } else {
                     // resolve path to be relative to pwd
                     PathBuf::from(self.fname.clone())

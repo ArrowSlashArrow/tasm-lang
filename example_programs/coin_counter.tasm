@@ -1,0 +1,11 @@
+; Counts how many times player 1 touches a collision block.
+; Before playing, place a collision block with block ID 1 somewhere in the level.
+_init:
+    alias COIN, b1
+    display POINTS
+
+_start:
+    coll got_coin, COLL_P1, COIN
+
+got_coin:
+    add POINTS, 1

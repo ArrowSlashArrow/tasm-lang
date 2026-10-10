@@ -1,0 +1,13 @@
+; A small library of geometry helpers.
+; Every routine reads its input from T1 and writes its result to T2.
+_init:
+    import ../stdlib/consts
+
+; T2 = area of a circle with radius T1 (pi * r^2)
+circle_area:
+    mul T2, T1, T1
+    mul T2, consts::PI
+
+; T2 = circumference of a circle with radius T1 (2 * pi * r)
+circumference:
+    mul T2, T1, consts::TAU

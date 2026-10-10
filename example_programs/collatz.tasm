@@ -1,0 +1,32 @@
+; Counts how many steps the Collatz sequence takes to reach 1.
+; Rule: if n is even, n = n / 2. If n is odd, n = 3n + 1.
+_init:
+    alias n, C1
+    alias steps, C2
+    alias START_VALUE, 27   ; 27 takes 111 steps
+
+    display n
+    display steps
+
+_start:
+    mov n, START_VALUE
+    mov steps, 0
+    spawn step
+
+step:
+    ; n is even exactly when n / 2 == floor(n / 2).
+    ; both sides are divided by 2, and the right side is also floored.
+    ife even, odd, n, n  | lmod:2 lmodop:/ rmod:2 rmodop:/ rmode:floor
+
+even:
+    div n, 2
+    spawn count
+
+odd:
+    mul n, 3
+    add n, 1
+    spawn count
+
+count:
+    add steps, 1
+    isg step, n, 1       ; keep going while n > 1

@@ -1,0 +1,15 @@
+; Uses the `shapes` library from this folder.
+_init:
+    import shapes
+
+    display T1  ; radius
+    display T2  ; latest result
+    display T3  ; saved area
+
+_start:
+    mov T1, 5
+    spawn shapes::circle_area   | ordered:false
+    wait 4                  ; give circle_area time to finish
+    mov T3, T2              ; save the area
+
+    spawn shapes::circumference | ordered:false

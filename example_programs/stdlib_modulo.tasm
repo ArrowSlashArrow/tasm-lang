@@ -1,0 +1,22 @@
+; Uses the standard library to compute 47 mod 5, then checks the answer.
+; The background flashes green if the answer is right, and red if it is wrong.
+_init:
+    import ../stdlib/math
+    import ../stdlib/debug
+
+    display C1
+    display C2
+    display C3
+
+; assert that 47 % 5 == 2
+_start:
+    ; math::modulo takes its inputs in C1 and C2 and returns C1 mod C2 in C3
+    mov C1, 47
+    mov C2, 5
+    spawn math::modulo          | ordered:false delay:0
+    wait 4
+
+    ; debug::assert_eq_int compares C1 with C2
+    mov C1, C3
+    mov C2, 2
+    spawn debug::assert_eq_int  | ordered:false delay:0

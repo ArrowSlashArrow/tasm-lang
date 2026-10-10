@@ -1,0 +1,27 @@
+; Converts a temperature from Celsius to Fahrenheit and Kelvin.
+; Timers (T) can hold decimals; counters (C) only hold whole numbers.
+_init:
+    alias celsius, T1
+    alias fahrenheit, T2
+    alias kelvin, T3
+    alias rounded_f, C1
+    alias START_TEMP, 21.5
+
+    display celsius
+    display fahrenheit
+    display kelvin
+    display rounded_f
+
+_start:
+    mov celsius, START_TEMP
+
+    ; fahrenheit = celsius * 1.8 + 32
+    mul fahrenheit, celsius, 1.8
+    add fahrenheit, 32
+
+    ; kelvin = celsius + 273.15
+    mov kelvin, celsius
+    add kelvin, 273.15
+
+    ; store fahrenheit as a whole number, rounded to the nearest integer
+    mov rounded_f, fahrenheit   | resmode:round
