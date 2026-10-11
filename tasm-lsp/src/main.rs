@@ -4,6 +4,7 @@
 //! spec and flag registry drive completion and hover.
 
 mod completion;
+mod definition;
 mod diagnostics;
 mod hover;
 mod index;
@@ -17,14 +18,15 @@ use std::{error::Error, path::PathBuf};
 use lsp_server::{Connection, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, HoverParams, HoverProviderCapability,
-    InitializeParams, PublishDiagnosticsParams, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, Url,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, GotoDefinitionParams,
+    GotoDefinitionResponse, HoverParams, HoverProviderCapability, InitializeParams, OneOf,
+    PublishDiagnosticsParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    Url,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
         PublishDiagnostics,
     },
-    request::{Completion, HoverRequest, Request as _},
+    request::{Completion, GotoDefinition, HoverRequest, Request as _},
 };
 use serde::Deserialize;
 
@@ -63,6 +65,7 @@ fn main() -> Result<(), AnyError> {
             ..Default::default()
         }),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
+        definition_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
     let init = connection.initialize(serde_json::to_value(capabilities)?)?;
@@ -139,6 +142,18 @@ fn handle_request(world: &World, req: Request) -> Response {
             }
             Err(e) => bad_params(id, e),
         },
+        GotoDefinition::METHOD => {
+            match serde_json::from_value::<GotoDefinitionParams>(req.params) {
+                Ok(p) => {
+                    let pos = p.text_document_position_params;
+                    let result = world.docs.get(&pos.text_document.uri).and_then(|d| {
+                        definition::definition(world, &pos.text_document.uri, &d.text, pos.position)
+                    });
+                    ok(id, result.map(GotoDefinitionResponse::Scalar))
+                }
+                Err(e) => bad_params(id, e),
+            }
+        }
         _ => Response::new_err(
             id,
             lsp_server::ErrorCode::MethodNotFound as i32,

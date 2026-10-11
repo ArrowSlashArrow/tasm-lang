@@ -6,7 +6,23 @@ Support for TASM
 - Language server ([`tasm-lsp`](../tasm-lsp)):
   - diagnostics from the compiler's lexer, plus link checks (`module::symbol`, imports, circular imports) and per-instruction checks (e.g. negative waits, writing to `ATTEMPTS`)
   - completion for instructions, arguments (filtered by the instruction's argsets), local and imported aliases/routines, `IMPORT`/`IMPORTSTD` paths, flags and `remap` entries
-  - hover for instructions, arguments, flags and imports
+  - hover for instructions, arguments, flags and imports; routines show their doc comment
+  - go to definition (ctrl + click) for imports, routines and aliases, including `module::symbol` in other files
+
+### Documenting routines
+The comment lines directly above a routine (and the comment on its label line) are its documentation, shown when hovering over the routine:
+
+```
+; Adds two counters.
+; @param c1 first operand
+; @param c2 second operand
+; @returns c3 the sum
+; @0tick
+add_two:
+    add c3, c1, c2
+```
+
+Tags: `@param <name> <description>`, `@returns <name> <description>`, `@0tick` (safe to 0-tick) and `@no0tick <reason>`. A blank `;` line starts a new paragraph.
 
 ## Installing
 Each GitHub release has a `.vsix` per platform (`win32-x64`, `linux-x64`) with the server bundled, built by `.github/workflows/vscode-ext.yml`. Install it with `code --install-extension <file>.vsix`.

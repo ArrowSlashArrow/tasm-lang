@@ -14,6 +14,9 @@ use crate::text::{code_part, is_indented, trim_span};
 pub struct RoutineDef {
     pub name: String,
     pub line: usize,
+    /// Doc comment: the unindented comment lines directly above the routine, then the comment
+    /// on the label line itself. Each entry is a comment without its `;`.
+    pub doc: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,14 +52,22 @@ impl DocIndex {
     pub fn build(text: &str, file: Option<&Path>, stdlib: &Path) -> Self {
         let mut index = DocIndex::default();
         let mut current: Option<String> = None;
+        // comment lines directly above the current line, candidates for a routine's doc
+        let mut doc: Vec<String> = vec![];
 
         for (line_idx, raw_line) in text.lines().enumerate() {
             // same preprocessing as `lexer::parse_file`
             let line = code_part(raw_line).replace('\t', " ");
             let line = line.trim_end();
             if line.trim().is_empty() {
+                if raw_line.starts_with(';') {
+                    doc.push(comment_text(raw_line));
+                } else {
+                    doc.clear();
+                }
                 continue;
             }
+            let above = std::mem::take(&mut doc);
 
             let mut rest = line;
             while let Some(i) = rest.find("::") {
@@ -74,9 +85,20 @@ impl DocIndex {
                 let trimmed = line.trim();
                 current = match trimmed.strip_suffix(':') {
                     Some(name) if !name.contains(' ') => {
+                        let mut doc = above;
+                        if let Some((_, comment)) = raw_line.split_once(';') {
+                            doc.push(comment_text(comment));
+                        }
+                        // blank comment lines separate paragraphs, but not at the ends
+                        while doc.last().is_some_and(String::is_empty) {
+                            doc.pop();
+                        }
+                        let lead = doc.iter().take_while(|l| l.is_empty()).count();
+                        doc.drain(..lead);
                         index.routines.push(RoutineDef {
                             name: name.to_string(),
                             line: line_idx,
+                            doc,
                         });
                         Some(name.to_string())
                     }
@@ -150,6 +172,12 @@ impl DocIndex {
     }
 }
 
+/// A comment without its leading `;`s and the space after them.
+fn comment_text(comment: &str) -> String {
+    let c = comment.trim_start().trim_start_matches(';');
+    c.strip_prefix(' ').unwrap_or(c).trim_end().to_string()
+}
+
 /// `TasmValue::to_value`, but a panic (e.g. slicing inside a multi-byte character) becomes an
 /// error instead of taking the server down.
 pub fn safe_to_value(s: &str) -> Result<TasmValue, (i32, String)> {
@@ -218,6 +246,17 @@ mod tests {
             Path::new(""),
         );
         assert_eq!(idx.referenced_modules, ["x", "lib_2"]);
+    }
+
+    #[test]
+    fn docs() {
+        let src = "; not this one\n\n; Does a thing.\n;\n; @0tick\nthing: ; inline\n    nop\n    ; not this\nother:\n";
+        let idx = DocIndex::build(src, None, Path::new(""));
+        assert_eq!(
+            idx.routines[0].doc,
+            ["Does a thing.", "", "@0tick", "inline"]
+        );
+        assert!(idx.routines[1].doc.is_empty());
     }
 
     #[test]
