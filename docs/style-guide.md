@@ -1,9 +1,15 @@
+---
+label: Style guide
+icon: paintbrush
+order: 80
+---
+
 # TASM Style Guide
 This guide has two parts:
 1. **[Formatting](#part-1-formatting)**: how TASM code should look, so that it is easy to read.
 2. **[Writing idiomatic TASM](#part-2-writing-idiomatic-tasm)**: how to write programs that are fast and use few groups. Triggers can be extremely slow and wasteful when they are arranged badly, and very powerful when they are arranged well.
 
-The standard library and the programs in `example_programs/` follow this guide. [`example_programs/collatz.tasm`](../example_programs/collatz.tasm) is a small program that uses most of it.
+The standard library and the programs in `example_programs/` follow this guide. [`example_programs/collatz.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/collatz.tasm) is a small program that uses most of it.
 
 ## Quick checklist
 - [ ] Instructions are indented with 4 spaces.

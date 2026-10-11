@@ -24,7 +24,7 @@ Severity: 🔴 wrong output or crash · 🟠 confusing or silently wrong behavio
 
 ## 1. Compiler: group allocation
 
-### 1.1 🔴 Auxiliary groups collide with routine groups and with each other
+<!-- ### 1.1 🔴 Auxiliary groups collide with routine groups and with each other
 **Files:** `rtasm/src/core/mod.rs:237`, `rtasm/src/instr/fns.rs:364-371, 467-487, 541, 579-580`, `rtasm/src/main.rs` (`parse_main` return value)
 
 **Problem:** Base compares and `SRAND`/`FRAND` put their intermediate spawn triggers in "auxiliary" groups that start at `self.curr_group`. That value is the group of the **last routine** (the counter is not advanced past it), and handlers don't agree on how to use it:
@@ -40,7 +40,7 @@ So:
 - Make every handler use the half-open range `[curr_group, curr_group + n)` and advance by `n`. Better still, have handlers *request* groups from an allocator instead of computing offsets themselves.
 - Add a test that compiles a program with consecutive compares and asserts that every aux group is unique and distinct from the routine groups.
 
-**Possibly linked bugs:** Spurious spawns, double execution, and "random" misbehaviour in programs with many branches. It may explain some race-like behaviour noted in comments (e.g. `example_programs/list_search.tasm`, which needs `kill` twice). The routine-group collision was observed in an earlier session: the SE spawn trigger was given the same group as routine `a`.
+**Possibly linked bugs:** Spurious spawns, double execution, and "random" misbehaviour in programs with many branches. It may explain some race-like behaviour noted in comments (e.g. `example_programs/list_search.tasm`, which needs `kill` twice). The routine-group collision was observed in an earlier session: the SE spawn trigger was given the same group as routine `a`. -->
 
 ### 1.2 🔴 An empty `_init` routine gives the next routine group 0 (verified)
 **File:** `rtasm/src/lexer.rs:597-615`
@@ -755,7 +755,7 @@ Every file in `stdlib/`, `example_programs/` and `programs/` was compiled and re
 
 ## 11. Documentation
 
-### 11.1 🟠 Two "Home" pages and divergent references
+<!-- ### 11.1 🟠 Two "Home" pages and divergent references
 **Files:** `docs/index.md`, `docs/updated_docs_v1.md`, `docs/book/*`
 
 **Problem:** Both reference files have `label: Home`. `index.md` still documents:
@@ -765,7 +765,7 @@ Every file in `stdlib/`, `example_programs/` and `programs/` was compiled and re
 
 The book links to `../index.md` anchors that only exist in `updated_docs_v1.md`.
 
-**Potential fixes:** Replace `index.md` with `updated_docs_v1.md` once reviewed, then update it for the uncommitted changes (`ADDM` removal, `IMPORTSTD` fix).
+**Potential fixes:** Replace `index.md` with `updated_docs_v1.md` once reviewed, then update it for the uncommitted changes (`ADDM` removal, `IMPORTSTD` fix). -->
 
 ### 11.2 🟠 Docs describe bugs that have been fixed, and vice versa
 **Files:** `docs/updated_docs_v1.md` §3.1.2.11, `docs/book/07-modules.md` §7.6, `docs/book/09-debugging.md` §9.5
@@ -783,11 +783,12 @@ The book links to `../index.md` anchors that only exist in `updated_docs_v1.md`.
 
 **Potential fixes:** Replace the tutorial with a link to `docs/book/`, or port it to `mem_8bit`.
 
-### 11.4 ⚪ Retype config placeholders
+<!-- ### 11.4 ⚪ Retype config placeholders
 **File:** `docs/retype.yml`
 
 **Problem:** `url: 127.0.0.1` is a placeholder; README says the site is `https://tasm.mntpoint.org/docs/`.
 
+-->
 ---
 
 ## 12. Install scripts, CI and tooling
@@ -828,7 +829,7 @@ The book links to `../index.md` anchors that only exist in `updated_docs_v1.md`.
 
 **Problem:** Shell scripts aren't forced to LF (`*.sh text eol=lf`), so `linux.sh` can get CRLF on Windows checkouts. `.gitignore` still lists `pytasm/namespace.json`.
 
-### 12.5 🟡 `scripts/stdlib_memory.py` no longer matches the stdlib
+<!-- ### 12.5 🟡 `scripts/stdlib_memory.py` no longer matches the stdlib
 **File:** `scripts/stdlib_memory.py`
 
 **Problem:**
@@ -836,13 +837,13 @@ The book links to `../index.md` anchors that only exist in `updated_docs_v1.md`.
 - It only generates bits 8..2 (not `bit_1`).
 - It claims 14-bit support but has no 14-bit mode.
 - It appends to `bits.txt` on every run without closing the file.
-- Template substitution via chained `.replace("M"/"N"/...)` is fragile.
+- Template substitution via chained `.replace("M"/"N"/...)` is fragile. -->
 
-### 12.6 🟡 VS Code extension is early-stage
+<!-- ### 12.6 🟡 VS Code extension is early-stage
 **Files:** `vscode-ext/package.json`, `vscode-ext/README.md`, `vscode-ext/syntaxes/tasm.tmLanguage.json`
 
 **Problem:**
 - `package.json`: `name` is `TASM` (Marketplace names must be lowercase), and it lacks `publisher`, `repository`, `license` and `icon`.
 - README is a placeholder ("Features: none yet").
 - The grammar is missing `BREAKPOINT` and still lists the removed `ADDM`/`SUBM`/`ADDD`/`SUBD` (see 4.2).
-- `language-configuration.json` has a never-matching `decreaseIndentPattern`.
+- `language-configuration.json` has a never-matching `decreaseIndentPattern`. -->

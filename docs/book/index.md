@@ -5,51 +5,57 @@ order: 90
 ---
 
 # The TASM Book
-An introduction to programming Geometry Dash triggers with TASM.
+A hands-on guide to programming Geometry Dash triggers with TASM.
 
-## Preface
-Geometry Dash triggers are surprisingly powerful. With enough Item Edit, Item Compare and Spawn triggers, you can build counters, loops, random number generators, and even memory. Placing those triggers by hand, however, is slow, error-prone, and hard to change later.
+## What this book is
+Geometry Dash triggers can count, compare, branch, loop and even address memory. Building programs out of them by hand is slow and fragile: one misplaced trigger and nothing works. TASM lets you write those programs as text, and the compiler, `tasmc`, places the triggers for you.
 
-TASM is a small assembly-like language that solves this problem. You write a program as text, and the compiler, `tasmc`, turns it into triggers and places them in a level for you. The language stays very close to the triggers that it compiles to, so learning TASM also teaches you how GD's trigger system really behaves.
+This book teaches TASM through complete programs. Most of them are based on the programs in [`example_programs/`](https://github.com/ArrowSlashArrow/tasm-lang/tree/master/example_programs), rewritten to follow the [style guide](../style-guide.md). Every chapter builds on the previous one:
 
-This book is a guided tour of the language. It starts from installing the compiler and works up to modules, the standard library, and dynamic memory. Every chapter is built around real programs from the [`example_programs`](https://github.com/ArrowSlashArrow/tasm-lang/tree/master/example_programs) folder of the repository, which you can compile and run yourself.
+| Chapter | You will learn | Programs |
+| ------- | -------------- | -------- |
+| [1. Getting started](01-getting-started.md) | Installing TASM, compiling, running a program in the level | `counter`, `count_by_five` |
+| [2. Items and arithmetic](02-items-and-arithmetic.md) | Counters, timers, arithmetic, aliases, rounding | `temperature`, `clock`, `digits`, `euler_6` |
+| [3. Routines and time](03-routines-and-time.md) | Ticks, spawning, waiting, running routines side by side | `two_workers`, `blinker`, `paused_workers` |
+| [4. Branching](04-branching.md) | Compares, forks, loops that end, randomness | `countdown`, `collatz`, `is_prime`, `dice` |
+| [5. Fast code](05-fast-code.md) | 0-ticking, instant branches, branchless logic | `min_max`, `factorial`, `collatz` (fast), `euler_1`, `random_byte` |
+| [6. Routines as functions](06-functions-and-remaps.md) | Calling conventions, passing arguments with remaps | `modulo_remap`, `clock_remap`, `fizz_buzz` |
+| [7. Modules and the standard library](07-modules-and-the-stdlib.md) | `import`, `importstd`, writing a library | `shapes`, `stdlib_modulo`, `stdlib_sign`, `big_sum` (`bigint`) |
+| [8. Talking to the level](08-the-level.md) | Displays, IOBlocks, timers, collisions, input events, persistence | `stopwatch`, `coin_counter`, `arrows`, `jump_record`, `door` |
+| [9. Memory](09-memory.md) | Reading and writing items by address | `memory_basics`, `fib_in_memory`, `list_search` |
+| [10. Debugging](10-debugging.md) | Compiler errors, linker output, assertions, common traps | |
 
-## Who this book is for
-You do not need to know assembly to read this book. It helps if you have:
-- Used the Geometry Dash editor before, and know what a group and a trigger are.
-- Written a little code in any language (variables, `if` statements and loops).
+## What you need
+- Geometry Dash 2.2 and a way to open levels in the editor.
+- TASM, installed as described in [chapter 1](01-getting-started.md).
+- A text editor. The [VS Code extension](https://github.com/ArrowSlashArrow/tasm-lang/tree/master/vscode-ext) adds syntax highlighting, completion and error checking.
 
-If you are completely new to programming, read slowly and run every example. TASM is a small language, and each chapter only introduces a handful of ideas.
+No previous programming experience is required, but it helps. If you have written assembly before, much of TASM will feel familiar.
 
 ## How to read this book
-The chapters are meant to be read in order. Each one ends with a few exercises: try them before moving on, since they cover things that the next chapter assumes you know.
+Each program is shown with its file name above it:
 
-The [reference documentation](../index.md) is the companion to this book. The book explains *why* and *how*; the reference lists every instruction, flag and error in full. When the book mentions an instruction in passing, look it up in the reference for all of its options.
+```nasm hello.tasm
+_init:
+    display c1
 
-## Contents
-1. [Getting started](01-getting-started.md): installing `tasmc`, writing and compiling your first program, and running it in GD.
-2. [Thinking in triggers](02-thinking-in-triggers.md): how routines, groups and ticks fit together.
-3. [Items and arithmetic](03-items-and-arithmetic.md): counters, timers, math instructions, aliases and flags.
-4. [Control flow](04-control-flow.md): spawning, branching, loops, and avoiding race conditions.
-5. [Concurrency and timing](05-concurrency.md): routines that run at the same time, waiting, and process control.
-6. [Talking to the level](06-the-level.md): displays, IOBlocks, timers, collisions and events.
-7. [Modules and the standard library](07-modules.md): splitting programs into files, and using the stdlib.
-8. [Dynamic memory](08-memory.md): reading and writing items by address.
-9. [Debugging and common mistakes](09-debugging.md): tools, error codes, and pitfalls to watch out for.
+_start:
+    mov c1, 42
+```
+
+Save it under that name and compile it as described in [chapter 1](01-getting-started.md). Shorter snippets without a file name show a single idea and are not meant to be run on their own.
+
+Every example in this book compiles with the current compiler. Run-time behaviour is described the way the [reference](../index.md) and the [style guide](../style-guide.md) specify it. If a program behaves differently in your level, the [debugging chapter](10-debugging.md) lists the usual causes.
+
+Most chapters end with exercises, followed by their solutions. Try them before reading the solutions.
+
 
 ## Conventions
-Code is written in blocks like this one:
-```x86asm
-_start:
-    MOV C1, 10  ; a comment
-```
-Instruction names are case-insensitive, so `MOV` and `mov` mean the same thing. The examples in this book use both styles, just like the programs in the repository.
+All code in this book follows the [style guide](../style-guide.md):
+- Instructions are lowercase and indented by 4 spaces.
+- Flags start in the same column within a routine.
+- Rounding modes are written out in full (`floor`, not `f`).
+- Values with a meaning get a name with `alias`.
+- Routines that can't be 0-ticked say so in a comment (chapter 5 explains what that means).
 
-Callouts are used for information that is easy to miss:
-> [!NOTE]
-> Extra detail that is useful but not essential.
-
-> [!WARNING]
-> Behaviour that is likely to surprise you, including known compiler bugs.
-
-This book describes TASM **v0.3.2**.
+Instruction names are case-insensitive, so `MOV C1, 2` in older programs means the same as `mov c1, 2`.

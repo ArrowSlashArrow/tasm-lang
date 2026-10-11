@@ -10,6 +10,8 @@ TASM is a powerful, domain-specific language that is designed to take advantage 
 The language is theoretically turing-complete, assuming unbounded IDs, however, GD imposes strictly unavoidable [constraints](#21-constraints). 
 A powerful instruction set is provided, which allows for looping, branching, as well as a versatile SDK.
 
+> **New to TASM?** Start with [The TASM Book](book/index.md), a step-by-step tutorial. Once you're writing your own programs, see the [Style guide](style-guide.md) for how to write readable, fast TASM.
+
 Quick links:
 - [Available Instructions](#312-available-instructions)
 - [Instruction Flags](#314-instruction-flags)
@@ -154,6 +156,7 @@ abs_value:
     ADD C2, C3 | itemmod:0.5      ; C2 = C2 + C3 * 0.5
 ```
 
+#### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  
 
@@ -601,10 +604,6 @@ The IMPORTSTD instruction behaves identically to the IMPORT instruction, except 
 To ensure that this instruction works properly, please install TASM via the provided install scripts (see [Installing TASM](#41-installing-tasm)). The installation directory is:
 - Windows: `%APPDATA%\tasm`
 - Linux: `~/.local/bin/tasm`
-
-> [!WARNING]
-> - The standard library is only bundled with releases newer than v0.3.2. With v0.3.2 and older, copy the `stdlib/` folder from the repository yourself, or use `IMPORT` with a relative path instead.
-> - In the v0.3.2 compiler, the lookup path contains `stdlib` twice, i.e. `importstd math` is looked up at `<install dir>/stdlib/stdlib/math.tasm`. If a standard import cannot be found (error E0043), check that location.
 
 Like IMPORT, this instruction is exclusive to the _init routine.
 

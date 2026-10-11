@@ -4,10 +4,10 @@ order: 89
 ---
 
 # Chapter 1: Getting started
-In this chapter, you will install the TASM compiler, compile a small program, and watch it run inside Geometry Dash.
+In this chapter you will install TASM, write a program that counts upwards, put it into a level, and run it.
 
-## 1.1. Installing the compiler
-The TASM compiler is called `tasmc`. The easiest way to get it is with an install script from the repository's `install/` folder:
+## 1.1. Installing TASM
+TASM comes with install scripts for Windows and Linux. Download the script for your system from the `install/` folder of the [repository](https://github.com/ArrowSlashArrow/tasm-lang/tree/master/install) and run it with the version you want:
 
 ```powershell
 # Windows (PowerShell)
@@ -18,89 +18,131 @@ The TASM compiler is called `tasmc`. The easiest way to get it is with an instal
 ./linux.sh install v0.3.2
 ```
 
-The script asks which build you want (pick MSVC on Windows and glibc on Linux if you are unsure), downloads it, and adds it to your `PATH`. Restart your terminal afterwards, then check that it works:
+The script asks which build to install. On Windows, pick MSVC unless it doesn't work for you; on Linux, either build is fine. It installs everything into one folder (`%APPDATA%\tasm` on Windows, `~/.local/bin/tasm` on Linux) and adds that folder to your `PATH`:
+- `tasmc`: the compiler.
+- `stdlib/`: the standard library, used in [chapter 7](07-modules-and-the-stdlib.md).
+- `tasm-lsp`: the language server used by the VS Code extension (newer releases only).
+
+Restart your terminal, then check that the compiler runs:
 
 ```bash
 tasmc --version
 ```
 
-If you would rather build from source, install Rust and run `cargo build --release` in the `rtasm` folder. The executable ends up in `rtasm/target/release/`. See [Installing TASM](../index.md#41-installing-tasm) in the reference for all options.
+To build the compiler from source instead, install Rust and run `cargo build --release` in the `rtasm/` folder of the repository. The executable ends up in `rtasm/target/release/`.
 
 ## 1.2. Your first program
-Create a file called `incrementer.tasm` with the following contents (it is also in [`example_programs/incrementer.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/incrementer.tasm)):
+Create a file called `counter.tasm`:
 
-```x86asm
+```nasm counter.tasm
+; Counts upwards forever.
 _init:
-    DISPLAY C234
+    display c1
 
 _start:
-    ADD C234, 1
-    SPAWN _start
+    add c1, 1
+    spawn _start
 ```
 
-Even this tiny program shows the basic shape of every TASM file:
-- A program is made of **routines**. A routine starts with a name followed by a colon (`_start:`), on a line with no indentation.
-- Each indented line under a routine is an **instruction**. An instruction is a name (`ADD`) followed by comma-separated arguments (`C234, 1`).
-- `C234` is a **counter**: counter item number 234 in GD. Counters hold whole numbers.
+Line by line:
+- `; Counts upwards forever.` is a **comment**. Everything after a `;` is ignored by the compiler.
+- `_init:` starts the **`_init` routine**. It holds setup instructions that apply to the whole level. Here, `display c1` places a counter display on the screen that shows the value of **counter 1**, written `c1`.
+- `_start:` starts the **`_start` routine**, where the program begins.
+- `add c1, 1` adds 1 to counter 1.
+- `spawn _start` starts `_start` again, so the program keeps counting.
 
-Two routine names are special:
-- `_init` runs once when the level starts. It is used for setup, such as `DISPLAY C234`, which places a counter label in the level so that you can see the value of `C234`.
-- `_start` is the entry point of the program, much like `main` in other languages.
+A **routine** is a list of instructions under a name ending in `:`. The name must start at the beginning of the line, and every instruction under it must be indented. This book uses 4 spaces, as the style guide recommends.
 
-So the program reads: "show counter 234 on screen; then, when the program starts, add 1 to counter 234 and start again". It counts up forever.
-
-## 1.3. Compiling
-Close Geometry Dash, then run:
+## 1.3. Compiling and running
+Close Geometry Dash first: the game overwrites its save file when it exits, so a level added while it is open would be lost. Then compile the program:
 
 ```bash
-tasmc incrementer.tasm
+tasmc counter.tasm
 ```
 
-The compiler prints something like:
-```
+The compiler prints what it is doing:
+
+```text
 Parsing tasm...
 Encoding level...
 Using groups 1 - 1
+Exported to savefile.
 ```
 
-By default, `tasmc` adds the program to your GD savefile as a new level named after the file. This is why GD should be closed: the game rewrites the savefile when it exits, and would throw away the new level.
+The program has been added to your save file as a new level called `counter.tasm`. Start Geometry Dash, open the level in the editor, and you will see:
+- a counter display to the left of the start, showing `c1`.
+- a block labelled **start**. Touching it with the player runs `_start`.
+- the program's triggers, in a row labelled `1: _start`.
 
-> [!NOTE]
-> If the compiler cannot find your savefile, or you want to share the level, export it as a `.gmd` file instead with `tasmc incrementer.tasm --gmd`. If you just want to check a program for errors, use `--no-export`.
+Start playtesting, walk into the **start** block (compiled levels use platformer mode), and watch the counter go up.
 
-## 1.4. Running it
-Open GD and find the new level, `incrementer.tasm`, in your created levels. Open it in the editor. You will see:
-- A counter label on the left, showing the value of `C234`.
-- A row of triggers on the right. These are your routines.
-- A block labelled `start` at the bottom. This is an **IOBlock**: when the player touches it, it spawns `_start`.
+> [!TIP]
+> Other ways to export a program:
+> - `tasmc counter.tasm --gmd` writes a `.gmd` file that you can import with a level-sharing mod, instead of touching the save file.
+> - `tasmc counter.tasm --clipboard` copies the objects to the clipboard, so you can paste them into an open level with BetterEdit (Windows only).
+> - `tasmc counter.tasm --no-export` only checks the program for errors.
 
-Compiled levels are platformer levels. Playtest the level, walk into the `start` block, and the counter starts counting up.
+## 1.4. What the compiler made
+Each instruction became a trigger:
+- `add c1, 1` is an **Item Edit** trigger that adds 1 to counter 1.
+- `spawn _start` is a **Spawn** trigger that spawns the routine's own group.
 
-## 1.5. Debug mode and release mode
-If you watched closely, the counter went up quite slowly: only a few times per second. That is because the compiler is in its default **debug mode**, which spaces instructions 30 units apart so that you can read them in the editor. GD runs the triggers in a routine from left to right, so this spacing also makes the program slow.
+Every routine (except `_init`) is compiled into one **group**. `Using groups 1 - 1` means the program used group 1, for `_start`. The **start** block is an **IOBlock**: a block with a touch-activated spawn trigger, which the compiler always adds for `_start`.
 
-Compile again with `--release` (or `-r`):
+The triggers of a routine are laid out from left to right and run in that order, one after another. How long that takes depends on how you compile:
+- By default, the compiler places triggers 30 units (one grid block) apart. That is easy to read in the editor, but each instruction then takes 30 ticks, or 1/8 of a second.
+- With `--release` (or `-r`), the triggers are packed 1 unit apart, and each instruction takes a single **tick**. GD runs 240 ticks per second.
+
+Compile `counter.tasm` again with `-r` and the counter goes up about 30 times faster. Use the default mode while writing a program, so that you can see what is happening, and release mode once it works.
+
+## 1.5. When something goes wrong
+Change `add` to `ad` and compile again:
+
+```text
+Parsing tasm...
+[E0044] Unable to compile "...\counter.tasm" with 1 errors:
+...\counter.tasm @ _start:5 [E0025] InvalidInstruction: Unrecognized instruction AD
+Unable to parse main module: lexing failed
+```
+
+The error names the routine (`_start`), the line (5) and an error code (`E0025`). For a longer explanation of any error code, run `tasmc -e` with its number:
 
 ```bash
-tasmc incrementer.tasm --release
+tasmc -e 25
 ```
 
-In release mode, instructions are packed 1 unit apart, and the program runs at full speed: one instruction per tick, and GD runs 240 ticks per second. Use debug mode while you are learning or looking for a bug, since you can watch your program step by step. Use release mode when the program is finished.
+Nothing is exported when there are errors. [Chapter 10](10-debugging.md) covers the most common errors and how to fix them.
 
-## 1.6. Comments
-Anything after a `;` is a comment, and is ignored by the compiler:
+> [!TIP]
+> The VS Code extension shows these errors while you type, so you rarely need to compile just to find them.
 
-```x86asm
+## 1.6. Exercises
+1. Make the counter go up by 5 each time.
+2. Add a second display for `c2`, and make `c2` count down by 1 at the same time as `c1` counts up.
+
+Solution 1
+```nasm count_by_five.tasm
+_init:
+    display c1
+
 _start:
-    ADD C234, 1     ; count up
-    SPAWN _start    ; and do it again
+    add c1, 5
+    spawn _start
 ```
 
-Use comments generously. Trigger programs are hard to read without them.
 
-## Exercises
-1. Change `incrementer.tasm` so that it counts up by 5 instead of 1.
-2. Add a second counter, `C1`, that counts *down* (hint: use `SUB`). Remember to `DISPLAY` it.
-3. Compile the program with `--gmd` and find the `.gmd` file that it creates.
+Solution 2
+```nasm up_and_down.tasm
+_init:
+    display c1
+    display c2
 
-Next: [Chapter 2: Thinking in triggers](02-thinking-in-triggers.md).
+_start:
+    add c1, 1
+    sub c2, 1
+    spawn _start
+```
+Both changes happen in the same routine, so `c1` and `c2` change one instruction apart.
+
+
+In the next chapter you will work with numbers in more detail: the different kinds of items, every arithmetic instruction, and how to give values readable names.

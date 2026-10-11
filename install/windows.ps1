@@ -43,8 +43,7 @@ function install ($version) {
             & (Join-Path $tasmdir "tasmc.exe") --version
         } 
         catch {
-            # do nothing
-            # since if the program failed the user shouldn't learn of our mistakes
+            # this shouldn't fail
         }
 
         # ask user for permission to remove old version
@@ -144,7 +143,7 @@ function remove {
     if (Test-Path $tasmdir) {
         # editors keep tasm-lsp.exe running, and a running exe can't be deleted
         $running = Get-Process -Name "tasm-lsp" -ErrorAction SilentlyContinue |
-            Where-Object { $_.Path -and $_.Path.StartsWith($tasmdir, [System.StringComparison]::OrdinalIgnoreCase) }
+        Where-Object { $_.Path -and $_.Path.StartsWith($tasmdir, [System.StringComparison]::OrdinalIgnoreCase) }
         if ($running) {
             Write-Host "The TASM language server is running. Close your editor (e.g. VS Code) and try again." -ForegroundColor Yellow
             return $false

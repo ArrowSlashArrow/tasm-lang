@@ -9,6 +9,7 @@ The working compiler is in the `rtasm/` directory. Note that the compiler is not
 
 Documentation can be found [here](https://tasm.mntpoint.org/docs/).  
 Join the TASM community on Discord [here](https://discord.gg/spqKPeFvYf).
+This language has [VS Code support](https://marketplace.visualstudio.com/items?itemName=ArrowSlashArrow.tasm-lang-gd).
 
 # Overview
 TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of complex programs. 
