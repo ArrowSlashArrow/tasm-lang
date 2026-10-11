@@ -1,0 +1,4 @@
+samples/**
+vsc-extension-quickstart.md
+.gitignore
+publish_package.ps1

@@ -57,6 +57,10 @@ jobs:
         working-directory: ./rtasm
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: build language server
+        working-directory: ./tasm-lsp
+        run: cargo build --release --target ${{ matrix.target }}
+
       - name: package release
         shell: bash
         working-directory: .
@@ -65,13 +69,16 @@ jobs:
 
           if [[ "${{ matrix.target }}" == *"windows"* ]]; then
             BIN="tasmc.exe"
+            LSP="tasm-lsp.exe"
             EXT="zip"
           else
             BIN="tasmc"
+            LSP="tasm-lsp"
             EXT="tar.gz"
           fi
 
           cp rtasm/target/${{ matrix.target }}/release/$BIN release-${{ matrix.target }}/
+          cp tasm-lsp/target/${{ matrix.target }}/release/$LSP release-${{ matrix.target }}/
           ARCHIVE="tasm-${{ github.ref_name }}-${{ matrix.target }}.$EXT"
 
           cp README.md LICENSE release-${{ matrix.target }}/

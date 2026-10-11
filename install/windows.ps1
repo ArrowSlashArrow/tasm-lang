@@ -54,7 +54,9 @@ function install ($version) {
         }
 
         # then, remove it
-        remove;
+        if (-not (remove)) {
+            return;
+        }
     }
 
     if (-not $version) {
@@ -111,6 +113,14 @@ function install ($version) {
     }
     Copy-Item -Path (Join-Path $outdir "*") -Destination $tasmdir -Recurse -Force
 
+    # language server for editor support (only bundled in newer releases)
+    if (Test-Path (Join-Path $tasmdir "tasm-lsp.exe")) {
+        Write-Host "Installed language server (tasm-lsp)."
+    }
+    else {
+        Write-Host "This release does not include the language server (tasm-lsp)."
+    }
+
     # verify stdlib was actually installed
     if ($needsStdlib -and -not (Test-Path (Join-Path $tasmdir "stdlib"))) {
         Write-Host "Error: stdlib failed to install to $tasmdir. Installation may be broken." -ForegroundColor Red
@@ -129,8 +139,17 @@ function install ($version) {
     Write-Host "Restart your shell for PATH changes to take effect."
 }
 
+# returns $true if tasm is no longer installed
 function remove {
     if (Test-Path $tasmdir) {
+        # editors keep tasm-lsp.exe running, and a running exe can't be deleted
+        $running = Get-Process -Name "tasm-lsp" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Path -and $_.Path.StartsWith($tasmdir, [System.StringComparison]::OrdinalIgnoreCase) }
+        if ($running) {
+            Write-Host "The TASM language server is running. Close your editor (e.g. VS Code) and try again." -ForegroundColor Yellow
+            return $false
+        }
+
         # update $PATH
         $old = [System.Environment]::GetEnvironmentVariable("PATH", "User")
         $new = ($old -split ";" | Where-Object { $_ -ne $tasmdir }) -join ';'
@@ -142,11 +161,12 @@ function remove {
     else {
         Write-Host "$appname is already removed."
     }
+    return $true
 }
 
 switch ($action) {
     "install" { install $version }
-    "remove" { remove }
+    "remove" { remove | Out-Null }
     default {
         Write-Host $help
     }

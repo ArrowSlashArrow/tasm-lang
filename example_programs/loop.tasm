@@ -1,0 +1,17 @@
+; for loop implementation in tasm
+; x = 1;
+; for (int i = 1; i <= 10; i++) {
+;    x *= i;
+; }
+
+_start:
+    mov c1, 1                        ; x
+    mov c2, 1                        ; i
+    spawn loop  | ordered:false delay:0
+
+; not 0-tickable (spawns itself)
+loop:
+    mul c1, c2                       ; x *= i
+    sle loop, c2, 10 | ordered:false ; i <= 10
+
+; since we know this loops 10 times, we should really unroll the loop to save a group, then _start would be 0-tickable

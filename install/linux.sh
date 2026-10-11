@@ -80,7 +80,6 @@ install() {
     rm -rf "$outdir"
 
     mkdir -p "$outdir"
-        mkdir -p "$outdir"
     tar -xzf "$outfile" -C "$outdir"
 
     local needs_stdlib=false
@@ -98,6 +97,14 @@ install() {
     mkdir -p "$TASMDIR"
     cp -r "$outdir"/. "$TASMDIR/"
     chmod +x "$TASMDIR/tasmc"
+
+    # language server for editor support (only bundled in newer releases)
+    if [ -f "$TASMDIR/tasm-lsp" ]; then
+        chmod +x "$TASMDIR/tasm-lsp"
+        echo "Installed language server (tasm-lsp)."
+    else
+        echo "This release does not include the language server (tasm-lsp)."
+    fi
 
     # verify stdlib was actually installed
     if $needs_stdlib && [ ! -d "$TASMDIR/stdlib" ]; then

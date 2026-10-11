@@ -23,7 +23,16 @@ function findServer(context) {
         path.join(context.extensionPath, "..", "tasm-lsp", "target", "release", EXE),
         path.join(context.extensionPath, "..", "tasm-lsp", "target", "debug", EXE),
     ];
-    return candidates.find((c) => fs.existsSync(c)) ?? "tasm-lsp";
+    const found = candidates.find((c) => fs.existsSync(c));
+    if (found && process.platform !== "win32") {
+        // the release .vsix bundles the server; make sure it kept its executable bit
+        try {
+            fs.accessSync(found, fs.constants.X_OK);
+        } catch {
+            fs.chmodSync(found, 0o755);
+        }
+    }
+    return found ?? "tasm-lsp";
 }
 
 async function start(context) {

@@ -8,6 +8,9 @@ Support for TASM
   - completion for instructions, arguments (filtered by the instruction's argsets), local and imported aliases/routines, `IMPORT`/`IMPORTSTD` paths, flags and `remap` entries
   - hover for instructions, arguments, flags and imports
 
+## Installing
+Each GitHub release has a `.vsix` per platform (`win32-x64`, `linux-x64`) with the server bundled, built by `.github/workflows/vscode-ext.yml`. Install it with `code --install-extension <file>.vsix`.
+
 ## Running from source
 1. Build the server: `cargo build --release` in `tasm-lsp/`.
 2. Install the client's dependencies: `npm install` in `vscode-ext/`.

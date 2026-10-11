@@ -1,0 +1,116 @@
+name: Build VS Code extension
+
+# Builds one .vsix per platform with tasm-lsp bundled in vscode-ext/server/
+# and attaches them to the release.
+on:
+  release:
+    types: [published]
+  # manual runs upload the .vsix files as workflow artifacts instead
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  server:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: win32-x64
+            bin: tasm-lsp.exe
+          # statically linked, so it runs on any x64 linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            platform: linux-x64
+            bin: tasm-lsp
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: build tasm-lsp
+        working-directory: ./tasm-lsp
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.platform }}
+          path: tasm-lsp/target/${{ matrix.target }}/release/${{ matrix.bin }}
+          if-no-files-found: error
+
+  package:
+    needs: server
+    strategy:
+      matrix:
+        platform: [win32-x64, linux-x64]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: server-${{ matrix.platform }}
+          path: vscode-ext/server
+
+      - name: prepare extension
+        shell: bash
+        working-directory: ./vscode-ext
+        run: |
+          chmod +x server/*
+          cp ../LICENSE .
+          npm ci
+
+          # release tags (e.g. v0.3.2) set the extension version
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              npm version "$VERSION" --no-git-tag-version --allow-same-version
+            else
+              echo "Tag $GITHUB_REF_NAME is not x.y.z; keeping the version from package.json"
+            fi
+          fi
+
+      - name: package
+        shell: bash
+        working-directory: ./vscode-ext
+        run: |
+          VSIX="tasm-vscode-${{ github.ref_name }}-${{ matrix.platform }}.vsix"
+          VSIX="${VSIX//\//-}"
+          npx --yes @vscode/vsce@3 package --target ${{ matrix.platform }} -o "../$VSIX"
+          echo "FILE=$VSIX" >> $GITHUB_ENV
+
+      - name: upload to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.FILE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: upload artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.platform }}
+          path: ${{ env.FILE }}

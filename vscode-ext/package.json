@@ -1,8 +1,14 @@
 {
-  "name": "TASM",
+  "name": "tasm-lang-gd",
+  "publisher": "ArrowSlashArrow",
+  "license": "MIT",
+  "repository": {
+    "url": "https://github.com/ArrowSlashArrow/tasm-lang"
+  },
+  "icon": "./img/tasm_logo.png",
   "displayName": ".tasm",
   "description": "VSCode support for Trigger Assembly (TASM) -- not Borland Turbo Assembler.",
-  "version": "0.0.1",
+  "version": "0.3.3",
   "engines": {
     "vscode": "^1.140.0"
   },
@@ -26,8 +32,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "../img/tasm_favicon.png",
-          "dark": "../img/tasm_favicon.png"
+          "light": "./img/tasm_favicon.png",
+          "dark": "./img/tasm_favicon.png"
         }
       }
     ],
