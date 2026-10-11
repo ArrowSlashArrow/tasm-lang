@@ -142,49 +142,62 @@ The [Collatz sequence](https://en.wikipedia.org/wiki/Collatz_conjecture) starts 
 ```x86asm
 ; Counts how many steps the Collatz sequence takes to reach 1.
 ; Rule: if n is even, n = n / 2. If n is odd, n = 3n + 1.
+;
+; Each iteration runs in a single tick: `step` branches instantly to `even` or `odd`,
+; which 0-tick `count`. Only `next_iteration` waits a tick, by spawning `step` with
+; the default spawn delay, so that `step` is never spawned while it is still running.
 _init:
-    alias n, C1
-    alias steps, C2
-    alias START_VALUE, 27   ; 27 takes 111 steps
+    alias n,            c1
+    alias steps,        c2
+    alias start_value,  27      ; 27 takes 111 steps
+    alias end_value,    1       ; the sequence stops once it reaches 1
 
     display n
     display steps
 
 _start:
-    mov n, START_VALUE
+    mov n, start_value
     mov steps, 0
     spawn step
 
+; not 0-tickable: loops back to itself (through `count` and `next_iteration`)
 step:
     ; n is even exactly when n / 2 == floor(n / 2).
     ; both sides are divided by 2, and the right side is also floored.
-    fe even, odd, n, n  | lmod:2 lmodop:/ rmod:2 rmodop:/ rmode:floor
+    ife even, odd, n, n             | lmod:2 lmodop:/ rmod:2 rmodop:/ rmode:floor
 
 even:
     div n, 2
-    spawn count
+    spawn count                     | ordered:false delay:0
 
 odd:
     mul n, 3
     add n, 1
-    spawn count
+    spawn count                     | ordered:false delay:0
 
 count:
     add steps, 1
-    sg step, n, 1       ; keep going while n > 1
+    isg next_iteration, n, end_value    ; keep going while n > 1
+
+; not 0-tickable: waits one tick before starting the next iteration
+next_iteration:
+    spawn step
 ```
 
 The program follows the "branch last, then continue" pattern from section 4.5:
 - `step` forks into `even` or `odd`.
 - Both branches update `n`, then spawn `count`.
-- `count` loops back to `step` while `n > 1`.
+- `count` adds a step, and continues to `next_iteration` while `n > 1`.
+- `next_iteration` spawns `step` again, which starts the next round.
+
+The branches are written with `ife` and `isg`, the *instant* versions of `fe` and `sg`. Section 4.7 explains them, and the flags on the two `spawn count` lines are covered in [Chapter 5](05-concurrency.md#54-ordered-and-unordered-routines). Together, they make each round of the loop run within a single tick. The plain `spawn step` in `next_iteration` adds the short delay that separates one round from the next. The [style guide](../style-guide.md) explains this technique, called 0-ticking, in detail.
 
 The fork in `step` uses **compare flags** to check whether `n` is even. Each side of a compare can be modified before the comparison happens:
 - `lmod` and `lmodop` apply an operation to the left side. `lmod:2 lmodop:/` divides it by 2.
 - `rmod` and `rmodop` do the same for the right side.
 - `lmode` and `rmode` round the side, using the same values as `resmode`.
 
-So `fe even, odd, n, n | ...` compares `n / 2` with `floor(n / 2)`, which are only equal when `n` is even. Without flags, this check would take four instructions (see the modulo example in Chapter 3). The prime checker in [`is_c1_prime.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/is_c1_prime.tasm) uses the same trick.
+So `ife even, odd, n, n | ...` compares `n / 2` with `floor(n / 2)`, which are only equal when `n` is even. Without flags, this check would take four instructions (see the modulo example in Chapter 3). The prime checker in [`is_c1_prime.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/is_c1_prime.tasm) uses the same trick.
 
 > [!WARNING]
 > When the right side of a compare is a number, `rmod` *replaces* that number: `SE done, C1, 10 | rmod:2` compares `C1` with 2, not with 20. Only use `rmod` when both sides are items.
@@ -225,7 +238,7 @@ This rarely matters in small programs, but it adds up in a large program with hu
 - Instant compares are faster but not spawn ordered.
 
 ## Exercises
-1. Change `START_VALUE` in `collatz.tasm` to 97. How many steps does it take?
+1. Change `start_value` in `collatz.tasm` to 97. How many steps does it take?
 2. Write a program that counts from 1 to 20 in `C1`, and adds 1 to `C2` each time `C1` is a multiple of 3. (Hint: combine the loop from section 4.4 with a modulo check.)
 3. Rewrite the `broken` routine from section 4.5 using the wait pattern. How many ticks of waiting does it need?
 4. The prime checker [`is_c1_prime.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/is_c1_prime.tasm) uses several forks. Read through it and work out what each routine does.

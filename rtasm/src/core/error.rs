@@ -246,7 +246,7 @@ impl Display for TasmError {
 
 /// Low-level temporary error type used for internal handling.
 #[derive(Debug)]
-pub(crate) enum ParseErrorType {
+pub enum ParseErrorType {
     BadID,
     TrailingComma,
     // InvalidNumber,

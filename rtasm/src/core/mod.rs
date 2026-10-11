@@ -73,7 +73,7 @@ impl Tasm {
         // setup state
         let mut level = GDLevel::new(GDVersion::GD22081);
         level.identity.name = level_name.to_string();
-        self.curr_group = start_at_group;
+        self.curr_group = start_at_group + 1;
 
         // need to take to iteration with mutable references to self in self.push_error and self.handle_instruction
         let routines = core::mem::take(&mut self.routines);

@@ -223,6 +223,8 @@ pub fn arithmetic_item_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GD
         },
     )]
 }
+
+// this function is called only when op is Op::Mul or Op::Div
 pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<GDObject> {
     let res = get_item_spec(&args.args[0]).unwrap();
     let op1 = get_item_spec(&args.args[1]).unwrap();
@@ -248,10 +250,10 @@ pub fn arithmetic_2items_num(args: HandlerArgs, op: Op, round_res: bool) -> Vec<
             modifier,
             assign_op: get_flag_value(&args, "iter", FlagValue::Op(Op::Set)).into(),
             // since we know this is only used for mul and div instructions, this is fine.
-            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(false))
+            multiply_mod: !get_flag_value(&args, "divmod", FlagValue::Bool(op == Op::Div))
                 .to_bool()
                 .unwrap(),
-            id_op: get_flag_value(&args, "op", FlagValue::Op(op)).into(),
+            id_op: Op::Add, // id_op actually does nothing here
             id_rounding: resmode.0,
             result_rounding: finmode.0,
             id_sign: resmode.1,
@@ -464,26 +466,26 @@ pub fn fork_compare(
     let spawning_true = if instant {
         target_true
     } else {
-        args.curr_group + 2
+        args.curr_group + 1
     };
     let spawning_false = if instant {
         target_false
     } else {
-        args.curr_group + 1
+        args.curr_group
     };
 
     let spawn_true_cfg = cfg
         .clone()
         .with_pos(cfg.pos.0, cfg.pos.1 + 10.0)
         .with_scale(0.33, 0.33)
-        .with_groups([args.curr_group + 2])
+        .with_groups([args.curr_group + 1])
         .with_control_id(target_true); // use auxiliary group for spawn trigger
 
     let spawn_false_cfg = cfg
         .clone()
         .with_pos(cfg.pos.0, cfg.pos.1 - 10.0)
         .with_scale(0.33, 0.33)
-        .with_groups([args.curr_group + 1])
+        .with_groups([args.curr_group])
         .with_control_id(target_false); // use auxiliary group for spawn trigger
 
     let compare = GDObject::from_config(

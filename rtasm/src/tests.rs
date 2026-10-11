@@ -134,6 +134,8 @@ macro_rules! tasm_test {
 // tasm_test!("fetch", example_no_entry_point);
 // this benchmark is no longer valid because the file uses deprecated syntax which is no longer supported by the compiler
 // tasm_test!("fib_in_memory", example);
+tasm_test!("coin_counter", example);
+tasm_test!("collatz", example);
 tasm_test!("incrementer", example);
 tasm_test!("is_c1_prime", example);
 tasm_test!("list_search", example);
@@ -141,11 +143,17 @@ tasm_test!("list_search", example);
 // tasm_test!("pointer_test", example);
 // this benchmark is no longer valid because the file uses deprecated syntax which is no longer supported by the compiler
 // tasm_test!("pointer_test1", example);
+tasm_test!("memory_basics", example);
 tasm_test!("proc_control", example);
 tasm_test!("project_euler_1", example);
 tasm_test!("project_euler_2", example);
 tasm_test!("project_euler_6", example);
 tasm_test!("rng", example);
+tasm_test!("stdlib_modulo", example);
+tasm_test!("stopwatch", example);
+tasm_test!("temperature", example);
+tasm_test!("two_workers", example);
+tasm_test!("use_shapes", example);
 tasm_test!("aliases", true);
 tasm_test!("all_instructions", true);
 tasm_test!("bad_args", false);
@@ -248,3 +256,86 @@ fn no_int_detection() {
 //     // level.export_to_gmd("test.gmd")?;
 //     Ok(())
 // }
+
+/// Regression test for helper group allocation (unresolved_issues.md, issue 1.1).
+///
+/// Compiles `tests/aux_groups.tasm`, which only uses non-instant compares and randoms.
+/// Every group targeted by an Item Compare or Random trigger is a helper group, so it must:
+/// * not be the group of any routine, and
+/// * contain exactly one object: the spawn trigger that the helper group exists for.
+#[test]
+fn aux_groups_are_unique() {
+    use gdlib::cclocallevels::gdobj::ids::{
+        objects::{ITEM_COMPARE_TRIGGER, RANDOM_TRIGGER, SPAWN_TRIGGER},
+        properties::{TARGET_ITEM, TARGET_ITEM_2},
+    };
+    use gdlib::cclocallevels::gdobj::structs::GDValue;
+    use std::collections::HashSet;
+
+    let (mut res, group) = crate::parse_main(&crate::Args::test_args(
+        "../tests/aux_groups.tasm".into(),
+        true,
+    ))
+    .unwrap();
+    let level = match res.handle_routines_inner("", group, false, false) {
+        Ok(level) => level,
+        Err(e) => {
+            print_errors(e, "errors");
+            panic!()
+        }
+    };
+    let objects = level.get_decrypted_data().unwrap().objects;
+
+    let routine_groups: HashSet<i16> = res
+        .routines
+        .iter()
+        .map(|r| r.group)
+        .filter(|&g| g != 0)
+        .collect();
+
+    // every group that a compare or random trigger spawns
+    let mut helper_groups = vec![];
+    for obj in objects
+        .iter()
+        .filter(|o| o.id == ITEM_COMPARE_TRIGGER || o.id == RANDOM_TRIGGER)
+    {
+        for (key, value) in &obj.properties {
+            if let (TARGET_ITEM | TARGET_ITEM_2, GDValue::Group(g)) = (*key, value)
+                && *g != 0
+            {
+                helper_groups.push(*g);
+            }
+        }
+    }
+    assert!(
+        !helper_groups.is_empty(),
+        "no compare or random triggers found"
+    );
+
+    let mut seen = HashSet::new();
+    for g in helper_groups {
+        assert!(
+            !routine_groups.contains(&g),
+            "helper group {g} is also the group of a routine"
+        );
+        assert!(
+            seen.insert(g),
+            "helper group {g} is spawned by more than one compare/random trigger"
+        );
+
+        let members = objects
+            .iter()
+            .filter(|o| o.config.groups.iter().any(|grp| grp.id() == g))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            members.len(),
+            1,
+            "helper group {g} contains {} objects instead of 1",
+            members.len()
+        );
+        assert_eq!(
+            members[0].id, SPAWN_TRIGGER,
+            "helper group {g} does not contain a spawn trigger"
+        );
+    }
+}

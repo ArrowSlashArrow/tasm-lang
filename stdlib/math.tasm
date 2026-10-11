@@ -31,9 +31,9 @@ modulo_fork:
 sign:
     ; load temp_regs (c2 = 0 for compares)
     mov c2, 0
-    spawn compare::greater  | ordered:false ;   no remap needed here; c1 => c1, c2 => c2
+    spawn compare::greater  | ordered:false delay:0 ;   no remap needed here; c1 => c1, c2 => c2
     mov c4, c3  ; save result
-    spawn compare::less     | ordered:false ;   no remap needed here; c1 => c1, c2 => c2
+    spawn compare::less     | ordered:false delay:0 ;   no remap needed here; c1 => c1, c2 => c2
     sub c2, c4, c3  ; c2 = (0 < val) - (val < 0)
 
 ; T1 to T2 = e^(ln(base) * exponent)

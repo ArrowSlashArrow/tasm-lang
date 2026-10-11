@@ -150,7 +150,7 @@ pub enum TasmPrimitive {
 }
 
 impl TasmValue {
-    pub(crate) fn to_value(s: &str) -> Result<Self, (ParseErrorType, String, i32)> {
+    pub fn to_value(s: &str) -> Result<Self, (ParseErrorType, String, i32)> {
         let mut iter = s.chars();
         let pref = match iter.next() {
             Some(c) => c,
@@ -371,7 +371,7 @@ impl TasmValue {
     }
 }
 
-pub(crate) fn split_at_str_once<'a>(s: &'a str, p: &'a str) -> Option<(&'a str, &'a str)> {
+pub fn split_at_str_once<'a>(s: &'a str, p: &'a str) -> Option<(&'a str, &'a str)> {
     if !s.contains(p) {
         return None;
     }

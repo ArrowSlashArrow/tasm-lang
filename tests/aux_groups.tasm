@@ -1,0 +1,25 @@
+; Regression test for helper ("auxiliary") group allocation. See unresolved_issues.md, issue 1.1.
+;
+; Every non-instant compare (spawn and fork) and random instruction places its spawn
+; triggers in helper groups. Each helper group must hold exactly one spawn trigger,
+; and must not be the group of a routine or of another instruction's spawn trigger.
+;
+; The instructions below mix spawn compares (1 helper group each) and fork compares
+; (2 helper groups each), in both orders, so that an off-by-one in either kind of
+; handler makes two instructions share a group.
+_start:
+    se  a, c1, 0
+    fe  a, b, c1, 0
+    se  b, c1, 1
+    fe  a, b, c1, c2
+    frand a, b, 50
+    srand a, 50
+    sl  a, c1, 2
+
+a:
+    add c1, 1
+    fg  a, b, c1, 10
+    sge b, c1, 5
+
+b:
+    mov c1, 0

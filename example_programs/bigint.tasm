@@ -1,0 +1,383 @@
+; Unsigned big integers made of 4 limbs in base 1000.
+; A bigint `x` is stored in four counters x0..x3, least significant limb first:
+;     x = x0 + x1 * 1000 + x2 * 1000^2 + x3 * 1000^3
+; so it can hold any whole number from 0 to 999,999,999,999. Base 1000 keeps every
+; intermediate value below 2^24 (where 32-bit floats stop being exact), and makes the
+; limbs readable as groups of three decimal digits when they are displayed.
+;
+; Results are taken modulo 1000^4, and `flag` reports when that happened (see each routine).
+; Every limb of an input must be in the range [0, 999].
+;
+; Calling convention:
+; Operands are passed by remapping the parameter IDs below onto the caller's counters:
+;     spawn bigint::add   | ordered:false delay:0 noremap:true remap: {bigint::lhs0 = x0, ...}
+; - Use `noremap:true`, so that a call never depends on how GD combines nested remaps.
+; - Any parameter that isn't remapped falls back to a counter that is internal to this module.
+; - The result may be remapped onto the same counters as an operand (e.g. `x = x * y`).
+; - The program must not use IDs 9901 to 9991 for its own groups or items, since remaps
+;   swap every kind of ID.
+;
+; All four operations are 0-tickable: the result is ready as soon as the spawn returns.
+; `example_programs/collatz.tasm` uses this module.
+_init:
+    alias base,         1000    ; flags can't use aliases: `itemmod:1000` and `itemmod:2000` must match this
+
+    ; ----- parameters -----
+    ; left-hand operand
+    alias lhs0,         c9901
+    alias lhs1,         c9902
+    alias lhs2,         c9903
+    alias lhs3,         c9904
+    ; right-hand operand
+    alias rhs0,         c9905
+    alias rhs1,         c9906
+    alias rhs2,         c9907
+    alias rhs3,         c9908
+    ; result (the quotient for `div`)
+    alias res0,         c9909
+    alias res1,         c9910
+    alias res2,         c9911
+    alias res3,         c9912
+    ; remainder (`div` only)
+    alias rem0,         c9913
+    alias rem1,         c9914
+    alias rem2,         c9915
+    alias rem3,         c9916
+    ; carry, borrow or error out of the operation
+    alias flag,         c9917
+
+    ; ----- internal state -----
+    ; column sums for `mul`
+    alias __col0,       c9920
+    alias __col1,       c9921
+    alias __col2,       c9922
+    alias __col3,       c9923
+    alias __overflow,   c9924   ; sum of the products that don't fit in 4 limbs
+    alias __carry,      c9925   ; carry between limbs in `__normalize`
+
+    ; `div` state: r = partial remainder, d = divisor, q = quotient,
+    ; x = copy of the dividend that is shifted right to read its bits
+    alias __r0,         c9926
+    alias __r1,         c9927
+    alias __r2,         c9928
+    alias __r3,         c9929
+    alias __d0,         c9930
+    alias __d1,         c9931
+    alias __d2,         c9932
+    alias __d3,         c9933
+    alias __q0,         c9934
+    alias __q1,         c9935
+    alias __q2,         c9936
+    alias __q3,         c9937
+    alias __s0,         c9938   ; s = r - d
+    alias __s1,         c9939
+    alias __s2,         c9940
+    alias __s3,         c9941
+    alias __x0,         c9942
+    alias __x1,         c9943
+    alias __x2,         c9944
+    alias __x3,         c9945
+    alias __borrow,     c9946   ; borrow of the last subtraction: 0 or -1
+    alias __ovf,        c9947   ; carry of the last addition. unused, but keeps it out of the caller's items
+    alias __keep,       c9948   ; 1 if the last subtraction didn't underflow, otherwise 0
+    alias __tmp,        c9949
+    alias __tmp2,       c9950
+    ; the bit that `__div_read_bit` writes and `__div_step` reads. each call remaps it onto one of the bits below.
+    alias __bit,        c9951
+    ; the dividend's bits, lowest first. 2^40 > 999,999,999,999, so 40 bits are enough.
+    alias __bit0,       c9952
+    alias __bit1,       c9953
+    alias __bit2,       c9954
+    alias __bit3,       c9955
+    alias __bit4,       c9956
+    alias __bit5,       c9957
+    alias __bit6,       c9958
+    alias __bit7,       c9959
+    alias __bit8,       c9960
+    alias __bit9,       c9961
+    alias __bit10,      c9962
+    alias __bit11,      c9963
+    alias __bit12,      c9964
+    alias __bit13,      c9965
+    alias __bit14,      c9966
+    alias __bit15,      c9967
+    alias __bit16,      c9968
+    alias __bit17,      c9969
+    alias __bit18,      c9970
+    alias __bit19,      c9971
+    alias __bit20,      c9972
+    alias __bit21,      c9973
+    alias __bit22,      c9974
+    alias __bit23,      c9975
+    alias __bit24,      c9976
+    alias __bit25,      c9977
+    alias __bit26,      c9978
+    alias __bit27,      c9979
+    alias __bit28,      c9980
+    alias __bit29,      c9981
+    alias __bit30,      c9982
+    alias __bit31,      c9983
+    alias __bit32,      c9984
+    alias __bit33,      c9985
+    alias __bit34,      c9986
+    alias __bit35,      c9987
+    alias __bit36,      c9988
+    alias __bit37,      c9989
+    alias __bit38,      c9990
+    alias __bit39,      c9991
+
+; res = lhs + rhs
+; flag = 1 if the sum doesn't fit in 4 limbs (the result wraps around), otherwise 0
+; @0tick
+add:
+    add res0, lhs0, rhs0
+    add res1, lhs1, rhs1
+    add res2, lhs2, rhs2
+    add res3, lhs3, rhs3
+    spawn __normalize           | ordered:false delay:0
+
+; res = lhs - rhs
+; flag = -1 if lhs < rhs (the result wraps around), otherwise 0.
+; this doubles as a comparison: lhs >= rhs exactly when flag == 0.
+; @0tick
+sub:
+    sub res0, lhs0, rhs0
+    sub res1, lhs1, rhs1
+    sub res2, lhs2, rhs2
+    sub res3, lhs3, rhs3
+    spawn __normalize           | ordered:false delay:0
+
+; res = lhs * rhs
+; flag = 0 if the product fits in 4 limbs, otherwise a positive number (the result wraps around)
+; @0tick
+mul:
+    ; long multiplication. Column i collects every product lhs_j * rhs_k where j + k = i.
+    ; the columns are summed into internal counters first, so that the result may share
+    ; counters with an operand.
+    mul __col0, lhs0, rhs0
+    mul __col1, lhs0, rhs1
+    mul __col1, lhs1, rhs0      | iter:+
+    mul __col2, lhs0, rhs2
+    mul __col2, lhs1, rhs1      | iter:+
+    mul __col2, lhs2, rhs0      | iter:+
+    mul __col3, lhs0, rhs3
+    mul __col3, lhs1, rhs2      | iter:+
+    mul __col3, lhs2, rhs1      | iter:+
+    mul __col3, lhs3, rhs0      | iter:+
+    ; columns 4 to 6 don't fit. none of the products are negative,
+    ; so their sum is non-zero exactly when one of them is.
+    mul __overflow, lhs1, rhs3
+    mul __overflow, lhs2, rhs2  | iter:+
+    mul __overflow, lhs3, rhs1  | iter:+
+    mul __overflow, lhs2, rhs3  | iter:+
+    mul __overflow, lhs3, rhs2  | iter:+
+    mul __overflow, lhs3, rhs3  | iter:+
+
+    mov res0, __col0
+    mov res1, __col1
+    mov res2, __col2
+    mov res3, __col3
+    spawn __normalize           | ordered:false delay:0
+    add flag, __overflow
+
+; res = lhs / rhs (rounded down), rem = lhs mod rhs
+; flag = 1 if rhs is 0 (then res = 0 and rem = lhs), otherwise 0
+;
+; binary long division with a fixed 40 steps, one per bit of the dividend (highest first):
+;     r = 2r + bit; if d <= r { r = r - d; the quotient bit is 1 }
+; r never exceeds the dividend, so it always fits in 4 limbs.
+; the loop is unrolled: the same 0-tickable routines are spawned once per bit, each time
+; with a remap that points `__bit` at a different counter.
+; @0tick
+div:
+    ; copy the operands, so that the outputs may share counters with them
+    mov __x0, lhs0
+    mov __x1, lhs1
+    mov __x2, lhs2
+    mov __x3, lhs3
+    mov __d0, rhs0
+    mov __d1, rhs1
+    mov __d2, rhs2
+    mov __d3, rhs3
+    mov __r0, 0
+    mov __r1, 0
+    mov __r2, 0
+    mov __r3, 0
+    mov __q0, 0
+    mov __q1, 0
+    mov __q2, 0
+    mov __q3, 0
+
+    ; read the bits of the dividend, lowest first
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit0}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit1}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit2}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit3}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit4}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit5}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit6}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit7}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit8}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit9}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit10}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit11}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit12}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit13}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit14}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit15}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit16}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit17}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit18}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit19}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit20}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit21}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit22}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit23}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit24}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit25}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit26}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit27}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit28}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit29}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit30}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit31}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit32}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit33}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit34}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit35}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit36}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit37}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit38}
+    spawn __div_read_bit        | ordered:false delay:0 noremap:true remap: {__bit = __bit39}
+
+    ; one long division step per bit, highest first
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit39}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit38}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit37}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit36}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit35}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit34}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit33}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit32}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit31}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit30}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit29}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit28}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit27}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit26}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit25}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit24}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit23}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit22}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit21}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit20}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit19}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit18}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit17}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit16}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit15}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit14}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit13}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit12}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit11}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit10}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit9}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit8}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit7}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit6}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit5}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit4}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit3}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit2}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit1}
+    spawn __div_step            | ordered:false delay:0 noremap:true remap: {__bit = __bit0}
+
+    ; dividing by 0 leaves r = lhs, but sets every quotient bit. clear the quotient in that case.
+    ; s = d0 + d1 + d2 + d3 is never negative, so ceil(s / (s + 1)) is 0 if s == 0 and 1 otherwise.
+    add __tmp, __d0, __d1
+    add __tmp, __d2
+    add __tmp, __d3
+    mov __tmp2, __tmp
+    add __tmp2, 1
+    div __keep, __tmp, __tmp2   | resmode:ceil
+    mul __q0, __keep
+    mul __q1, __keep
+    mul __q2, __keep
+    mul __q3, __keep
+    mov flag, 1
+    sub flag, __keep
+
+    mov res0, __q0
+    mov res1, __q1
+    mov res2, __q2
+    mov res3, __q3
+    mov rem0, __r0
+    mov rem1, __r1
+    mov rem2, __r2
+    mov rem3, __r3
+
+; __bit = x mod 2, then x = floor(x / 2)
+; the base is even, so x has the same parity as its lowest limb. when halving, each limb moves
+; its lowest bit into the limb below it (as 1000 of that limb's units), from the top limb down.
+; @0tick
+__div_read_bit:
+    fldiv __tmp, __x0, 2
+    mov __bit, __x0
+    sub __bit, __tmp            | itemmod:2         ; bit = x0 - 2 * floor(x0 / 2)
+
+    fldiv __tmp, __x3, 2
+    add __x2, __x3              | itemmod:1000
+    sub __x2, __tmp             | itemmod:2000      ; x2 += 1000 * (x3 mod 2)
+    mov __x3, __tmp
+    fldiv __tmp, __x2, 2
+    add __x1, __x2              | itemmod:1000
+    sub __x1, __tmp             | itemmod:2000
+    mov __x2, __tmp
+    fldiv __tmp, __x1, 2
+    add __x0, __x1              | itemmod:1000
+    sub __x0, __tmp             | itemmod:2000
+    mov __x1, __tmp
+    fldiv __x0, __x0, 2
+
+; one long division step for the bit in `__bit`:
+;     r = 2r + bit; q = 2q; if d <= r { r = r - d; q = q + 1 }
+; @0tick
+__div_step:
+    ; r = 2r + bit. r was just doubled, so its lowest limb is even and adding the bit can't carry.
+    spawn add                   | ordered:false delay:0 noremap:true remap: {lhs0 = __r0, lhs1 = __r1, lhs2 = __r2, lhs3 = __r3, rhs0 = __r0, rhs1 = __r1, rhs2 = __r2, rhs3 = __r3, res0 = __r0, res1 = __r1, res2 = __r2, res3 = __r3, flag = __ovf}
+    add __r0, __bit
+    ; s = r - d, borrow = -1 if r < d
+    spawn sub                   | ordered:false delay:0 noremap:true remap: {lhs0 = __r0, lhs1 = __r1, lhs2 = __r2, lhs3 = __r3, rhs0 = __d0, rhs1 = __d1, rhs2 = __d2, rhs3 = __d3, res0 = __s0, res1 = __s1, res2 = __s2, res3 = __s3, flag = __borrow}
+
+    ; branchless: r = r + (s - r) * keep, where keep = (d <= r)
+    mov __keep, 1
+    add __keep, __borrow
+    sub __tmp, __s0, __r0
+    mul __r0, __tmp, __keep     | iter:+
+    sub __tmp, __s1, __r1
+    mul __r1, __tmp, __keep     | iter:+
+    sub __tmp, __s2, __r2
+    mul __r2, __tmp, __keep     | iter:+
+    sub __tmp, __s3, __r3
+    mul __r3, __tmp, __keep     | iter:+
+
+    ; q = 2q + keep. like r, q's lowest limb is even after doubling, so this can't carry.
+    spawn add                   | ordered:false delay:0 noremap:true remap: {lhs0 = __q0, lhs1 = __q1, lhs2 = __q2, lhs3 = __q3, rhs0 = __q0, rhs1 = __q1, rhs2 = __q2, rhs3 = __q3, res0 = __q0, res1 = __q1, res2 = __q2, res3 = __q3, flag = __ovf}
+    add __q0, __keep
+
+; Brings every limb of `res` back into [0, 999] by carrying (or borrowing) into the next limb.
+; flag = the carry out of the top limb (negative for a borrow)
+; @0tick
+__normalize:
+    ; floor division also handles negative limbs: -5 becomes 995 with a carry of -1
+    fldiv __carry, res0, base
+    sub res0, __carry           | itemmod:1000
+    add res1, __carry
+    fldiv __carry, res1, base
+    sub res1, __carry           | itemmod:1000
+    add res2, __carry
+    fldiv __carry, res2, base
+    sub res2, __carry           | itemmod:1000
+    add res3, __carry
+    fldiv flag, res3, base
+    sub res3, flag              | itemmod:1000

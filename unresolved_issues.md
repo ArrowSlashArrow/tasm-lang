@@ -97,12 +97,12 @@ So:
 
 ## 2. Compiler: lexer and value parsing
 
-### 2.1 🔴 `ALIAS` with one argument panics (verified)
+<!-- ### 2.1 🔴 `ALIAS` with one argument panics (verified)
 **File:** `rtasm/src/lexer.rs:201-232`
 
 **Problem:** E0012 is pushed when the argument count is wrong, but execution continues and indexes `trimmed[1]`. The input `ALIAS foo` crashes with `index out of bounds`. The same pattern exists for `IMPORT` (`lexer.rs:135-148`), which keeps using `trimmed[0]` after the error.
 
-**Potential fixes:** `continue` after pushing the error.
+**Potential fixes:** `continue` after pushing the error. -->
 
 ### 2.2 🔴 Panic on a non-ASCII character after `C`/`T`/`G`/`b` (verified)
 **File:** `rtasm/src/core/structs.rs:167-177`
@@ -301,14 +301,14 @@ So:
 
 ## 4. Compiler: instruction handlers
 
-### 4.1 🔴 3-argument `DIV`/`FLDIV` with a number multiplies
+<!-- ### 4.1 🔴 3-argument `DIV`/`FLDIV` with a number multiplies 
 **File:** `rtasm/src/instr/fns.rs:226-261`
 
 **Problem:** `arithmetic_2items_num` always sets `multiply_mod = !divmod` (default `true`). `DIV C1, C2, 4` compiles to `C1 = C2 * 4`. The workaround is `| divmod:true`.
 
 **Potential fixes:** Default `divmod` to `op == Op::Div`.
 
-**Possibly linked bugs:** `stdlib/compare.tasm` (`div c3, c3, 2 | resmode:+ iter:/`) may depend on the current multiply behaviour (`d / (|d|*2)`). Check and adjust it when fixing.
+**Possibly linked bugs:** `stdlib/compare.tasm` (`div c3, c3, 2 | resmode:+ iter:/`) may depend on the current multiply behaviour (`d / (|d|*2)`). Check and adjust it when fixing.-->
 
 ### 4.2 🟠 `ADDM`/`SUBM`/`ADDD`/`SUBD` removed but still referenced (uncommitted change)
 **Files:** `rtasm/src/instr/mod.rs`, `rtasm/src/instr/fns.rs` (working tree), `tests/all_instructions.tasm:19-22`, `docs/index.md:100-115`, `docs/updated_docs_v1.md` §3.1.2.1.2, `docs/book/09-debugging.md` §9.5, `vscode-ext/syntaxes/tasm.tmLanguage.json`
@@ -723,10 +723,10 @@ Every file in `stdlib/`, `example_programs/` and `programs/` was compiled and re
 
 ## 10. Tests
 
-### 10.1 🔴 `cargo test` fails on the current working tree (verified)
+<!-- ### 10.1 🔴 `cargo test` fails on the current working tree (verified)
 **File:** `tests/all_instructions.tasm:19-22`
 
-**Problem:** It uses the removed `ADDM`/`ADDD`/`SUBM`/`SUBD` (see 4.2).
+**Problem:** It uses the removed `ADDM`/`ADDD`/`SUBM`/`SUBD` (see 4.2). -->
 
 ### 10.2 🟡 Tests only check whether compilation succeeds or fails
 **File:** `rtasm/src/tests.rs`
@@ -746,10 +746,10 @@ Every file in `stdlib/`, `example_programs/` and `programs/` was compiled and re
 
 **Potential fixes:** Add a test for every file in `stdlib/` and `example_programs/` (or a glob-driven test), and assert the expected error codes.
 
-### 10.4 ⚪ Stale and duplicate test infrastructure
+<!-- ### 10.4 ⚪ Stale and duplicate test infrastructure
 **Files:** `rtasm/src/tests.rs`, `rtasm/profile.ps1`
 
-**Problem:** The commented-out benchmark and `example_no_entry_point` macro arm are dead code. `profile.ps1` references a nonexistent `tests/big_malloc.tasm` and passes a bare `-e`.
+**Problem:** The commented-out benchmark and `example_no_entry_point` macro arm are dead code. `profile.ps1` references a nonexistent `tests/big_malloc.tasm` and passes a bare `-e`. -->
 
 ---
 

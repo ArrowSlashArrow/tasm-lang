@@ -209,6 +209,7 @@ impl Tasm {
                     "Instruction ALIAS must only have two arguments: [String, Any]".to_string(),
                     12,
                 );
+                continue;
             }
 
             // ensure that the alias identifier is a string
@@ -881,14 +882,14 @@ pub fn parse_file<T: AsRef<str>>(
 }
 
 #[cfg(target_os = "windows")]
-fn stdlib_dir() -> PathBuf {
+pub fn stdlib_dir() -> PathBuf {
     PathBuf::from(std::env::var("APPDATA").expect("APPDATA not set"))
         .join("tasm")
         .join("stdlib")
 }
 
 #[cfg(not(target_os = "windows"))]
-fn stdlib_dir() -> PathBuf {
+pub fn stdlib_dir() -> PathBuf {
     PathBuf::from(std::env::var("HOME").expect("HOME not set"))
         .join(".local")
         .join("bin")

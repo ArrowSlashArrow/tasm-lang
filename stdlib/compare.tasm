@@ -9,19 +9,19 @@
 ; Returns `c1 > c2` as a boolean in `c3`. 
 greater:
     sub c3, c1, c2  ; d
-    div c3, c3, 2   | resmode:+ iter:/
+    mul c3, c3, 2   | resmode:+ iter:/
     add c3, 0.5
 
 ; Returns `c1 < c2` as a boolean in `c3`.
 less:
     sub c3, c1, c2  ; d
-    div c3, c3, -2  | resmode:+ iter:/
+    mul c3, c3, -2  | resmode:+ iter:/
     add c3, 0.5
 
 ; Returns `c1 <= c2` as a boolean in `c3`.
 less_eq:
     sub c3, c1, c2  ; d
-    div c3, c3, 2   | resmode:+ iter:/
+    mul c3, c3, 2   | resmode:+ iter:/
     mov c4, 0.5
     sub c3, c4, c3  | resmode:c 
     

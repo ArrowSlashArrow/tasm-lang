@@ -21,10 +21,10 @@ For example, `--linker-output` on [`collatz.tasm`](https://github.com/ArrowSlash
 
 ```
 step: (2)
-    FE Group(3), Group(4), Counter(1), Counter(1) | Flag { ident: "lmod", ... }
+    IFE Group(3), Group(4), Counter(1), Counter(1) | Flag { ident: "lmod", ... }
 even: (3)
     DIV Counter(1), Number(2.0) |
-    SPAWN Group(5) |
+    SPAWN Group(5) | Flag { ident: "ordered", ... }, Flag { ident: "delay", ... }
 ```
 
 If a value shows up with the wrong type here (for example, `String` where you expected a `Counter`), you have found your bug.

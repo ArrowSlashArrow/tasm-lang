@@ -9,6 +9,10 @@
   "categories": [
     "Programming Languages"
   ],
+  "main": "./client/extension.js",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
   "contributes": {
     "languages": [
       {
@@ -20,7 +24,11 @@
         "extensions": [
           ".tasm"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "../img/tasm_favicon.png",
+          "dark": "../img/tasm_favicon.png"
+        }
       }
     ],
     "grammars": [
@@ -35,6 +43,42 @@
         "language": "tasm",
         "path": "./snippets/tasm.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "tasm.restartServer",
+        "title": "TASM: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "TASM",
+      "properties": {
+        "tasm.server.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the tasm-lsp executable. If empty, a bundled server, a build in the repository's tasm-lsp/target, or tasm-lsp on PATH is used."
+        },
+        "tasm.stdlibPath": {
+          "type": "string",
+          "default": "",
+          "description": "Directory used for IMPORTSTD. If empty, the installer's location is used (%APPDATA%\\tasm\\stdlib or ~/.local/bin/tasm/stdlib)."
+        },
+        "tasm.diagnostics.requireEntryPoint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Report E0011 for files without a _start routine. Off by default because libraries don't have one."
+        },
+        "tasm.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    }
   }
 }

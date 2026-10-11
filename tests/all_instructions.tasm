@@ -16,11 +16,7 @@ routine2:
 
 _start:
     ADD C1, C2
-    ADDM C1, C2, 2
-    ADDD C1, C2, 2
     SUB C1, C2
-    SUBM C1, C2, 0.4
-    SUBD C1, C2, 0.4
     MUL C1, C2
     DIV C1, C2
     FLDIV C1, C2

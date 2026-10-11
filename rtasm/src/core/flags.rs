@@ -311,6 +311,8 @@ pub fn get_flag_type(ident: &str) -> Option<FlagValueType> {
         "nover" => FlagValueType::Bool,
         "extra1" => FlagValueType::Float,
         "extra2" => FlagValueType::Float,
+        "nospawn" => FlagValueType::Bool,
+        "onexit" => FlagValueType::Bool,
         _ => return None,
     })
 }

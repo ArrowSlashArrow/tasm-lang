@@ -20,11 +20,10 @@ use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
 use crate::decomp::decompile_gmd;
 use crate::linker::{parse_module, post_link_processing};
 
-mod core;
 mod decomp;
-mod instr;
-mod lexer;
 mod linker;
+
+use tasmc::{core, instr, lexer, log};
 #[cfg(test)]
 mod tests;
 
