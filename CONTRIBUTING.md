@@ -29,7 +29,6 @@ Note: stdlib contributions have stricter requirements due to being a central par
 - Do not use any deprecated instructions. Furthermore, do not use `PERS`, `DISPLAY`, or `IOBLOCK`.
 - Prefix all internal routine - that is, routines not meant to be used outside of the file - with `_std_{filename}_` to prevent name collisions. This is recommended for aliases too, but is not necessary. 
 - If you are unsure whether your contribution fits the criteria, open a PR anyways and a maintainer will help integrate your code into the codebase, provided that it is functional.
-- No AI-generated code.
 
 ## Other
 - Describe your suggestion briefly and informatively in the title

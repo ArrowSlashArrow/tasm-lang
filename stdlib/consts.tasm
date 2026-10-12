@@ -2,36 +2,169 @@
 
 _init:
     ; tasm-specific numbers
-    alias MAX_GROUP,    g9999
-    alias MAX_SAFE_INT, 16777216
-    alias MIN_SAFE_INT, -16777216
-    alias INT_LIMIT,    2147483647
-    alias NEG_INT_LIMIT,-21247483648
+    alias MAX_GROUP,        g9999
+    alias MAX_SAFE_INT,     16777216        ; maximum integer that can be a modifier at full precision
+    alias MIN_SAFE_INT,     -16777216       ; minumum integer that can be a modifier at full precision
+    alias INT_LIMIT,        2147483647
+    alias NEG_INT_LIMIT,    -2147483648
+    alias MAX_TIMER_VALUE,  9999999.0    ; maximum value a timer will accept from an item edit trigger
 
     ; math numbers. source: https://doc.rust-lang.org/src/core/num/f32.rs.html
-    alias PI,           3.14159265358979323846264338327950288
-    alias TAU,          6.28318530717958647692528676655900577
-    alias E,            2.71828182845904523536028747135266250
-    alias GOLDEN_RATIO, 1.618033988749894848204586834365638118
-    ; The Euler-Mascheroni constant (γ)
-    alias EULER_GAMMA,  0.577215664901532860606512090082402431
-    alias HALF_PI,      1.57079632679489661923132169163975144
-    ; pi/3
-    alias FRAC_PI_3,    1.04719755119659774615421446109316763
-    ; pi/4
-    alias FRAC_PI_4,    0.785398163397448309615660845819875721
-    ; pi/6
-    alias FRAC_PI_6,    0.52359877559829887307710723054658381
-    ; pi/8
-    alias FRAC_PI_8,    0.39269908169872415480783042290993786
-    ; 1/pi
-    alias FRAC_1_PI,    0.318309886183790671537767526745028724
-    alias SQRT_2,       1.41421356237309504880168872420969808
-    ; 1 / sqrt2
-    alias FRAC_1_SQRT_2,0.707106781186547524400844362104849039
-    alias LOG2_E,       1.44269504088896340735992468100189214
-    alias LOG2_10,      3.32192809488736234787031942948939018
-    alias LOG10_E,      0.434294481903251827651128918916605082
-    alias LOG10_2,      0.301029995663981195213738894724493027
-    alias LN_2,         0.693147180559945309417232121458176568
-    alias LN_10,        2.30258509299404568401799145468436421
+    ; see docs section 3.1.2.1.1 about loading constants
+    alias PI,               3.14159265358979323846264338327950288
+    alias TAU,              6.28318530717958647692528676655900577
+    alias E,                2.71828182845904523536028747135266250
+    alias GOLDEN_RATIO,     1.618033988749894848204586834365638118
+    alias EULER_GAMMA,      0.577215664901532860606512090082402431      ; The Euler-Mascheroni constant (γ)
+    alias HALF_PI,          1.57079632679489661923132169163975144
+    alias FRAC_PI_3,        1.04719755119659774615421446109316763       ; pi/3
+    alias FRAC_PI_4,        0.785398163397448309615660845819875721      ; pi/4
+    alias FRAC_PI_6,        0.52359877559829887307710723054658381       ; pi/6
+    alias FRAC_PI_8,        0.39269908169872415480783042290993786       ; pi/8
+    alias FRAC_1_PI,        0.318309886183790671537767526745028724      ; 1/pi
+    alias SQRT_2,           1.41421356237309504880168872420969808
+    alias FRAC_1_SQRT_2,    0.707106781186547524400844362104849039      ; 1 / sqrt2
+    alias LOG2_E,           1.44269504088896340735992468100189214
+    alias LOG2_10,          3.32192809488736234787031942948939018
+    alias LOG10_E,          0.434294481903251827651128918916605082
+    alias LOG10_2,          0.301029995663981195213738894724493027
+    alias LN_2,             0.693147180559945309417232121458176568
+    alias LN_10,            2.30258509299404568401799145468436421
+
+    ; internal alias
+    alias __CONST_SCALE_FACTOR, 1000000
+
+    ; consts with precision
+; Loads `PI` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_PI:
+    mov t1, 265358
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 3.14159
+; Loads `TAU` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_TAU:
+    mov t1, 530717
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 6.28318
+; Loads `E` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_E:
+    mov t1, 182845
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 2.71828
+; Loads `GOLDEN_RATIO` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_GOLDEN_RATIO:
+    mov t1, 398874
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 1.61803
+; Loads `EULER_GAMMA` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_EULER_GAMMA:
+    mov t1, 566490      ; The Euler-Mascheroni constant (γ)
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.57721
+; Loads `HALF_PI` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_HALF_PI:
+    mov t1, 632679
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 1.57079
+; Loads `FRAC_PI_3` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_FRAC_PI_3:
+    mov t1, 755119      ; pi/3
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 1.04719
+; Loads `FRAC_PI_4` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_FRAC_PI_4:
+    mov t1, 816339      ; pi/4
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.78539
+; Loads `FRAC_PI_6` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_FRAC_PI_6:
+    mov t1, 877559      ; pi/6
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.52359
+; Loads `FRAC_PI_8` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_FRAC_PI_8:
+    mov t1, 908169      ; pi/8
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.39269
+; Loads `FRAC_1_PI` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_FRAC_1_PI:
+    mov t1, 988618      ; 1/pi
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.31830
+; Loads `SQRT_2` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_SQRT_2:
+    mov t1, 356237
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 1.41421
+; Loads `FRAC_1_SQRT_2` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_FRAC_1_SQRT_2:
+    mov t1, 678118      ; 1 / sqrt2
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.70710
+; Loads `LOG2_E` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_LOG2_E:
+    mov t1, 504088
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 1.44269
+; Loads `LOG2_10` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_LOG2_10:
+    mov t1, 809488
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 3.32192
+; Loads `LOG10_E` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_LOG10_E:
+    mov t1, 448190
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.43429
+; Loads `LOG10_2` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_LOG10_2:
+    mov t1, 999566
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.30102
+; Loads `LN_2` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_LN_2:
+    mov t1, 718055
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 0.69314
+; Loads `LN_10` into t1 with full precision.
+; @param t1 Where the constant will be written
+; @0tick
+load_const_LN_10:
+    mov t1, 509299
+    div t1, __CONST_SCALE_FACTOR
+    add t1, 2.30258

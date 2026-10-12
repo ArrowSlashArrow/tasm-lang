@@ -54,6 +54,31 @@
       {
         "command": "tasm.restartServer",
         "title": "TASM: Restart Language Server"
+      },
+      {
+        "command": "tasm.compileGmd",
+        "title": "Compile to .gmd",
+        "category": "TASM"
+      },
+      {
+        "command": "tasm.compileGmdRelease",
+        "title": "Compile to .gmd (Release Mode)",
+        "category": "TASM"
+      },
+      {
+        "command": "tasm.compileGmdUnorderedStart",
+        "title": "Compile to .gmd (Unordered Start)",
+        "category": "TASM"
+      },
+      {
+        "command": "tasm.compileClipboard",
+        "title": "Compile to Clipboard",
+        "category": "TASM"
+      },
+      {
+        "command": "tasm.compileClipboardLens",
+        "title": "Compile to Clipboard (No Entry Point)",
+        "category": "TASM"
       }
     ],
     "configuration": {
@@ -63,6 +88,11 @@
           "type": "string",
           "default": "",
           "description": "Path to the tasm-lsp executable. If empty, a bundled server, a build in the repository's tasm-lsp/target, or tasm-lsp on PATH is used."
+        },
+        "tasm.compiler.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the tasmc executable used by the compile commands. If empty, a build in the repository's rtasm/target, the installer's location (%APPDATA%\\tasm or ~/.local/bin/tasm), or tasmc on PATH is used."
         },
         "tasm.stdlibPath": {
           "type": "string",
@@ -85,6 +115,74 @@
           "description": "Traces the communication between VS Code and the language server."
         }
       }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "tasm.compileGmd",
+          "when": "editorLangId == tasm"
+        },
+        {
+          "command": "tasm.compileGmdRelease",
+          "when": "editorLangId == tasm"
+        },
+        {
+          "command": "tasm.compileGmdUnorderedStart",
+          "when": "editorLangId == tasm"
+        },
+        {
+          "command": "tasm.compileClipboard",
+          "when": "editorLangId == tasm"
+        },
+        {
+          "command": "tasm.compileClipboardLens",
+          "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "tasm.compileGmd",
+          "when": "editorLangId == tasm",
+          "group": "tasm@1"
+        },
+        {
+          "command": "tasm.compileGmdRelease",
+          "when": "editorLangId == tasm",
+          "group": "tasm@2"
+        },
+        {
+          "command": "tasm.compileGmdUnorderedStart",
+          "when": "editorLangId == tasm",
+          "group": "tasm@3"
+        },
+        {
+          "command": "tasm.compileClipboard",
+          "when": "editorLangId == tasm",
+          "group": "tasm@4"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "tasm.compileGmd",
+          "when": "resourceExtname == .tasm",
+          "group": "tasm@1"
+        },
+        {
+          "command": "tasm.compileGmdRelease",
+          "when": "resourceExtname == .tasm",
+          "group": "tasm@2"
+        },
+        {
+          "command": "tasm.compileGmdUnorderedStart",
+          "when": "resourceExtname == .tasm",
+          "group": "tasm@3"
+        },
+        {
+          "command": "tasm.compileClipboard",
+          "when": "resourceExtname == .tasm",
+          "group": "tasm@4"
+        }
+      ]
     }
   }
 }

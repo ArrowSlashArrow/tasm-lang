@@ -11,7 +11,6 @@ set0:
 
 rand_iter:
     ifrand set0, set1, 50
-    wait 2  ; wait for T2 to be set
     
     mul T2, T3
     add T1, T2

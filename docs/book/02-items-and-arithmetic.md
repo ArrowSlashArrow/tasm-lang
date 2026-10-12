@@ -134,6 +134,10 @@ _start:
 
 The temperatures are timers because they have decimals. The last line stores the Fahrenheit value in a counter, which can only hold whole numbers. The `| resmode:round` part is a **flag**: it rounds the value to the nearest whole number before it is stored. Without it, you leave it to GD to drop the fraction.
 
+> [!NOTE] Be careful with large or precise numbers.
+> GD will not correctly load large and/or precise numbers directly. Keep this in mind when using precise values, such as those from `stdlib/consts.tasm`.  
+> See [section 3.1.2.1.1 of the documentation](../index.md#31211-caveats-with-using-largeprecise-numbers) for more info.
+
 ## 2.5. Rounding
 Rounding is controlled with two flags:
 - `resmode` rounds the **item result**: the value computed from the input items, before it is combined with the target. For `mov` and the three-item forms, that is the value that gets stored.
@@ -149,7 +153,7 @@ Both take a rounding mode, a sign mode, or both:
 | `+` | make positive (absolute value) |
 | `-` | make negative |
 
-They combine as `floor+`, `round-` and so on. The short forms `r`, `f` and `c` also work, but the style guide asks for the full names.
+They combine as `floor+`, `round-` and so on. The short forms `r`, `f` and `c` also work, but full names are preferred for readability.
 
 `fldiv` is `div` with rounding down built in. These pairs do the same thing:
 

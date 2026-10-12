@@ -9,7 +9,7 @@ This guide has two parts:
 1. **[Formatting](#part-1-formatting)**: how TASM code should look, so that it is easy to read.
 2. **[Writing idiomatic TASM](#part-2-writing-idiomatic-tasm)**: how to write programs that are fast and use few groups. Triggers can be extremely slow and wasteful when they are arranged badly, and very powerful when they are arranged well.
 
-The standard library and the programs in `example_programs/` follow this guide. [`example_programs/collatz.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/collatz.tasm) is a small program that uses most of it.
+The standard library and the programs in `example_programs/` follow this guide. [`example_programs/collatz.tasm`](../example_programs/collatz.tasm) is a small program that uses most of it.
 
 ## Quick checklist
 - [ ] Instructions are indented with 4 spaces.
@@ -77,6 +77,31 @@ _init:
 _start:
     ise magic_group, magic_item, magic_number
 ```
+
+## Footnote: Documenting routines
+The comment lines directly above a routine (and the comment on its label line) are its documentation, shown when hovering over the routine:
+
+```
+; Adds two counters.
+; @param c1 first operand
+; @param c2 second operand
+; @returns c3 the sum
+; @0tick
+add_two:
+    add c3, c1, c2
+```
+Tags: `@param <name> <description>`, `@returns <name> <description>`, `@0tick` (safe to 0-tick) and `@no0tick <reason>`. A blank `;` line starts a new paragraph.
+
+The example yields the below docs:
+### Example routine docs
+Adds two counters.
+#### Parameters:
+* `C1`: first operand
+* `C2`: second operand
+
+Returns `C3`: the sum
+
+This routine is safe to 0-tick.
 
 ---
 
@@ -269,3 +294,6 @@ helper1:
 ```
 
 `helper1` sees `c2` wherever it uses `c1`. When it spawns `helper2`, `c2` is remapped again, so `helper2` ends up seeing `c3` wherever it uses `c1`.
+
+## 4. Concurrent instructions
+Concurrent instructions (instructions prefixed with a `~`) are unpredictable and generally not recommended for use in programs. They also do not work on routines that are spawned with `ordered:false`.  

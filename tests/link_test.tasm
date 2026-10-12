@@ -5,4 +5,4 @@ _start:
     ; external symbols: 
     ; * routine (mem)
     ; * flag params (mem_end, cread)
-    spawn mem_8bit::mem | remap: {mem_8bit::mem_end = mem_8bit::cread}
+    spawn mem_8bit::mem | remap: {mem_8bit::mem = mem_8bit::cread}

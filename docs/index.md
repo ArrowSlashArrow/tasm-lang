@@ -134,9 +134,6 @@ Note: Neither `MAINTIME` nor `ATTEMPTS` can ever be the result. Those items are 
 - MOV: assignment
 > \* MOV simply assigns the 2nd argument to the 1st item in this case. Data is not transformed when MOV is used. MOV only accepts the first two argsets.
 
-> [!WARNING]
-> \*\* In the current compiler (v0.3.2), the `<item> <item> <number>` form of `DIV` and `FLDIV` compiles with the modifier set to *multiply*, i.e. `DIV C1, C2, 4` produces `C1 = C2 * 4`. Until this is fixed, add `| divmod:true` to get a division: `DIV C1, C2, 4 | divmod:true` produces `C1 = C2 / 4`.
-
 ##### Flags
 All arithmetic instructions read the following flags (see [Instruction flags](#314-instruction-flags) for details):
 
@@ -155,6 +152,37 @@ abs_value:
     MOV C1, C1 | resmode:+        ; C1 = |C1|
     ADD C2, C3 | itemmod:0.5      ; C2 = C2 + C3 * 0.5
 ```
+
+##### 3.1.2.1.1. Caveats with using large/precise numbers
+GD will truncate decimals after 3 decimal points of precision on a modifier, meaning that you cannot have something like `0.1234` as a modifier, only `0.123`. Timers do not accept assignment above 9,999,999.00 from item edit triggers.
+
+Furthermore, large numbers will not be precise modifiers, which complicates loading precise numbers even more:
+
+```x86asm
+_init:
+    alias PI,                3.14159265     ; normal pi
+    alias PRECISE_PI,        3141592.65     ; shifted to avoid truncation
+    alias PRECISION_SCALING, 1000000        ; scaling factor for PRECISE_PI
+
+_start:
+    mov t1, PI                              ; doesn't work, sets t1 to 3.142
+    mov t2, PRECISE_PI
+    div t2, PRECISION_SCALING               ; doesn't work either, t2 = 3.14159275  (lost precision) 
+```
+
+The proper way to load large/precise numbers is to load them in parts:
+```x86asm
+_init:
+    alias PI_FIRST,         3.14159         ; 6dp cutoff for precision (even lower for larger numbers)
+    alias PI_SECOND,        265359          ; 6dp second half scaled up x1,000,000
+
+_start:
+    mov t1, PI_SECOND           ; load lower precision first
+    div t1, 1000000             ; scale down second half
+    add t1, PI_FIRST            ; now add the rest (not scaled in this case)
+```
+
+This process is 0-tickable, since there are no spawns. The standard library has a routine to load all of the values in `consts.tasm` - `load_const_<CONST_NAME>`.
 
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  

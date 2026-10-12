@@ -10,19 +10,19 @@ use lsp_types::{
     Documentation, InsertTextFormat, MarkupContent, MarkupKind, Position, TextEdit, Url,
 };
 use tasmc::core::{
-    consts::INIT_ROUTINE,
-    flags::{FlagValueType, get_flag_type},
+    consts::{ENTRY_POINT, INIT_ROUTINE},
+    flags::{FlagValueType, get_flag_type, resolve_flag_int},
     structs::{Hitbox, InstrType, TasmPrimitive, TasmValue},
 };
 
 use crate::{
-    index::{DocIndex, safe_to_value},
+    index::{AliasDef, DocIndex, safe_to_value},
     line::parse_instr_line,
     spec::{
         self, FlagInfo, OP_VALUES, ROUNDSIGN_VALUES, all_instrs, flag_doc, flags_for, instr_doc,
         instr_info, prim_fits, signature,
     },
-    text::{byte_of_col, enclosing_routine, range, shorten, split_lines},
+    text::{byte_of_col, enclosing_routine, is_indented, range, shorten, split_lines, utf16_col},
     world::World,
 };
 
@@ -31,6 +31,15 @@ const SORT_LITERAL: &str = "0";
 const SORT_LOCAL: &str = "1";
 const SORT_EXTERNAL: &str = "2";
 const SORT_LAST: &str = "3";
+
+/// The document being completed in.
+struct Source<'a> {
+    uri: &'a Url,
+    lines: &'a [&'a str],
+}
+
+/// Unimported symbols are only suggested once this much of a name has been typed.
+const AUTO_IMPORT_MIN_CHARS: usize = 2;
 
 struct Ctx<'a> {
     line_idx: usize,
@@ -127,6 +136,7 @@ pub fn complete(world: &World, uri: &Url, text: &str, pos: Position) -> Vec<Comp
         return complete_flags(
             world,
             &index,
+            &Source { uri, lines: &lines },
             line_idx,
             line,
             &instr,
@@ -164,7 +174,10 @@ pub fn complete(world: &World, uri: &Url, text: &str, pos: Position) -> Vec<Comp
                 .map(|(_, raw)| world.resolve(&index, raw).map(|r| r.value))
                 .collect::<Result<Vec<_>, _>>();
             match prior {
-                Ok(prior) => complete_arg(world, &index, &ctx, &instr, &prior),
+                Ok(prior) => {
+                    let src = Source { uri, lines: &lines };
+                    complete_arg(world, &index, &src, &ctx, &instr, &prior)
+                }
                 Err(_) => vec![],
             }
         }
@@ -211,6 +224,7 @@ fn complete_mnemonic(ctx: &Ctx, in_init: bool) -> Vec<CompletionItem> {
 fn complete_arg(
     world: &World,
     index: &DocIndex,
+    src: &Source,
     ctx: &Ctx,
     instr: &str,
     prior: &[TasmValue],
@@ -322,6 +336,14 @@ fn complete_arg(
         }
     });
 
+    items.extend(unimported_symbols(
+        world,
+        index,
+        src,
+        ctx,
+        accepts(&TasmValue::Group(1)),
+        &|a| safe_to_value(&a.value).is_ok_and(|v| accepts(&v)),
+    ));
     items
 }
 
@@ -422,6 +444,7 @@ fn tasm_files(dir: &Path) -> Vec<String> {
 fn complete_flags(
     world: &World,
     index: &DocIndex,
+    src: &Source,
     line_idx: usize,
     line: &str,
     instr: &str,
@@ -445,7 +468,7 @@ fn complete_flags(
             start: flags_start + entry,
             end: col,
         };
-        return complete_dict_entry(world, index, &ctx);
+        return complete_dict_entry(world, index, src, &ctx);
     }
 
     let token_start = typed.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
@@ -528,7 +551,12 @@ fn flag_item(ctx: &Ctx, f: &FlagInfo) -> CompletionItem {
     item
 }
 
-fn complete_dict_entry(world: &World, index: &DocIndex, ctx: &Ctx) -> Vec<CompletionItem> {
+fn complete_dict_entry(
+    world: &World,
+    index: &DocIndex,
+    src: &Source,
+    ctx: &Ctx,
+) -> Vec<CompletionItem> {
     let mut items = vec![];
     for r in index.routines.iter().filter(|r| r.name != INIT_ROUTINE) {
         let mut item = ctx.item(r.name.clone(), CompletionItemKind::FUNCTION, SORT_LOCAL);
@@ -568,5 +596,256 @@ fn complete_dict_entry(world: &World, index: &DocIndex, ctx: &Ctx) -> Vec<Comple
             }
         }
     });
+    items.extend(unimported_symbols(world, index, src, ctx, true, &|a| {
+        resolve_flag_int(&a.value).is_some()
+    }));
     items
+}
+
+/// A module that isn't imported yet, but could be: a stdlib module, or a file in the
+/// directory of the current file or one of its subdirectories.
+struct Candidate {
+    module: String,
+    /// The line to add to `_init`, e.g. `importstd math`.
+    import: String,
+    /// Where the module comes from, shown next to the suggestion.
+    origin: String,
+    index: DocIndex,
+}
+
+fn import_candidates(world: &World, uri: &Url, index: &DocIndex) -> Vec<Candidate> {
+    let this_file = uri.to_file_path().ok().and_then(|p| p.canonicalize().ok());
+    let imported: Vec<PathBuf> = index
+        .imports
+        .iter()
+        .filter_map(|i| i.path.as_ref()?.canonicalize().ok())
+        .collect();
+
+    let mut sources: Vec<(PathBuf, String, String)> = tasm_files(&world.stdlib)
+        .into_iter()
+        .map(|rel| {
+            let path = world.stdlib.join(format!("{rel}.tasm"));
+            (
+                path,
+                format!("importstd {rel}"),
+                format!("stdlib/{rel}.tasm"),
+            )
+        })
+        .collect();
+    if let Some(dir) = uri.to_file_path().ok().as_ref().and_then(|f| f.parent()) {
+        sources.extend(tasm_files(dir).into_iter().map(|rel| {
+            let path = dir.join(format!("{rel}.tasm"));
+            (path, format!("import {rel}"), format!("{rel}.tasm"))
+        }));
+    }
+
+    let mut out = vec![];
+    // the stdlib may also be under this directory; it's then only offered through `importstd`
+    let mut seen: Vec<PathBuf> = vec![];
+    for (path, import, origin) in sources {
+        let Some(m) = world.module(&path) else {
+            continue;
+        };
+        if seen.contains(&m.path) {
+            continue;
+        }
+        seen.push(m.path.clone());
+        let module = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let is_self = this_file.as_ref() == Some(&m.path);
+        // importing a file that imports this one would be circular
+        let imports_self = m
+            .index
+            .imports
+            .iter()
+            .any(|i| i.path.as_ref().and_then(|p| p.canonicalize().ok()) == this_file);
+        // programs (files with `_start`) aren't libraries
+        if is_self
+            || imports_self
+            || imported.contains(&m.path)
+            || index.import(&module).is_some()
+            || m.index.routine(ENTRY_POINT).is_some()
+        {
+            continue;
+        }
+        out.push(Candidate {
+            module,
+            import,
+            origin,
+            index: m.index.clone(),
+        });
+    }
+    out
+}
+
+/// Whether the name part of what was typed (after any `module::`) could complete to `ident`:
+/// its characters appear in `ident` in order, ignoring case.
+fn could_complete(typed: &str, ident: &str) -> bool {
+    let typed = typed
+        .rsplit("::")
+        .next()
+        .unwrap_or(typed)
+        .to_ascii_lowercase();
+    let mut chars = ident.chars().map(|c| c.to_ascii_lowercase());
+    typed.chars().all(|t| chars.any(|c| c == t))
+}
+
+/// `module::symbol` suggestions from modules that aren't imported yet. Choosing one also adds
+/// the import to `_init`.
+fn unimported_symbols(
+    world: &World,
+    index: &DocIndex,
+    src: &Source,
+    ctx: &Ctx,
+    routines: bool,
+    alias_ok: &dyn Fn(&AliasDef) -> bool,
+) -> Vec<CompletionItem> {
+    let typed = ctx.partial();
+    if typed.chars().count() < AUTO_IMPORT_MIN_CHARS {
+        return vec![];
+    }
+    let mut items = vec![];
+    for c in import_candidates(world, src.uri, index) {
+        let edit = import_edit(src.lines, index, &c.import);
+        let mut add = |ident: &str, kind: CompletionItemKind, detail: String| {
+            // `__` marks internal symbols
+            if ident.starts_with("__") || !could_complete(typed, ident) {
+                return;
+            }
+            let label = format!("{}::{ident}", c.module);
+            let mut item = ctx.item(label.clone(), kind, SORT_LAST);
+            describe(&mut item, &c.origin);
+            item.detail = Some(format!("{detail} (adds `{}`)", c.import));
+            item.filter_text = Some(if typed.contains("::") {
+                label
+            } else {
+                ident.to_string()
+            });
+            item.additional_text_edits = Some(vec![edit.clone()]);
+            items.push(item);
+        };
+        if routines {
+            for r in c.index.routines.iter().filter(|r| r.name != INIT_ROUTINE) {
+                add(&r.name, CompletionItemKind::FUNCTION, "routine".into());
+            }
+        }
+        for a in c.index.aliases.iter().filter(|a| alias_ok(a)) {
+            add(
+                &a.name,
+                CompletionItemKind::CONSTANT,
+                format!("alias {}, {}", a.name, a.value),
+            );
+        }
+    }
+    items
+}
+
+/// Adds `import` to `_init`: after its last import, or right after `_init:`. Files without
+/// `_init` get one at the top.
+fn import_edit(lines: &[&str], index: &DocIndex, import: &str) -> TextEdit {
+    let Some(init) = index.routine(INIT_ROUTINE) else {
+        let start = Position::new(0, 0);
+        return TextEdit::new(
+            lsp_types::Range::new(start, start),
+            format!("{INIT_ROUTINE}:\n    {import}\n\n"),
+        );
+    };
+    let anchor = index
+        .imports
+        .iter()
+        .map(|i| i.line)
+        .max()
+        .unwrap_or(init.line)
+        .max(init.line);
+    let indent = lines
+        .iter()
+        .skip(init.line + 1)
+        .find(|l| !l.trim().is_empty() && is_indented(l))
+        .map(|l| &l[..l.len() - l.trim_start().len()])
+        .unwrap_or("    ");
+    let line = lines.get(anchor).copied().unwrap_or_default();
+    let end = Position::new(anchor as u32, utf16_col(line, line.len()));
+    TextEdit::new(
+        lsp_types::Range::new(end, end),
+        format!("\n{indent}{import}"),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::world::Document;
+
+    #[test]
+    fn auto_import() {
+        let dir = std::env::temp_dir().join(format!("tasm-lsp-ai-{}", std::process::id()));
+        let std_dir = dir.join("stdlib");
+        fs::create_dir_all(dir.join("lib")).unwrap();
+        fs::create_dir_all(&std_dir).unwrap();
+        fs::write(
+            std_dir.join("math.tasm"),
+            "_init:\n    alias PI_ISH, 3\n\nsqrt:\n    nop\n__internal_sq:\n    nop\n",
+        )
+        .unwrap();
+        fs::write(dir.join("lib/utils.tasm"), "square:\n    nop\n").unwrap();
+        fs::write(
+            dir.join("program.tasm"),
+            "_start:\n    nop\nsquash:\n    nop\n",
+        )
+        .unwrap();
+        let main = "_init:\n    alias x, c1\n\nroutine:\n    spawn sq\n";
+        let path = dir.join("main.tasm");
+        fs::write(&path, main).unwrap();
+        let uri = Url::from_file_path(&path).unwrap();
+        let mut world = World::new(std_dir, false);
+        world
+            .docs
+            .insert(uri.clone(), Document { text: main.into() });
+
+        let found = |text: &str, pos: Position| {
+            complete(&world, &uri, text, pos)
+                .into_iter()
+                .filter_map(|i| {
+                    let edit = i.additional_text_edits.as_ref()?[0].clone();
+                    let origin = i.label_details?.description?;
+                    Some((i.label, origin, edit.new_text, edit.range.start))
+                })
+                .collect::<Vec<_>>()
+        };
+        let s = String::from;
+        assert_eq!(
+            found(main, Position::new(4, 12)),
+            [
+                (
+                    s("math::sqrt"),
+                    s("stdlib/math.tasm"),
+                    s("\n    importstd math"),
+                    Position::new(0, 6)
+                ),
+                (
+                    s("utils::square"),
+                    s("lib/utils.tasm"),
+                    s("\n    import lib/utils"),
+                    Position::new(0, 6)
+                ),
+            ]
+        );
+
+        // one character isn't enough
+        assert!(
+            found(
+                "_init:\n    nop\nroutine:\n    spawn s\n",
+                Position::new(3, 11)
+            )
+            .is_empty()
+        );
+
+        // without `_init`, one is created
+        let no_init = found("routine:\n    spawn sq\n", Position::new(1, 12));
+        assert_eq!(no_init[0].2, "_init:\n    importstd math\n\n");
+
+        let _ = fs::remove_dir_all(dir);
+    }
 }
