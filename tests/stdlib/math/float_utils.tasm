@@ -1,0 +1,80 @@
+; Tests for math::deg_to_rad, rad_to_deg, fract, hypot, sign_float, min_float, max_float, clamp_float and lerp_float.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias deg_to_rad_1,  t10
+    alias rad_to_deg_1,  t11
+    alias fract_1,       t12
+    alias fract_2,       t13
+    alias hypot_1,       t14
+    alias hypot_2,       t15
+    alias sign_float_1,  t16
+    alias sign_float_2,  t17
+    alias sign_float_3,  t18
+    alias min_float_1,   t19
+    alias max_float_1,   t20
+    alias clamp_float_1, t21
+    alias clamp_float_2, t22
+    alias clamp_float_3, t23
+    alias lerp_float_1,  t24
+
+    display deg_to_rad_1     ; expected: 3.14   (deg_to_rad(180))
+    display rad_to_deg_1     ; expected: 57.30   (rad_to_deg(1))
+    display fract_1          ; expected: 0.75   (fract(3.75))
+    display fract_2          ; expected: 0.75   (fract(-1.25))
+    display hypot_1          ; expected: 5.00   (hypot(3, 4))
+    display hypot_2          ; expected: 13.00   (hypot(-5, 12))
+    display sign_float_1     ; expected: -1.00   (sign_float(-2.5))
+    display sign_float_2     ; expected: 0.00   (sign_float(0))
+    display sign_float_3     ; expected: 1.00   (sign_float(0.25))
+    display min_float_1      ; expected: -2.25   (min_float(1.5, -2.25))
+    display max_float_1      ; expected: 1.50   (max_float(1.5, -2.25))
+    display clamp_float_1    ; expected: 2.50   (clamp_float(7.5, -1, 2.5))
+    display clamp_float_2    ; expected: -1.00   (clamp_float(-3, -1, 2.5))
+    display clamp_float_3    ; expected: 0.50   (clamp_float(0.5, -1, 2.5))
+    display lerp_float_1     ; expected: 2.50   (lerp_float(2, 4, 0.25))
+
+
+_start:
+    mov t1, 180
+    spawn math::deg_to_rad      | ordered:false delay:0 remap: {t2 = deg_to_rad_1}
+    mov t1, 1
+    spawn math::rad_to_deg      | ordered:false delay:0 remap: {t2 = rad_to_deg_1}
+    mov t1, 3.75
+    spawn math::fract           | ordered:false delay:0 remap: {t2 = fract_1}
+    mov t1, -1.25
+    spawn math::fract           | ordered:false delay:0 remap: {t2 = fract_2}
+    mov t1, 3
+    mov t2, 4
+    spawn math::hypot           | ordered:false delay:0 remap: {t3 = hypot_1}
+    mov t1, -5
+    mov t2, 12
+    spawn math::hypot           | ordered:false delay:0 remap: {t3 = hypot_2}
+    mov t1, -2.5
+    spawn math::sign_float      | ordered:false delay:0 remap: {t2 = sign_float_1}
+    mov t1, 0
+    spawn math::sign_float      | ordered:false delay:0 remap: {t2 = sign_float_2}
+    mov t1, 0.25
+    spawn math::sign_float      | ordered:false delay:0 remap: {t2 = sign_float_3}
+    mov t1, 1.5
+    mov t2, -2.25
+    spawn math::min_float       | ordered:false delay:0 remap: {t3 = min_float_1}
+    mov t1, 1.5
+    mov t2, -2.25
+    spawn math::max_float       | ordered:false delay:0 remap: {t3 = max_float_1}
+    mov t1, 7.5
+    mov t2, -1
+    mov t3, 2.5
+    spawn math::clamp_float     | ordered:false delay:0 remap: {t4 = clamp_float_1}
+    mov t1, -3
+    mov t2, -1
+    mov t3, 2.5
+    spawn math::clamp_float     | ordered:false delay:0 remap: {t4 = clamp_float_2}
+    mov t1, 0.5
+    mov t2, -1
+    mov t3, 2.5
+    spawn math::clamp_float     | ordered:false delay:0 remap: {t4 = clamp_float_3}
+    mov t1, 2
+    mov t2, 4
+    mov t3, 0.25
+    spawn math::lerp_float      | ordered:false delay:0 remap: {t4 = lerp_float_1}

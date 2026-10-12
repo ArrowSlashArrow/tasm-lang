@@ -1,0 +1,59 @@
+; Tests for math::sign_int, min_int, max_int, clamp_int and lerp_int.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias sign_int_1,  c10
+    alias sign_int_2,  c11
+    alias sign_int_3,  c12
+    alias min_int_1,   c13
+    alias max_int_1,   c14
+    alias min_int_2,   c15
+    alias clamp_int_1, c16
+    alias clamp_int_2, c17
+    alias clamp_int_3, c18
+    alias lerp_int_1,  c19
+
+    display sign_int_1     ; expected: -1   (sign_int(-7))
+    display sign_int_2     ; expected: 0   (sign_int(0))
+    display sign_int_3     ; expected: 1   (sign_int(42))
+    display min_int_1      ; expected: -3   (min_int(5, -3))
+    display max_int_1      ; expected: 5   (max_int(5, -3))
+    display min_int_2      ; expected: 4   (min_int(4, 4))
+    display clamp_int_1    ; expected: 5   (clamp_int(10, 0, 5))
+    display clamp_int_2    ; expected: 0   (clamp_int(-2, 0, 5))
+    display clamp_int_3    ; expected: 3   (clamp_int(3, 0, 5))
+    display lerp_int_1     ; expected: 40   (lerp_int(10, 20, 3))
+
+
+_start:
+    mov c1, -7
+    spawn math::sign_int        | ordered:false delay:0 remap: {c2 = sign_int_1}
+    mov c1, 0
+    spawn math::sign_int        | ordered:false delay:0 remap: {c2 = sign_int_2}
+    mov c1, 42
+    spawn math::sign_int        | ordered:false delay:0 remap: {c2 = sign_int_3}
+    mov c1, 5
+    mov c2, -3
+    spawn math::min_int         | ordered:false delay:0 remap: {c3 = min_int_1}
+    mov c1, 5
+    mov c2, -3
+    spawn math::max_int         | ordered:false delay:0 remap: {c3 = max_int_1}
+    mov c1, 4
+    mov c2, 4
+    spawn math::min_int         | ordered:false delay:0 remap: {c3 = min_int_2}
+    mov c1, 10
+    mov c2, 0
+    mov c3, 5
+    spawn math::clamp_int       | ordered:false delay:0 remap: {c4 = clamp_int_1}
+    mov c1, -2
+    mov c2, 0
+    mov c3, 5
+    spawn math::clamp_int       | ordered:false delay:0 remap: {c4 = clamp_int_2}
+    mov c1, 3
+    mov c2, 0
+    mov c3, 5
+    spawn math::clamp_int       | ordered:false delay:0 remap: {c4 = clamp_int_3}
+    mov c1, 10
+    mov c2, 20
+    mov c3, 3
+    spawn math::lerp_int        | ordered:false delay:0 remap: {c4 = lerp_int_1}

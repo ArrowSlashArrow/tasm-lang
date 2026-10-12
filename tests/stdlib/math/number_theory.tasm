@@ -1,0 +1,97 @@
+; Tests for math::gcd, lcm, ipow, modpow and isqrt.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias gcd_1,    c10
+    alias gcd_2,    c11
+    alias gcd_3,    c12
+    alias gcd_4,    c13
+    alias lcm_1,    c14
+    alias lcm_2,    c15
+    alias lcm_3,    c16
+    alias ipow_1,   c17
+    alias ipow_2,   c18
+    alias ipow_3,   c19
+    alias ipow_4,   c20
+    alias modpow_1, c21
+    alias modpow_2, c22
+    alias modpow_3, c23
+    alias isqrt_1,  c24
+    alias isqrt_2,  c25
+    alias isqrt_3,  c26
+    alias isqrt_4,  c27
+
+    display gcd_1       ; expected: 6   (gcd(12, 18))
+    display gcd_2       ; expected: 12   (gcd(-48, 180))
+    display gcd_3       ; expected: 0   (gcd(0, 0))
+    display gcd_4       ; expected: 1   (gcd(14930352, 9227465): consecutive Fibonacci numbers, the slowest case)
+    display lcm_1       ; expected: 12   (lcm(4, 6))
+    display lcm_2       ; expected: 42   (lcm(-21, 6))
+    display lcm_3       ; expected: 0   (lcm(0, 5))
+    display ipow_1      ; expected: 81   (ipow(3, 4))
+    display ipow_2      ; expected: -32   (ipow(-2, 5))
+    display ipow_3      ; expected: 1   (ipow(5, 0))
+    display ipow_4      ; expected: -1   (ipow(-1, 1001))
+    display modpow_1    ; expected: 445   (modpow(4, 13, 497))
+    display modpow_2    ; expected: 24   (modpow(2, 10, 1000))
+    display modpow_3    ; expected: 2   (modpow(-3, 5, 7))
+    display isqrt_1     ; expected: 9   (isqrt(99))
+    display isqrt_2     ; expected: 10   (isqrt(100))
+    display isqrt_3     ; expected: 0   (isqrt(0))
+    display isqrt_4     ; expected: 4095   (isqrt(16777215))
+
+
+_start:
+    mov c1, 12
+    mov c2, 18
+    spawn math::gcd             | ordered:false delay:0 remap: {c3 = gcd_1}
+    mov c1, -48
+    mov c2, 180
+    spawn math::gcd             | ordered:false delay:0 remap: {c3 = gcd_2}
+    mov c1, 0
+    mov c2, 0
+    spawn math::gcd             | ordered:false delay:0 remap: {c3 = gcd_3}
+    mov c1, 14930352
+    mov c2, 9227465
+    spawn math::gcd             | ordered:false delay:0 remap: {c3 = gcd_4}
+    mov c1, 4
+    mov c2, 6
+    spawn math::lcm             | ordered:false delay:0 remap: {c3 = lcm_1}
+    mov c1, -21
+    mov c2, 6
+    spawn math::lcm             | ordered:false delay:0 remap: {c3 = lcm_2}
+    mov c1, 0
+    mov c2, 5
+    spawn math::lcm             | ordered:false delay:0 remap: {c3 = lcm_3}
+    mov c1, 3
+    mov c2, 4
+    spawn math::ipow            | ordered:false delay:0 remap: {c3 = ipow_1}
+    mov c1, -2
+    mov c2, 5
+    spawn math::ipow            | ordered:false delay:0 remap: {c3 = ipow_2}
+    mov c1, 5
+    mov c2, 0
+    spawn math::ipow            | ordered:false delay:0 remap: {c3 = ipow_3}
+    mov c1, -1
+    mov c2, 1001
+    spawn math::ipow            | ordered:false delay:0 remap: {c3 = ipow_4}
+    mov c1, 4
+    mov c2, 13
+    mov c3, 497
+    spawn math::modpow          | ordered:false delay:0 remap: {c4 = modpow_1}
+    mov c1, 2
+    mov c2, 10
+    mov c3, 1000
+    spawn math::modpow          | ordered:false delay:0 remap: {c4 = modpow_2}
+    mov c1, -3
+    mov c2, 5
+    mov c3, 7
+    spawn math::modpow          | ordered:false delay:0 remap: {c4 = modpow_3}
+    mov c1, 99
+    spawn math::isqrt           | ordered:false delay:0 remap: {c2 = isqrt_1}
+    mov c1, 100
+    spawn math::isqrt           | ordered:false delay:0 remap: {c2 = isqrt_2}
+    mov c1, 0
+    spawn math::isqrt           | ordered:false delay:0 remap: {c2 = isqrt_3}
+    mov c1, 16777215
+    spawn math::isqrt           | ordered:false delay:0 remap: {c2 = isqrt_4}

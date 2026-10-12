@@ -1,0 +1,84 @@
+; Tests for math::asin, acos, atan, atan2, acsc, asec and acot.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias asin_1,  t10
+    alias asin_2,  t11
+    alias asin_3,  t12
+    alias acos_1,  t13
+    alias acos_2,  t14
+    alias acos_3,  t15
+    alias atan_1,  t16
+    alias atan_2,  t17
+    alias atan_3,  t18
+    alias atan2_1, t19
+    alias atan2_2, t20
+    alias atan2_3, t21
+    alias atan2_4, t22
+    alias acsc_1,  t23
+    alias asec_1,  t24
+    alias asec_2,  t25
+    alias acot_1,  t26
+    alias acot_2,  t27
+
+    display asin_1     ; expected: 0.52   (asin(0.5))
+    display asin_2     ; expected: -1.57   (asin(-1))
+    display asin_3     ; expected: 1.57   (asin(2): input clamped to 1)
+    display acos_1     ; expected: 1.05   (acos(0.5))
+    display acos_2     ; expected: 3.14   (acos(-1))
+    display acos_3     ; expected: 0.00   (acos(1))
+    display atan_1     ; expected: 0.79   (atan(1))
+    display atan_2     ; expected: -1.47   (atan(-10))
+    display atan_3     ; expected: 0.00   (atan(0))
+    display atan2_1    ; expected: 2.36   (atan2(1, -1))
+    display atan2_2    ; expected: -1.57   (atan2(-1, 0))
+    display atan2_3    ; expected: 3.14   (atan2(0, -1))
+    display atan2_4    ; expected: 0.00   (atan2(0, 0) is defined as 0)
+    display acsc_1     ; expected: 0.52   (acsc(2))
+    display asec_1     ; expected: 1.05   (asec(2))
+    display asec_2     ; expected: 2.09   (asec(-2))
+    display acot_1     ; expected: 0.79   (acot(1))
+    display acot_2     ; expected: 2.36   (acot(-1))
+
+
+_start:
+    mov t1, 0.5
+    spawn math::asin            | ordered:false delay:0 remap: {t2 = asin_1}
+    mov t1, -1
+    spawn math::asin            | ordered:false delay:0 remap: {t2 = asin_2}
+    mov t1, 2
+    spawn math::asin            | ordered:false delay:0 remap: {t2 = asin_3}
+    mov t1, 0.5
+    spawn math::acos            | ordered:false delay:0 remap: {t2 = acos_1}
+    mov t1, -1
+    spawn math::acos            | ordered:false delay:0 remap: {t2 = acos_2}
+    mov t1, 1
+    spawn math::acos            | ordered:false delay:0 remap: {t2 = acos_3}
+    mov t1, 1
+    spawn math::atan            | ordered:false delay:0 remap: {t2 = atan_1}
+    mov t1, -10
+    spawn math::atan            | ordered:false delay:0 remap: {t2 = atan_2}
+    mov t1, 0
+    spawn math::atan            | ordered:false delay:0 remap: {t2 = atan_3}
+    mov t1, 1
+    mov t2, -1
+    spawn math::atan2           | ordered:false delay:0 remap: {t3 = atan2_1}
+    mov t1, -1
+    mov t2, 0
+    spawn math::atan2           | ordered:false delay:0 remap: {t3 = atan2_2}
+    mov t1, 0
+    mov t2, -1
+    spawn math::atan2           | ordered:false delay:0 remap: {t3 = atan2_3}
+    mov t1, 0
+    mov t2, 0
+    spawn math::atan2           | ordered:false delay:0 remap: {t3 = atan2_4}
+    mov t1, 2
+    spawn math::acsc            | ordered:false delay:0 remap: {t2 = acsc_1}
+    mov t1, 2
+    spawn math::asec            | ordered:false delay:0 remap: {t2 = asec_1}
+    mov t1, -2
+    spawn math::asec            | ordered:false delay:0 remap: {t2 = asec_2}
+    mov t1, 1
+    spawn math::acot            | ordered:false delay:0 remap: {t2 = acot_1}
+    mov t1, -1
+    spawn math::acot            | ordered:false delay:0 remap: {t2 = acot_2}

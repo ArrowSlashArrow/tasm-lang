@@ -1,0 +1,56 @@
+; Tests for math::sinh, cosh, tanh, asinh, acosh and atanh.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias sinh_1,  t10
+    alias sinh_2,  t11
+    alias cosh_1,  t12
+    alias cosh_2,  t13
+    alias tanh_1,  t14
+    alias tanh_2,  t15
+    alias asinh_1, t16
+    alias asinh_2, t17
+    alias acosh_1, t18
+    alias acosh_2, t19
+    alias atanh_1, t20
+    alias atanh_2, t21
+
+    display sinh_1     ; expected: 1.18   (sinh(1))
+    display sinh_2     ; expected: -3.63   (sinh(-2))
+    display cosh_1     ; expected: 1.54   (cosh(1))
+    display cosh_2     ; expected: 10.07   (cosh(-3))
+    display tanh_1     ; expected: 0.76   (tanh(1))
+    display tanh_2     ; expected: -1.00   (tanh(-20))
+    display asinh_1    ; expected: 0.88   (asinh(1))
+    display asinh_2    ; expected: -3.00   (asinh(-10))
+    display acosh_1    ; expected: 1.32   (acosh(2))
+    display acosh_2    ; expected: 0.00   (acosh(1))
+    display atanh_1    ; expected: 0.55   (atanh(0.5))
+    display atanh_2    ; expected: -1.47   (atanh(-0.9))
+
+
+_start:
+    mov t1, 1
+    spawn math::sinh            | ordered:false delay:0 remap: {t2 = sinh_1}
+    mov t1, -2
+    spawn math::sinh            | ordered:false delay:0 remap: {t2 = sinh_2}
+    mov t1, 1
+    spawn math::cosh            | ordered:false delay:0 remap: {t2 = cosh_1}
+    mov t1, -3
+    spawn math::cosh            | ordered:false delay:0 remap: {t2 = cosh_2}
+    mov t1, 1
+    spawn math::tanh            | ordered:false delay:0 remap: {t2 = tanh_1}
+    mov t1, -20
+    spawn math::tanh            | ordered:false delay:0 remap: {t2 = tanh_2}
+    mov t1, 1
+    spawn math::asinh           | ordered:false delay:0 remap: {t2 = asinh_1}
+    mov t1, -10
+    spawn math::asinh           | ordered:false delay:0 remap: {t2 = asinh_2}
+    mov t1, 2
+    spawn math::acosh           | ordered:false delay:0 remap: {t2 = acosh_1}
+    mov t1, 1
+    spawn math::acosh           | ordered:false delay:0 remap: {t2 = acosh_2}
+    mov t1, 0.5
+    spawn math::atanh           | ordered:false delay:0 remap: {t2 = atanh_1}
+    mov t1, -0.9
+    spawn math::atanh           | ordered:false delay:0 remap: {t2 = atanh_2}

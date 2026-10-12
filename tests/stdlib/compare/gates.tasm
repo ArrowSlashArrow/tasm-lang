@@ -1,0 +1,145 @@
+; Tests for compare::and, or, not, nand, nor, xor and xnor.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/compare
+    alias and_1,  c10
+    alias or_1,   c11
+    alias nand_1, c12
+    alias nor_1,  c13
+    alias xor_1,  c14
+    alias xnor_1, c15
+    alias and_2,  c16
+    alias or_2,   c17
+    alias nand_2, c18
+    alias nor_2,  c19
+    alias xor_2,  c20
+    alias xnor_2, c21
+    alias and_3,  c22
+    alias or_3,   c23
+    alias nand_3, c24
+    alias nor_3,  c25
+    alias xor_3,  c26
+    alias xnor_3, c27
+    alias and_4,  c28
+    alias or_4,   c29
+    alias nand_4, c30
+    alias nor_4,  c31
+    alias xor_4,  c32
+    alias xnor_4, c33
+    alias and_5,  c34
+    alias not_1,  c35
+    alias not_2,  c36
+    alias not_3,  c37
+
+    display and_1     ; expected: 0   (and(0, 0))
+    display or_1      ; expected: 0   (or(0, 0))
+    display nand_1    ; expected: 1   (nand(0, 0))
+    display nor_1     ; expected: 1   (nor(0, 0))
+    display xor_1     ; expected: 0   (xor(0, 0))
+    display xnor_1    ; expected: 1   (xnor(0, 0))
+    display and_2     ; expected: 0   (and(0, 1))
+    display or_2      ; expected: 1   (or(0, 1))
+    display nand_2    ; expected: 1   (nand(0, 1))
+    display nor_2     ; expected: 0   (nor(0, 1))
+    display xor_2     ; expected: 1   (xor(0, 1))
+    display xnor_2    ; expected: 0   (xnor(0, 1))
+    display and_3     ; expected: 0   (and(1, 0))
+    display or_3      ; expected: 1   (or(1, 0))
+    display nand_3    ; expected: 1   (nand(1, 0))
+    display nor_3     ; expected: 0   (nor(1, 0))
+    display xor_3     ; expected: 1   (xor(1, 0))
+    display xnor_3    ; expected: 0   (xnor(1, 0))
+    display and_4     ; expected: 1   (and(1, 1))
+    display or_4      ; expected: 1   (or(1, 1))
+    display nand_4    ; expected: 0   (nand(1, 1))
+    display nor_4     ; expected: 0   (nor(1, 1))
+    display xor_4     ; expected: 0   (xor(1, 1))
+    display xnor_4    ; expected: 1   (xnor(1, 1))
+    display and_5     ; expected: 1   (and(5, -3): any value other than 0 is true)
+    display not_1     ; expected: 1   (not(0))
+    display not_2     ; expected: 0   (not(1))
+    display not_3     ; expected: 0   (not(7))
+
+
+_start:
+    mov c1, 0
+    mov c2, 0
+    spawn compare::and          | ordered:false delay:0 remap: {c3 = and_1}
+    mov c1, 0
+    mov c2, 0
+    spawn compare::or           | ordered:false delay:0 remap: {c3 = or_1}
+    mov c1, 0
+    mov c2, 0
+    spawn compare::nand         | ordered:false delay:0 remap: {c3 = nand_1}
+    mov c1, 0
+    mov c2, 0
+    spawn compare::nor          | ordered:false delay:0 remap: {c3 = nor_1}
+    mov c1, 0
+    mov c2, 0
+    spawn compare::xor          | ordered:false delay:0 remap: {c3 = xor_1}
+    mov c1, 0
+    mov c2, 0
+    spawn compare::xnor         | ordered:false delay:0 remap: {c3 = xnor_1}
+    mov c1, 0
+    mov c2, 1
+    spawn compare::and          | ordered:false delay:0 remap: {c3 = and_2}
+    mov c1, 0
+    mov c2, 1
+    spawn compare::or           | ordered:false delay:0 remap: {c3 = or_2}
+    mov c1, 0
+    mov c2, 1
+    spawn compare::nand         | ordered:false delay:0 remap: {c3 = nand_2}
+    mov c1, 0
+    mov c2, 1
+    spawn compare::nor          | ordered:false delay:0 remap: {c3 = nor_2}
+    mov c1, 0
+    mov c2, 1
+    spawn compare::xor          | ordered:false delay:0 remap: {c3 = xor_2}
+    mov c1, 0
+    mov c2, 1
+    spawn compare::xnor         | ordered:false delay:0 remap: {c3 = xnor_2}
+    mov c1, 1
+    mov c2, 0
+    spawn compare::and          | ordered:false delay:0 remap: {c3 = and_3}
+    mov c1, 1
+    mov c2, 0
+    spawn compare::or           | ordered:false delay:0 remap: {c3 = or_3}
+    mov c1, 1
+    mov c2, 0
+    spawn compare::nand         | ordered:false delay:0 remap: {c3 = nand_3}
+    mov c1, 1
+    mov c2, 0
+    spawn compare::nor          | ordered:false delay:0 remap: {c3 = nor_3}
+    mov c1, 1
+    mov c2, 0
+    spawn compare::xor          | ordered:false delay:0 remap: {c3 = xor_3}
+    mov c1, 1
+    mov c2, 0
+    spawn compare::xnor         | ordered:false delay:0 remap: {c3 = xnor_3}
+    mov c1, 1
+    mov c2, 1
+    spawn compare::and          | ordered:false delay:0 remap: {c3 = and_4}
+    mov c1, 1
+    mov c2, 1
+    spawn compare::or           | ordered:false delay:0 remap: {c3 = or_4}
+    mov c1, 1
+    mov c2, 1
+    spawn compare::nand         | ordered:false delay:0 remap: {c3 = nand_4}
+    mov c1, 1
+    mov c2, 1
+    spawn compare::nor          | ordered:false delay:0 remap: {c3 = nor_4}
+    mov c1, 1
+    mov c2, 1
+    spawn compare::xor          | ordered:false delay:0 remap: {c3 = xor_4}
+    mov c1, 1
+    mov c2, 1
+    spawn compare::xnor         | ordered:false delay:0 remap: {c3 = xnor_4}
+    mov c1, 5
+    mov c2, -3
+    spawn compare::and          | ordered:false delay:0 remap: {c3 = and_5}
+    mov c1, 0
+    spawn compare::not          | ordered:false delay:0 remap: {c3 = not_1}
+    mov c1, 1
+    spawn compare::not          | ordered:false delay:0 remap: {c3 = not_2}
+    mov c1, 7
+    spawn compare::not          | ordered:false delay:0 remap: {c3 = not_3}

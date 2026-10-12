@@ -184,6 +184,8 @@ _start:
 
 This process is 0-tickable, since there are no spawns. The standard library has a routine to load all of the values in `consts.tasm` - `load_const_<CONST_NAME>`.
 
+**To be clear:** GD *does not* truncate any numbers at a greater precision than 3 decimal places, nor does it make counters imprecise above the maximum safe integer. Though you can't see the value of a counter if it is above 999,999,999, it still retains its original value.
+
 #### 3.1.2.2. Compare
 Spawning a group does not automatically pause the parent group.  
 All compare instructions are 1-tick.  

@@ -195,6 +195,9 @@ tasm_test!("max", compdef);
 // stdlib
 tasm_test!("mem_8bit", stdlib);
 tasm_test!("mem_14bit", stdlib);
+tasm_test!("math", stdlib);
+tasm_test!("compare", stdlib);
+tasm_test!("bits", stdlib);
 
 impl Args {
     pub fn test_args(infile: String, has_entry: bool) -> Self {

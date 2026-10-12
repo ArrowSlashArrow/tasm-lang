@@ -1,0 +1,51 @@
+; Tests for bits::bitwise_and, bitwise_or, bitwise_xor and bitwise_not.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/bits
+    alias bitwise_and_1, c10
+    alias bitwise_or_1,  c11
+    alias bitwise_xor_1, c12
+    alias bitwise_and_2, c13
+    alias bitwise_and_3, c14
+    alias bitwise_or_2,  c15
+    alias bitwise_xor_2, c16
+    alias bitwise_not_1, c17
+    alias bitwise_not_2, c18
+
+    display bitwise_and_1    ; expected: 8   (bitwise_and(12, 10))
+    display bitwise_or_1     ; expected: 14   (bitwise_or(12, 10))
+    display bitwise_xor_1    ; expected: 6   (bitwise_xor(12, 10))
+    display bitwise_and_2    ; expected: 8   (bitwise_and(-12, 10): the sign is ignored)
+    display bitwise_and_3    ; expected: 999936   (bitwise_and(1000000, 999999))
+    display bitwise_or_2     ; expected: 1000063   (bitwise_or(1000000, 999999))
+    display bitwise_xor_2    ; expected: 127   (bitwise_xor(1000000, 999999))
+    display bitwise_not_1    ; expected: 1147483647   (bitwise_not(1000000000): above 2^24, so GD may round the last digits)
+    display bitwise_not_2    ; expected: 2147483642   (bitwise_not(5): close to 2^31, where 32-bit floats can't be exact)
+
+
+_start:
+    mov c1, 12
+    mov c2, 10
+    spawn bits::bitwise_and     | ordered:false delay:0 remap: {c3 = bitwise_and_1}
+    mov c1, 12
+    mov c2, 10
+    spawn bits::bitwise_or      | ordered:false delay:0 remap: {c3 = bitwise_or_1}
+    mov c1, 12
+    mov c2, 10
+    spawn bits::bitwise_xor     | ordered:false delay:0 remap: {c3 = bitwise_xor_1}
+    mov c1, -12
+    mov c2, 10
+    spawn bits::bitwise_and     | ordered:false delay:0 remap: {c3 = bitwise_and_2}
+    mov c1, 1000000
+    mov c2, 999999
+    spawn bits::bitwise_and     | ordered:false delay:0 remap: {c3 = bitwise_and_3}
+    mov c1, 1000000
+    mov c2, 999999
+    spawn bits::bitwise_or      | ordered:false delay:0 remap: {c3 = bitwise_or_2}
+    mov c1, 1000000
+    mov c2, 999999
+    spawn bits::bitwise_xor     | ordered:false delay:0 remap: {c3 = bitwise_xor_2}
+    mov c1, 1000000000
+    spawn bits::bitwise_not     | ordered:false delay:0 remap: {c3 = bitwise_not_1}
+    mov c1, 5
+    spawn bits::bitwise_not     | ordered:false delay:0 remap: {c3 = bitwise_not_2}

@@ -1,0 +1,15 @@
+_init:
+    import ../../../stdlib/math
+    alias input, t1
+    alias out_sqrt, T2
+    alias out_cbrt, T3
+    
+    display input
+    display out_sqrt    ; expected: 31.62
+    display out_cbrt    ; expected: 10.00
+
+
+_start:
+    mov input, 1000
+    spawn math::sqrt    | ordered:false delay:0
+    spawn math::cbrt    | ordered:false delay:0 remap:{ t2 = out_cbrt }

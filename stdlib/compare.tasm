@@ -1,4 +1,15 @@
 ; This module defines implementations for branchless compares.
+; The boolean gates (and, or, not, ...) use c9800-c9807 internally.
+
+_init:
+    alias __cs1, c9800                      ; scratch
+    alias __cs2, c9801                      ; scratch
+    alias __cs3, c9802                      ; scratch
+    alias __cs4, c9803                      ; scratch
+    alias __cs5, c9804                      ; scratch
+    alias __a,   c9805                      ; c1 as a boolean
+    alias __b,   c9806                      ; c2 as a boolean
+    alias __t,   c9807
 
 ; todo:
 ; equals, nequals
@@ -23,5 +34,122 @@ less_eq:
     sub c3, c1, c2  ; d
     mul c3, c3, 2   | resmode:+ iter:/
     mov c4, 0.5
-    sub c3, c4, c3  | resmode:c 
-    
+    sub c3, c4, c3  | resmode:c
+
+; Returns `c1` AND `c2` as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the first boolean
+; @param c2 the second boolean
+; @returns c3 `c1` AND `c2`
+; @0tick
+and:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov __cs1, c2               | resmode:+                 ; __b = c2 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __b, __cs1, __cs2       | resmode:ceil
+    mul c3, __a, __b
+
+; Returns `c1` OR `c2` as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the first boolean
+; @param c2 the second boolean
+; @returns c3 `c1` OR `c2`
+; @0tick
+or:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov __cs1, c2               | resmode:+                 ; __b = c2 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __b, __cs1, __cs2       | resmode:ceil
+    add c3, __a, __b
+    mul __t, __a, __b
+    sub c3, __t                             ; a + b - ab
+
+; Returns NOT `c1` as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the boolean
+; @returns c3 NOT `c1`
+; @0tick
+not:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov c3, __a                 | itemmod:-1                ; c3 = 1 - __a
+    add c3, 1
+
+; Returns NOT (`c1` AND `c2`) as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the first boolean
+; @param c2 the second boolean
+; @returns c3 NOT (`c1` AND `c2`)
+; @0tick
+nand:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov __cs1, c2               | resmode:+                 ; __b = c2 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __b, __cs1, __cs2       | resmode:ceil
+    mul c3, __a, __b
+    mul c3, -1
+    add c3, 1
+
+; Returns NOT (`c1` OR `c2`) as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the first boolean
+; @param c2 the second boolean
+; @returns c3 NOT (`c1` OR `c2`)
+; @0tick
+nor:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov __cs1, c2               | resmode:+                 ; __b = c2 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __b, __cs1, __cs2       | resmode:ceil
+    add c3, __a, __b
+    mul __t, __a, __b
+    sub c3, __t                             ; a + b - ab
+    mul c3, -1
+    add c3, 1
+
+; Returns `c1` XOR `c2` as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the first boolean
+; @param c2 the second boolean
+; @returns c3 `c1` XOR `c2`
+; @0tick
+xor:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov __cs1, c2               | resmode:+                 ; __b = c2 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __b, __cs1, __cs2       | resmode:ceil
+    sub c3, __a, __b            | resmode:+                 ; |a - b|
+
+; Returns NOT (`c1` XOR `c2`) as a boolean (0 or 1) in `c3`. Any value other than 0 counts as true.
+; @param c1 the first boolean
+; @param c2 the second boolean
+; @returns c3 NOT (`c1` XOR `c2`)
+; @0tick
+xnor:
+    mov __cs1, c1               | resmode:+                 ; __a = c1 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __a, __cs1, __cs2       | resmode:ceil
+    mov __cs1, c2               | resmode:+                 ; __b = c2 != 0
+    mov __cs2, __cs1
+    add __cs2, 1
+    div __b, __cs1, __cs2       | resmode:ceil
+    sub c3, __a, __b            | resmode:+                 ; |a - b|
+    mul c3, -1
+    add c3, 1

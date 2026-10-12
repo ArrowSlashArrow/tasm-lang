@@ -1,6 +1,205 @@
+; Math routines.
+;
+; Every routine takes its arguments in the lowest items (t1, t2, ... for real numbers, c1, c2, ... for
+; integers) and returns its result in the next one, as documented above it. All of them can be
+; 0-ticked, e.g.:
+;     mov t1, 2
+;     spawn math::sqrt  | ordered:false delay:0
+;     mov t5, t2        ; t2 = 1.4142135
+;
+; They are branchless: no compares, so they use no extra groups. They use t9500-t9608 and c9500-c9569
+; internally; don't use those items for anything else.
+; Many routines spawn internal `__*` routines. When passing arguments with a remap, make sure
+; that no remapped ID is the group of one of these routines (check with `tasmc -l`), since remaps
+; apply to groups too.
+;
+; GD's arithmetic has float precision (about 7 significant digits), timers can't hold values above
+; 9,999,999 and integer results are only exact below 16,777,216; the limits of each routine are
+; listed with it.
+
 _init:
     import core
     import compare
+
+    alias __k,              c9500           ; integer part of the constant being loaded
+    alias __one,            c9501           ; holds 1, for divisions of 1
+    alias __ts1,            t9500           ; scratch
+    alias __ts2,            t9501           ; scratch
+    alias __ts3,            t9502           ; scratch
+    alias __ts4,            t9503           ; scratch
+    alias __ts5,            t9504           ; scratch
+    alias __cs1,            c9502           ; scratch
+    alias __cs2,            c9503           ; scratch
+    alias __cs3,            c9504           ; scratch
+    alias __cs4,            c9505           ; scratch
+    alias __cs5,            c9506           ; scratch
+    alias __exp_x,          t9505           ; input of __exp
+    alias __exp_y,          t9506           ; output of __exp
+    alias __exp_t,          t9507           ; clamped input
+    alias __exp_d,          t9508
+    alias __exp_g,          t9509
+    alias __exp_kt,         t9510
+    alias __exp_r,          t9511           ; reduced argument
+    alias __exp_p,          t9512           ; e^r
+    alias __exp_fac,        t9513
+    alias __exp_f,          c9507
+    alias __exp_k,          c9508           ; power of 2
+    alias __exp_kp,         c9509
+    alias __exp_kn,         c9510
+    alias __exp_b,          c9511
+    alias __exp_ifac,       c9512
+    alias __ln_x,           t9514           ; input of __ln
+    alias __ln_y,           t9515           ; output of __ln
+    alias __ln_m,           t9516           ; mantissa
+    alias __ln_d,           t9517
+    alias __ln_g,           t9518
+    alias __ln_lo,          t9519
+    alias __ln_c,           t9520
+    alias __ln_s,           t9521
+    alias __ln_s2,          t9522
+    alias __ln_p,           t9523
+    alias __ln_f,           c9513
+    alias __ln_fac,         c9514
+    alias __ln_k,           c9515           ; exponent
+    alias __sqrt_x,         t9524           ; input of __sqrt
+    alias __sqrt_y,         t9525           ; output of __sqrt
+    alias __sqrt_a,         t9526
+    alias __sqrt_g,         t9527           ; current guess
+    alias __sqrt_q,         t9528
+    alias __sqrt_f,         c9516
+    alias __sincos_x,       t9529           ; input of __sincos
+    alias __sincos_s,       t9530           ; sine output of __sincos
+    alias __sincos_c,       t9531           ; cosine output of __sincos
+    alias __sincos_jt,      t9532
+    alias __sincos_g,       t9533
+    alias __sincos_r,       t9534           ; reduced argument
+    alias __sincos_r2,      t9535
+    alias __sincos_sr,      t9536           ; sin(r)
+    alias __sincos_cr,      t9537           ; cos(r)
+    alias __sincos_z,       t9538
+    alias __sincos_t1,      t9539
+    alias __sincos_t2,      t9540
+    alias __sincos_j,       c9517           ; quarter turns
+    alias __sincos_q,       c9518           ; quadrant
+    alias __sincos_a,       c9519           ; cos(q * pi/2)
+    alias __sincos_b,       c9520           ; sin(q * pi/2)
+    alias __atan_x,         t9541           ; input of __atan
+    alias __atan_y,         t9542           ; output of __atan
+    alias __atan_a,         t9543
+    alias __atan_sign,      t9544
+    alias __atan_d,         t9545
+    alias __atan_rec,       t9546
+    alias __atan_b,         t9547
+    alias __atan_const,     t9548
+    alias __atan_num,       t9549
+    alias __atan_den,       t9550
+    alias __atan_c,         t9551
+    alias __atan_cc,        t9552
+    alias __atan_p,         t9553
+    alias __atan_z,         t9554
+    alias __atan_inv,       c9521
+    alias __atan_red,       c9522
+    alias __atan2_y,        t9555           ; first input (y) of __atan2
+    alias __atan2_x,        t9556           ; second input (x) of __atan2
+    alias __atan2_out,      t9557           ; output of __atan2
+    alias __atan2_ax,       t9558
+    alias __atan2_ay,       t9559
+    alias __atan2_d,        t9560
+    alias __atan2_max,      t9561
+    alias __atan2_min,      t9562
+    alias __atan2_base,     t9563
+    alias __atan2_const,    t9564
+    alias __atan2_z,        t9565
+    alias __atan2_sx,       c9523
+    alias __atan2_sy,       c9524
+    alias __atan2_big,      c9525
+    alias __atan2_xpos,     c9526
+    alias __atan2_xneg,     c9527
+    alias __atan2_xzero,    c9528
+    alias __atan2_yneg,     c9529
+    alias __atan2_ys,       c9530
+    alias __expm1_x,        t9566           ; input of __expm1
+    alias __expm1_y,        t9567           ; output of __expm1
+    alias __expm1_a,        t9568
+    alias __expm1_d,        t9569
+    alias __expm1_xs,       t9570
+    alias __expm1_series,   t9571
+    alias __expm1_big,      t9572
+    alias __expm1_small,    c9531
+    alias __log1p_x,        t9573           ; input of __log1p
+    alias __log1p_y,        t9574           ; output of __log1p
+    alias __log1p_u,        t9575
+    alias __log1p_d,        t9576
+    alias __log1p_w,        t9577
+    alias __log1p_f,        c9532
+    alias __hypot_a,        t9578           ; first input of __hypot
+    alias __hypot_b,        t9579           ; second input of __hypot
+    alias __hypot_y,        t9580           ; output of __hypot
+    alias __hypot_aa,       t9581
+    alias __hypot_ab,       t9582
+    alias __hypot_d,        t9583
+    alias __hypot_max,      t9584
+    alias __hypot_min,      t9585
+    alias __hypot_f,        c9533
+    alias __cbrt_x,         t9586           ; input of __cbrt
+    alias __cbrt_y,         t9587           ; output of __cbrt
+    alias __cbrt_a,         t9588
+    alias __cbrt_sign,      t9589
+    alias __cbrt_g,         t9590           ; current guess
+    alias __cbrt_q,         t9591
+    alias __pow_exponent,   t9592           ; t2, clamped
+    alias __pow_d,          t9593
+    alias __pow_g,          t9594
+    alias __pow_res,        t9595
+    alias __pow_f,          c9534
+    alias __pow_floor,      c9535
+    alias __pow_odd,        c9536
+    alias __pow_neg,        c9537
+    alias __pow_sign,       c9538
+    alias __pow_nzb,        c9539
+    alias __pow_nze,        c9540
+    alias __pow_zb,         c9541
+    alias __pow_ze,         c9542
+    alias __asincos_x,      t9596           ; input of __asincos
+    alias __asincos_s,      t9597           ; asin output of __asincos
+    alias __asincos_c,      t9598           ; acos output of __asincos
+    alias __asincos_t,      t9599
+    alias __asincos_d,      t9600
+    alias __asincos_g,      t9601
+    alias __asincos_cos,    t9602
+    alias __asincos_f,      c9543
+    alias __hyp_a,          t9603
+    alias __hyp_sign,       t9604
+    alias __hyp_u,          t9605
+    alias __hyp_v,          t9606
+    alias __hyp_d,          t9607
+    alias __hyp_f,          c9544
+    alias __minmax_int_f,   c9545
+    alias __clamp_int_t,    c9546
+    alias __minmax_float_f, c9547
+    alias __clamp_float_t,  t9608
+    alias __gcd_a,          c9548
+    alias __gcd_b,          c9549
+    alias __gcd_q,          c9550
+    alias __gcd_r,          c9551
+    alias __gcd_f,          c9552
+    alias __gcd_t,          c9553
+    alias __ipow_e,         c9554
+    alias __ipow_big,       c9555
+    alias __ipow_parity,    c9556
+    alias __ipow_bit,       c9557
+    alias __ipow_fac,       c9558
+    alias __ipow_res,       c9559
+    alias __modpow_base,    c9560
+    alias __modpow_e,       c9561
+    alias __modpow_res,     c9562
+    alias __modpow_q,       c9563
+    alias __modpow_bit,     c9564
+    alias __modpow_fac,     c9565
+    alias __isqrt_n,        c9566
+    alias __isqrt_res,      c9567
+    alias __isqrt_cand,     c9568
+    alias __isqrt_q,        c9569
 
 ; Returns a mod b.
 ; @param C1 a
@@ -36,6 +235,2785 @@ sign:
     spawn compare::less     | ordered:false delay:0 ;   no remap needed here; c1 => c1, c2 => c2
     sub c2, c4, c3  ; c2 = (0 < val) - (val < 0)
 
-; T1 to T2 = e^(ln(base) * exponent)
-; Returns `T1` raised to `C2`
-exponent:
+; Returns e raised to the power of `t1`.
+; `t1` is clamped to [-87, 16.118], since larger results don't fit in a timer (9,999,999). Relative error about 1e-7.
+; @param t1 the exponent
+; @returns t2 e^t1
+; @0tick
+exp:
+    mov __exp_x, t1
+    spawn __exp                 | ordered:false delay:0
+    mov t2, __exp_y
+
+; Returns e^`t1` - 1. More accurate than `exp` minus 1 when `t1` is close to 0.
+; @param t1 the exponent
+; @returns t2 e^t1 - 1
+; @0tick
+expm1:
+    mov __expm1_x, t1
+    spawn __expm1               | ordered:false delay:0
+    mov t2, __expm1_y
+
+; Returns the natural logarithm of `t1`. `t1` must be positive (from about 1e-19 up).
+; @param t1 the number
+; @returns t2 ln(t1)
+; @0tick
+ln:
+    mov __ln_x, t1
+    spawn __ln                  | ordered:false delay:0
+    mov t2, __ln_y
+
+; Returns the base-2 logarithm of `t1`. `t1` must be positive.
+; @param t1 the number
+; @returns t2 log2(t1)
+; @0tick
+log2:
+    mov __ln_x, t1
+    spawn __ln                  | ordered:false delay:0
+    mov __k, 12102203                       ; 1 / ln(2)
+    mul t2, __ln_y, __k         | itemmod:8388608 divmod:true
+
+; Returns the base-10 logarithm of `t1`. `t1` must be positive.
+; @param t1 the number
+; @returns t2 log10(t1)
+; @0tick
+log10:
+    mov __ln_x, t1
+    spawn __ln                  | ordered:false delay:0
+    mov __k, 14572505                       ; 1 / ln(10)
+    mul t2, __ln_y, __k         | itemmod:33554432 divmod:true
+
+; Returns ln(1 + `t1`). More accurate than `ln` when `t1` is close to 0. `t1` must be greater than -1.
+; @param t1 the number
+; @returns t2 ln(1 + t1)
+; @0tick
+log1p:
+    mov __log1p_x, t1
+    spawn __log1p               | ordered:false delay:0
+    mov t2, __log1p_y
+
+; Returns the square root of `t1`. Negative values are treated as their absolute value.
+; Accurate to the last digit for 1e-12 <= `t1` <= 9,999,999.
+; @param t1 the number
+; @returns t2 sqrt(t1)
+; @0tick
+sqrt:
+    mov __sqrt_x, t1
+    spawn __sqrt                | ordered:false delay:0
+    mov t2, __sqrt_y
+
+; Returns the cube root of `t1` (negative for negative `t1`).
+; @param t1 the number
+; @returns t2 the cube root of t1
+; @0tick
+cbrt:
+    mov __cbrt_x, t1
+    spawn __cbrt                | ordered:false delay:0
+    mov t2, __cbrt_y
+
+; Returns `t1` raised to the power of `t2`, computed as e^(t2 * ln|t1|).
+; For negative `t1`, `t2` is rounded down for the sign (real powers of negative numbers aren't real).
+; 0^0 is 1, 0^t2 is 0 otherwise. Results are limited like `exp` (at most 9,999,999). Relative error about 1e-6.
+; @param t1 the base
+; @param t2 the exponent
+; @returns t3 t1^t2
+; @0tick
+pow:
+    mov __ln_x, t1              | resmode:+
+    spawn __ln                  | ordered:false delay:0
+    ; clamp t2 to [-200000, 200000] so that t2 * ln|t1| can be stored; the result saturates long before
+    mov __pow_d, t2             | resmode:+
+    sub __pow_d, 200000
+    mov __ts1, __pow_d          | resmode:+                 ; __pow_f = __pow_d > 0
+    add __ts2, __pow_d, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __pow_f, __ts2, __ts3   | resmode:ceil
+    mul __pow_g, __pow_f, __pow_d           ; how far |t2| is above the limit
+    mov __ts1, t2               | resmode:+                 ; __pow_exponent = sign(t2) = t2 / |t2|
+    div __pow_exponent, t2, __ts1
+    mul __pow_g, __pow_exponent
+    sub __pow_exponent, t2, __pow_g
+    mul __exp_x, __pow_exponent, __ln_y
+    spawn __exp                 | ordered:false delay:0
+    ; sign: negative base and odd exponent
+    mov __pow_floor, __pow_exponent | resmode:floor
+    mov __pow_odd, __pow_floor
+    fldiv __pow_odd, 2
+    mul __pow_odd, -2
+    add __pow_odd, __pow_floor              ; floor(t2) mod 2
+    mov __pow_d, t1             | itemmod:-1
+    mov __ts1, __pow_d          | resmode:+                 ; __pow_neg = __pow_d > 0
+    add __ts2, __pow_d, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __pow_neg, __ts2, __ts3 | resmode:ceil
+    mul __pow_sign, __pow_neg, __pow_odd
+    mul __pow_sign, -2
+    add __pow_sign, 1
+    mul __pow_res, __exp_y, __pow_sign
+    ; zero base
+    mov __ts1, t1               | resmode:+ itemmod:2 divmod:true ; __pow_nzb = t1 != 0
+    mov __ts2, __ts1
+    add __ts2, 1
+    div __pow_nzb, __ts1, __ts2 | resmode:ceil
+    mov __ts1, t2               | resmode:+ itemmod:2 divmod:true ; __pow_nze = t2 != 0
+    mov __ts2, __ts1
+    add __ts2, 1
+    div __pow_nze, __ts1, __ts2 | resmode:ceil
+    mul __pow_res, __pow_nzb
+    mov __pow_zb, __pow_nzb     | itemmod:-1                ; __pow_zb = 1 - __pow_nzb
+    add __pow_zb, 1
+    mov __pow_ze, __pow_nze     | itemmod:-1                ; __pow_ze = 1 - __pow_nze
+    add __pow_ze, 1
+    mul __pow_zb, __pow_ze                  ; 1 for 0^0
+    add t3, __pow_res, __pow_zb
+
+; Returns the sine of `t1` (in radians).
+; Accurate to about 1e-7 for |`t1`| up to a few thousand.
+; @param t1 the angle in radians
+; @returns t2 sin(t1)
+; @0tick
+sin:
+    mov __sincos_x, t1
+    spawn __sincos              | ordered:false delay:0
+    mov t2, __sincos_s
+
+; Returns the cosine of `t1` (in radians).
+; Accurate to about 1e-7 for |`t1`| up to a few thousand.
+; @param t1 the angle in radians
+; @returns t2 cos(t1)
+; @0tick
+cos:
+    mov __sincos_x, t1
+    spawn __sincos              | ordered:false delay:0
+    mov t2, __sincos_c
+
+; Returns the tangent of `t1` (in radians). Returns 0 where it is undefined (cos(t1) = 0 exactly).
+; @param t1 the angle in radians
+; @returns t2 tan(t1)
+; @0tick
+tan:
+    mov __sincos_x, t1
+    spawn __sincos              | ordered:false delay:0
+    div t2, __sincos_s, __sincos_c
+
+; Returns the cotangent of `t1` (in radians), 1 / tan(t1). Returns 0 where it is undefined.
+; @param t1 the angle in radians
+; @returns t2 cot(t1)
+; @0tick
+cot:
+    mov __sincos_x, t1
+    spawn __sincos              | ordered:false delay:0
+    div t2, __sincos_c, __sincos_s
+
+; Returns the secant of `t1` (in radians), 1 / cos(t1). Returns 0 where it is undefined.
+; @param t1 the angle in radians
+; @returns t2 sec(t1)
+; @0tick
+sec:
+    mov __sincos_x, t1
+    spawn __sincos              | ordered:false delay:0
+    mov __one, 1
+    div t2, __one, __sincos_c
+
+; Returns the cosecant of `t1` (in radians), 1 / sin(t1). Returns 0 where it is undefined.
+; @param t1 the angle in radians
+; @returns t2 csc(t1)
+; @0tick
+csc:
+    mov __sincos_x, t1
+    spawn __sincos              | ordered:false delay:0
+    mov __one, 1
+    div t2, __one, __sincos_s
+
+; Returns the arctangent of `t1`, in radians, in (-pi/2, pi/2).
+; @param t1 the number
+; @returns t2 atan(t1)
+; @0tick
+atan:
+    mov __atan_x, t1
+    spawn __atan                | ordered:false delay:0
+    mov t2, __atan_y
+
+; Returns the angle of the point (`t2`, `t1`) from the positive x axis, in radians, in (-pi, pi].
+; Handles every quadrant and `t2` = 0; atan2(0, 0) is 0.
+; @param t1 y
+; @param t2 x
+; @returns t3 atan2(t1, t2)
+; @0tick
+atan2:
+    mov __atan2_y, t1
+    mov __atan2_x, t2
+    spawn __atan2               | ordered:false delay:0
+    mov t3, __atan2_out
+
+; Returns the arcsine of `t1`, in radians, in [-pi/2, pi/2]. `t1` is clamped to [-1, 1].
+; @param t1 the number
+; @returns t2 asin(t1)
+; @0tick
+asin:
+    mov __asincos_x, t1
+    spawn __asincos             | ordered:false delay:0
+    mov t2, __asincos_s
+
+; Returns the arccosine of `t1`, in radians, in [0, pi]. `t1` is clamped to [-1, 1].
+; @param t1 the number
+; @returns t2 acos(t1)
+; @0tick
+acos:
+    mov __asincos_x, t1
+    spawn __asincos             | ordered:false delay:0
+    mov t2, __asincos_c
+
+; Returns the arccosecant of `t1`, asin(1 / t1), in radians. |`t1`| should be at least 1; acsc(0) returns 0.
+; @param t1 the number
+; @returns t2 acsc(t1)
+; @0tick
+acsc:
+    mov __one, 1
+    div __asincos_x, __one, t1
+    spawn __asincos             | ordered:false delay:0
+    mov t2, __asincos_s
+
+; Returns the arcsecant of `t1`, acos(1 / t1), in radians. |`t1`| should be at least 1; asec(0) returns pi/2.
+; @param t1 the number
+; @returns t2 asec(t1)
+; @0tick
+asec:
+    mov __one, 1
+    div __asincos_x, __one, t1
+    spawn __asincos             | ordered:false delay:0
+    mov t2, __asincos_c
+
+; Returns the arccotangent of `t1`, pi/2 - atan(t1), in radians, in (0, pi).
+; @param t1 the number
+; @returns t2 acot(t1)
+; @0tick
+acot:
+    mov __atan_x, t1
+    spawn __atan                | ordered:false delay:0
+    mov __k, 13176795                       ; t2 = 1.570796327
+    mov t2, __k                 | itemmod:8388608 divmod:true
+    sub t2, __atan_y
+
+; Returns the hyperbolic sine of `t1`. Results are limited like `exp` (|`t1`| up to about 16.8).
+; @param t1 the number
+; @returns t2 sinh(t1)
+; @0tick
+sinh:
+    mov __hyp_a, t1             | resmode:+
+    div __hyp_sign, t1, __hyp_a             ; sign of t1
+    mov __expm1_x, __hyp_a
+    spawn __expm1               | ordered:false delay:0
+    ; with u = e^|x| - 1: sinh|x| = (u + u / (u + 1)) / 2, without cancellation near 0
+    mov __hyp_u, __expm1_y
+    mov __hyp_v, __hyp_u
+    add __hyp_v, 1
+    div __hyp_v, __hyp_u, __hyp_v
+    add __hyp_v, __hyp_u
+    div __hyp_v, 2
+    mul t2, __hyp_v, __hyp_sign
+
+; Returns the hyperbolic cosine of `t1`. Results are limited like `exp` (|`t1`| up to about 16.8).
+; @param t1 the number
+; @returns t2 cosh(t1)
+; @0tick
+cosh:
+    mov __exp_x, t1             | resmode:+
+    spawn __exp                 | ordered:false delay:0
+    mov __one, 1
+    div __hyp_v, __one, __exp_y
+    add __hyp_v, __exp_y
+    mov t2, __hyp_v
+    div t2, 2
+
+; Returns the hyperbolic tangent of `t1`.
+; @param t1 the number
+; @returns t2 tanh(t1)
+; @0tick
+tanh:
+    mov __hyp_a, t1             | resmode:+
+    div __hyp_sign, t1, __hyp_a             ; sign of t1
+    mov __hyp_d, __hyp_a
+    sub __hyp_d, 9
+    mov __ts1, __hyp_d          | resmode:+                 ; __hyp_f = __hyp_d > 0
+    add __ts2, __hyp_d, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __hyp_f, __ts2, __ts3   | resmode:ceil
+    mul __hyp_v, __hyp_f, __hyp_d
+    sub __hyp_a, __hyp_v                    ; |x| = min(|x|, 9): tanh(9) rounds to 1
+    mov __expm1_x, __hyp_a      | itemmod:2
+    spawn __expm1               | ordered:false delay:0
+    ; with u = e^(2|x|) - 1: tanh|x| = u / (u + 2)
+    mov __hyp_v, __expm1_y
+    add __hyp_v, 2
+    div __hyp_v, __expm1_y, __hyp_v
+    mul t2, __hyp_v, __hyp_sign
+
+; Returns the inverse hyperbolic sine of `t1`.
+; @param t1 the number
+; @returns t2 asinh(t1)
+; @0tick
+asinh:
+    mov __hyp_a, t1             | resmode:+
+    div __hyp_sign, t1, __hyp_a             ; sign of t1
+    mov __hypot_a, __hyp_a
+    mov __hypot_b, 1
+    spawn __hypot               | ordered:false delay:0
+    ; asinh|x| = ln(|x| + sqrt(x^2 + 1)) = log1p(|x| + |x| * |x| / (1 + sqrt(x^2 + 1)))
+    mov __hyp_v, __hypot_y
+    add __hyp_v, 1
+    div __hyp_v, __hyp_a, __hyp_v
+    mul __hyp_v, __hyp_a
+    add __log1p_x, __hyp_v, __hyp_a
+    spawn __log1p               | ordered:false delay:0
+    mul t2, __log1p_y, __hyp_sign
+
+; Returns the inverse hyperbolic cosine of `t1`. `t1` is clamped to at least 1.
+; @param t1 the number
+; @returns t2 acosh(t1)
+; @0tick
+acosh:
+    mov __hyp_a, t1
+    sub __hyp_a, 1
+    mov __ts1, __hyp_a          | resmode:+                 ; __hyp_f = __hyp_a > 0
+    add __ts2, __hyp_a, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __hyp_f, __ts2, __ts3   | resmode:ceil
+    mul __hyp_a, __hyp_f                    ; t = max(x - 1, 0)
+    ; acosh(x) = ln(x + sqrt(x^2 - 1)) = log1p(t + sqrt(t) * sqrt(t + 2))
+    mov __sqrt_x, __hyp_a
+    spawn __sqrt                | ordered:false delay:0
+    mov __hyp_u, __sqrt_y
+    mov __sqrt_x, __hyp_a
+    add __sqrt_x, 2
+    spawn __sqrt                | ordered:false delay:0
+    mul __hyp_u, __sqrt_y
+    add __log1p_x, __hyp_a, __hyp_u
+    spawn __log1p               | ordered:false delay:0
+    mov t2, __log1p_y
+
+; Returns the inverse hyperbolic tangent of `t1`. |`t1`| must be less than 1.
+; @param t1 the number
+; @returns t2 atanh(t1)
+; @0tick
+atanh:
+    mov __hyp_a, t1             | resmode:+
+    div __hyp_sign, t1, __hyp_a             ; sign of t1
+    ; atanh|x| = (ln(1 + |x|) - ln(1 - |x|)) / 2
+    mov __log1p_x, __hyp_a
+    spawn __log1p               | ordered:false delay:0
+    mov __hyp_u, __log1p_y
+    mov __log1p_x, __hyp_a      | itemmod:-1
+    spawn __log1p               | ordered:false delay:0
+    sub __hyp_u, __log1p_y
+    div __hyp_u, 2
+    mul t2, __hyp_u, __hyp_sign
+
+; Converts `t1` from degrees to radians.
+; @param t1 the angle in degrees
+; @returns t2 the angle in radians
+; @0tick
+deg_to_rad:
+    mov __k, 9370165                        ; pi / 180
+    mul t2, t1, __k             | itemmod:536870912 divmod:true
+
+; Converts `t1` from radians to degrees.
+; @param t1 the angle in radians
+; @returns t2 the angle in degrees
+; @0tick
+rad_to_deg:
+    mov __k, 15019745                       ; 180 / pi
+    mul t2, t1, __k             | itemmod:262144 divmod:true
+
+; Returns the fractional part of `t1`, `t1` - floor(`t1`). Always in [0, 1), also for negative numbers.
+; @param t1 the number
+; @returns t2 the fractional part of t1
+; @0tick
+fract:
+    mov t2, t1                  | resmode:floor
+    sub t2, t1, t2
+
+; Returns sqrt(`t1`^2 + `t2`^2), the length of the vector (`t1`, `t2`), without squaring large numbers.
+; @param t1 x
+; @param t2 y
+; @returns t3 sqrt(t1^2 + t2^2)
+; @0tick
+hypot:
+    mov __hypot_a, t1
+    mov __hypot_b, t2
+    spawn __hypot               | ordered:false delay:0
+    mov t3, __hypot_y
+
+; Returns the sign of `c1`: -1, 0 or 1.
+; @param c1 the number
+; @returns c2 the sign of c1
+; @0tick
+sign_int:
+    mov c2, c1                  | resmode:+
+    div c2, c1, c2                          ; x / |x| (GD gives 0 for 0 / 0)
+
+; Returns the smaller of `c1` and `c2`.
+; @param c1 the first number
+; @param c2 the second number
+; @returns c3 min(c1, c2)
+; @0tick
+min_int:
+    sub c3, c1, c2
+    mov __cs1, c3               | resmode:+                 ; c1 > c2
+    add __cs2, c3, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mul __cs4, __minmax_int_f, c2           ; c3 = __minmax_int_f ? c2 : c1
+    mul __cs5, __minmax_int_f, c1
+    sub __cs5, c1, __cs5
+    add c3, __cs4, __cs5
+
+; Returns the larger of `c1` and `c2`.
+; @param c1 the first number
+; @param c2 the second number
+; @returns c3 max(c1, c2)
+; @0tick
+max_int:
+    sub c3, c1, c2
+    mov __cs1, c3               | resmode:+                 ; c1 > c2
+    add __cs2, c3, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mul __cs4, __minmax_int_f, c1           ; c3 = __minmax_int_f ? c1 : c2
+    mul __cs5, __minmax_int_f, c2
+    sub __cs5, c2, __cs5
+    add c3, __cs4, __cs5
+
+; Returns `c1` limited to the range [`c2`, `c3`].
+; @param c1 the number
+; @param c2 the lower bound
+; @param c3 the upper bound (at least the lower bound)
+; @returns c4 min(max(c1, c2), c3)
+; @0tick
+clamp_int:
+    sub c4, c2, c1
+    mov __cs1, c4               | resmode:+                 ; c1 < c2
+    add __cs2, c4, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mul __cs4, __minmax_int_f, c2           ; c4 = __minmax_int_f ? c2 : c1
+    mul __cs5, __minmax_int_f, c1
+    sub __cs5, c1, __cs5
+    add c4, __cs4, __cs5
+    sub __clamp_int_t, c4, c3
+    mov __cs1, __clamp_int_t    | resmode:+                 ; result > c3
+    add __cs2, __clamp_int_t, __cs1 | itemmod:2 divmod:true ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mul __cs4, __minmax_int_f, c3           ; c4 = __minmax_int_f ? c3 : c4
+    mul __cs5, __minmax_int_f, c4
+    sub __cs5, c4, __cs5
+    add c4, __cs4, __cs5
+
+; Linear interpolation: returns `c1` + (`c2` - `c1`) * `c3`.
+; @param c1 the start value
+; @param c2 the end value
+; @param c3 the amount (0 gives c1, 1 gives c2)
+; @returns c4 c1 + (c2 - c1) * c3
+; @0tick
+lerp_int:
+    sub c4, c2, c1
+    mul c4, c3
+    add c4, c1
+
+; Returns the sign of `t1`: -1, 0 or 1.
+; @param t1 the number
+; @returns t2 the sign of t1
+; @0tick
+sign_float:
+    mov t2, t1                  | resmode:+
+    div t2, t1, t2                          ; x / |x| (GD gives 0 for 0 / 0)
+
+; Returns the smaller of `t1` and `t2`.
+; @param t1 the first number
+; @param t2 the second number
+; @returns t3 min(t1, t2)
+; @0tick
+min_float:
+    sub t3, t1, t2
+    mov __ts1, t3               | resmode:+                 ; t1 > t2
+    add __ts2, t3, __ts1        | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __minmax_float_f, __ts2, __ts3 | resmode:ceil
+    mul __ts4, __minmax_float_f, t2         ; t3 = __minmax_float_f ? t2 : t1
+    mul __ts5, __minmax_float_f, t1
+    sub __ts5, t1, __ts5
+    add t3, __ts4, __ts5
+
+; Returns the larger of `t1` and `t2`.
+; @param t1 the first number
+; @param t2 the second number
+; @returns t3 max(t1, t2)
+; @0tick
+max_float:
+    sub t3, t1, t2
+    mov __ts1, t3               | resmode:+                 ; t1 > t2
+    add __ts2, t3, __ts1        | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __minmax_float_f, __ts2, __ts3 | resmode:ceil
+    mul __ts4, __minmax_float_f, t1         ; t3 = __minmax_float_f ? t1 : t2
+    mul __ts5, __minmax_float_f, t2
+    sub __ts5, t2, __ts5
+    add t3, __ts4, __ts5
+
+; Returns `t1` limited to the range [`t2`, `t3`].
+; @param t1 the number
+; @param t2 the lower bound
+; @param t3 the upper bound (at least the lower bound)
+; @returns t4 min(max(t1, t2), t3)
+; @0tick
+clamp_float:
+    sub t4, t2, t1
+    mov __ts1, t4               | resmode:+                 ; t1 < t2
+    add __ts2, t4, __ts1        | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __minmax_float_f, __ts2, __ts3 | resmode:ceil
+    mul __ts4, __minmax_float_f, t2         ; t4 = __minmax_float_f ? t2 : t1
+    mul __ts5, __minmax_float_f, t1
+    sub __ts5, t1, __ts5
+    add t4, __ts4, __ts5
+    sub __clamp_float_t, t4, t3
+    mov __ts1, __clamp_float_t  | resmode:+                 ; result > t3
+    add __ts2, __clamp_float_t, __ts1 | itemmod:4 divmod:true ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __minmax_float_f, __ts2, __ts3 | resmode:ceil
+    mul __ts4, __minmax_float_f, t3         ; t4 = __minmax_float_f ? t3 : t4
+    mul __ts5, __minmax_float_f, t4
+    sub __ts5, t4, __ts5
+    add t4, __ts4, __ts5
+
+; Linear interpolation: returns `t1` + (`t2` - `t1`) * `t3`.
+; @param t1 the start value
+; @param t2 the end value
+; @param t3 the amount (0 gives t1, 1 gives t2)
+; @returns t4 t1 + (t2 - t1) * t3
+; @0tick
+lerp_float:
+    sub t4, t2, t1
+    mul t4, t3
+    add t4, t1
+
+; Returns the greatest common divisor of `c1` and `c2` (always >= 0; gcd(0, 0) is 0).
+; Euclid's algorithm, unrolled to 38 steps, which is enough for any inputs below 16,777,216.
+; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; @param c1 the first integer
+; @param c2 the second integer
+; @returns c3 gcd(c1, c2)
+; @0tick
+gcd:
+    mov __gcd_a, c1             | resmode:+
+    mov __gcd_b, c2             | resmode:+
+    ; each step: (a, b) = (b, a mod b) while b != 0; once b is 0 the pair stays the same
+    fldiv __gcd_q, __gcd_a, __gcd_b         ; step 1
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_t, __gcd_b
+    add __gcd_t, 1
+    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    mov c3, __gcd_a
+
+; Returns the least common multiple of `c1` and `c2` (always >= 0; 0 if either is 0).
+; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; @param c1 the first integer
+; @param c2 the second integer
+; @returns c3 lcm(c1, c2)
+; @0tick
+lcm:
+    spawn gcd                   | ordered:false delay:0
+    mov __gcd_a, c1             | resmode:+
+    div __gcd_a, c3                         ; |c1| / gcd, exact (0 if gcd is 0)
+    mov __gcd_b, c2             | resmode:+
+    mul c3, __gcd_a, __gcd_b
+
+; Returns `c1` raised to the power of `c2`, for integers and `c2` >= 0 (negative exponents count as 0). 0^0 is 1.
+; Results must fit in a counter; for bases other than -1, 0 and 1 that means exponents up to 31.
+; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; @param c1 the base
+; @param c2 the exponent
+; @returns c3 c1^c2
+; @0tick
+ipow:
+    mov __cs1, c2               | resmode:+                 ; c2 > 0
+    add __cs2, c2, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mul __ipow_e, __gcd_f, c2               ; e = max(c2, 0)
+    ; only bases -1, 0 and 1 allow exponents above 31, and for them only the parity matters: use 30 or 31
+    mov __gcd_t, __ipow_e
+    sub __gcd_t, 31
+    mov __cs1, __gcd_t          | resmode:+                 ; e > 31
+    add __cs2, __gcd_t, __cs1   | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __ipow_big, __cs2, __cs3 | resmode:ceil
+    mov __ipow_parity, __ipow_e
+    fldiv __ipow_parity, 2
+    mul __ipow_parity, -2
+    add __ipow_parity, __ipow_e             ; e mod 2
+    mov __gcd_t, __ipow_e
+    sub __gcd_t, 30
+    sub __gcd_t, __ipow_parity
+    mul __gcd_t, __ipow_big
+    sub __ipow_e, __gcd_t
+    ; square-and-multiply from the highest bit: every intermediate result is at most the final one
+    mov __ipow_res, 1
+    mul __ipow_res, __ipow_res
+    mov __ipow_bit, __ipow_e                ; bit 16 of e
+    fldiv __ipow_bit, 16
+    sub __ipow_e, __ipow_bit    | itemmod:16
+    mov __ipow_fac, c1
+    sub __ipow_fac, 1
+    mul __ipow_fac, __ipow_bit
+    add __ipow_fac, 1                       ; c1 if the bit is set, else 1
+    mul __ipow_res, __ipow_fac
+    mul __ipow_res, __ipow_res
+    mov __ipow_bit, __ipow_e                ; bit 8 of e
+    fldiv __ipow_bit, 8
+    sub __ipow_e, __ipow_bit    | itemmod:8
+    mov __ipow_fac, c1
+    sub __ipow_fac, 1
+    mul __ipow_fac, __ipow_bit
+    add __ipow_fac, 1                       ; c1 if the bit is set, else 1
+    mul __ipow_res, __ipow_fac
+    mul __ipow_res, __ipow_res
+    mov __ipow_bit, __ipow_e                ; bit 4 of e
+    fldiv __ipow_bit, 4
+    sub __ipow_e, __ipow_bit    | itemmod:4
+    mov __ipow_fac, c1
+    sub __ipow_fac, 1
+    mul __ipow_fac, __ipow_bit
+    add __ipow_fac, 1                       ; c1 if the bit is set, else 1
+    mul __ipow_res, __ipow_fac
+    mul __ipow_res, __ipow_res
+    mov __ipow_bit, __ipow_e                ; bit 2 of e
+    fldiv __ipow_bit, 2
+    sub __ipow_e, __ipow_bit    | itemmod:2
+    mov __ipow_fac, c1
+    sub __ipow_fac, 1
+    mul __ipow_fac, __ipow_bit
+    add __ipow_fac, 1                       ; c1 if the bit is set, else 1
+    mul __ipow_res, __ipow_fac
+    mul __ipow_res, __ipow_res
+    mov __ipow_bit, __ipow_e                ; bit 1 of e
+    fldiv __ipow_bit, 1
+    sub __ipow_e, __ipow_bit    | itemmod:1
+    mov __ipow_fac, c1
+    sub __ipow_fac, 1
+    mul __ipow_fac, __ipow_bit
+    add __ipow_fac, 1                       ; c1 if the bit is set, else 1
+    mul __ipow_res, __ipow_fac
+    mov c3, __ipow_res
+
+; Returns (`c1` ^ `c2`) mod `c3`, in [0, `c3`), for integers, `c2` >= 0 and `c3` >= 1.
+; Exact while `c2` is below 16,777,216 and (`c3` - 1)^2 is too, i.e. for `c3` up to 4097.
+; @param c1 the base
+; @param c2 the exponent (negative counts as 0)
+; @param c3 the modulus
+; @returns c4 c1^c2 mod c3
+; @0tick
+modpow:
+    mov __modpow_base, c1
+    fldiv __modpow_q, __modpow_base, c3
+    mul __modpow_q, c3
+    sub __modpow_base, __modpow_q           ; __modpow_base mod c3
+    mov __cs1, c2               | resmode:+                 ; c2 > 0
+    add __cs2, c2, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mul __modpow_e, __gcd_f, c2
+    mov __modpow_res, 1
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    ; square-and-multiply over the 31 bits of the exponent, reducing after every product
+    mul __modpow_res, __modpow_res          ; bit 30
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 1073741824
+    sub __modpow_e, __modpow_bit | itemmod:1073741824
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 29
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 536870912
+    sub __modpow_e, __modpow_bit | itemmod:536870912
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 28
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 268435456
+    sub __modpow_e, __modpow_bit | itemmod:268435456
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 27
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 134217728
+    sub __modpow_e, __modpow_bit | itemmod:134217728
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 26
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 67108864
+    sub __modpow_e, __modpow_bit | itemmod:67108864
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 25
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 33554432
+    sub __modpow_e, __modpow_bit | itemmod:33554432
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 24
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 16777216
+    sub __modpow_e, __modpow_bit | itemmod:16777216
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 23
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 8388608
+    sub __modpow_e, __modpow_bit | itemmod:8388608
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 22
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 4194304
+    sub __modpow_e, __modpow_bit | itemmod:4194304
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 21
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 2097152
+    sub __modpow_e, __modpow_bit | itemmod:2097152
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 20
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 1048576
+    sub __modpow_e, __modpow_bit | itemmod:1048576
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 19
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 524288
+    sub __modpow_e, __modpow_bit | itemmod:524288
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 18
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 262144
+    sub __modpow_e, __modpow_bit | itemmod:262144
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 17
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 131072
+    sub __modpow_e, __modpow_bit | itemmod:131072
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 16
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 65536
+    sub __modpow_e, __modpow_bit | itemmod:65536
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 15
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 32768
+    sub __modpow_e, __modpow_bit | itemmod:32768
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 14
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 16384
+    sub __modpow_e, __modpow_bit | itemmod:16384
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 13
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 8192
+    sub __modpow_e, __modpow_bit | itemmod:8192
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 12
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 4096
+    sub __modpow_e, __modpow_bit | itemmod:4096
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 11
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 2048
+    sub __modpow_e, __modpow_bit | itemmod:2048
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 10
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 1024
+    sub __modpow_e, __modpow_bit | itemmod:1024
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 9
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 512
+    sub __modpow_e, __modpow_bit | itemmod:512
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 8
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 256
+    sub __modpow_e, __modpow_bit | itemmod:256
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 7
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 128
+    sub __modpow_e, __modpow_bit | itemmod:128
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 6
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 64
+    sub __modpow_e, __modpow_bit | itemmod:64
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 5
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 32
+    sub __modpow_e, __modpow_bit | itemmod:32
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 4
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 16
+    sub __modpow_e, __modpow_bit | itemmod:16
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 3
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 8
+    sub __modpow_e, __modpow_bit | itemmod:8
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 2
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 4
+    sub __modpow_e, __modpow_bit | itemmod:4
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 1
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 2
+    sub __modpow_e, __modpow_bit | itemmod:2
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_res          ; bit 0
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov __modpow_bit, __modpow_e
+    fldiv __modpow_bit, 1
+    sub __modpow_e, __modpow_bit | itemmod:1
+    mov __modpow_fac, __modpow_base
+    sub __modpow_fac, 1
+    mul __modpow_fac, __modpow_bit
+    add __modpow_fac, 1
+    mul __modpow_res, __modpow_fac
+    fldiv __modpow_q, __modpow_res, c3
+    mul __modpow_q, c3
+    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mov c4, __modpow_res
+
+; Returns the integer square root of `c1`: the largest integer whose square is at most `c1`. Negative `c1` gives 0.
+; Builds the result one bit at a time, from 2^15 down.
+; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; @param c1 the integer
+; @returns c2 floor(sqrt(c1))
+; @0tick
+isqrt:
+    mov __cs1, c1               | resmode:+                 ; c1 > 0
+    add __cs2, c1, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mul __isqrt_n, __gcd_f, c1              ; n = max(c1, 0)
+    mov __isqrt_res, 0
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 32768                 ; try adding 2^15
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:32768
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 16384                 ; try adding 2^14
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:16384
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 8192                  ; try adding 2^13
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:8192
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 4096                  ; try adding 2^12
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:4096
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 2048                  ; try adding 2^11
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:2048
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 1024                  ; try adding 2^10
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:1024
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 512                   ; try adding 2^9
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:512
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 256                   ; try adding 2^8
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:256
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 128                   ; try adding 2^7
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:128
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 64                    ; try adding 2^6
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:64
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 32                    ; try adding 2^5
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:32
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 16                    ; try adding 2^4
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:16
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 8                     ; try adding 2^3
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:8
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 4                     ; try adding 2^2
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:4
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 2                     ; try adding 2^1
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:2
+    mov __isqrt_cand, __isqrt_res
+    add __isqrt_cand, 1                     ; try adding 2^0
+    fldiv __isqrt_q, __isqrt_n, __isqrt_cand
+    sub __isqrt_q, __isqrt_cand
+    add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
+    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
+    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    add __isqrt_res, __gcd_f    | itemmod:1
+    mov c2, __isqrt_res
+
+; ---- internal routines; don't spawn these directly ----
+
+; __exp_y = e^__exp_x.
+; The input is clamped to [-87, 16.118]: e^16.118 is just below the timer limit (9,999,999).
+; Method: e^x = 2^k * e^r with k = round(x / ln 2) and |r| <= ln(2) / 2; e^r from its Taylor series.
+; @param __exp_x
+; @returns __exp_y
+; @0tick
+__exp:
+    ; clamp x to [-87, 16.118]
+    mov __exp_t, __exp_x
+    mov __exp_d, __exp_t
+    sub __exp_d, 16.118
+    mov __ts1, __exp_d          | resmode:+                 ; __exp_f = __exp_d > 0
+    add __ts2, __exp_d, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __exp_f, __ts2, __ts3   | resmode:ceil
+    mul __exp_g, __exp_f, __exp_d
+    sub __exp_t, __exp_g                    ; x = min(x, 16.118)
+    mov __exp_d, __exp_t        | itemmod:-1
+    add __exp_d, -87                        ; d = -87 - x
+    mov __ts1, __exp_d          | resmode:+                 ; __exp_f = __exp_d > 0
+    add __ts2, __exp_d, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __exp_f, __ts2, __ts3   | resmode:ceil
+    mul __exp_g, __exp_f, __exp_d
+    add __exp_t, __exp_g                    ; x = max(x, -87)
+    ; k = round(x / ln 2)
+    mov __k, 12102203                       ; 1.442695041 * 2^23
+    mul __exp_kt, __exp_t, __k  | itemmod:8388608 divmod:true
+    add __exp_kt, 0.5
+    mov __exp_k, __exp_kt       | resmode:floor
+    ; r = x - k * ln 2, with ln 2 split in two parts so that k * (high part) is exact
+    mov __k, 22713
+    mul __exp_g, __exp_k, __k   | itemmod:32768 divmod:true ; k * 0.693145751953125
+    sub __exp_r, __exp_t, __exp_g
+    mov __k, 12566158                       ; k * 1.428607e-06
+    mul __exp_g, __exp_k, __k   | itemmod:8796093022208 divmod:true
+    sub __exp_r, __exp_g
+    ; e^r = 1 + r(1 + r/2(1 + r/3(... (1 + r/8)))), error below 2e-10
+    mov __exp_p, __exp_r        | itemmod:8 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r        | itemmod:7 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r        | itemmod:6 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r        | itemmod:5 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r        | itemmod:4 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r        | itemmod:3 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r        | itemmod:2 divmod:true
+    add __exp_p, 1
+    mul __exp_p, __exp_r
+    add __exp_p, 1
+    ; multiply by 2^k one bit of k at a time, so that no step stores a value above the result
+    mov __cs1, __exp_k          | resmode:+                 ; __exp_f = __exp_k > 0
+    add __cs2, __exp_k, __cs1   | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __exp_f, __cs2, __cs3   | resmode:ceil
+    mul __exp_kp, __exp_f, __exp_k          ; kp = max(k, 0), at most 24
+    mov __exp_b, __exp_kp                   ; bit 16 of kp
+    fldiv __exp_b, 16
+    sub __exp_kp, __exp_b       | itemmod:16
+    mov __exp_ifac, __exp_b     | itemmod:65535
+    add __exp_ifac, 1                       ; 2^16 if the bit is set, else 1
+    mul __exp_p, __exp_ifac
+    mov __exp_b, __exp_kp                   ; bit 8 of kp
+    fldiv __exp_b, 8
+    sub __exp_kp, __exp_b       | itemmod:8
+    mov __exp_ifac, __exp_b     | itemmod:255
+    add __exp_ifac, 1                       ; 2^8 if the bit is set, else 1
+    mul __exp_p, __exp_ifac
+    mov __exp_b, __exp_kp                   ; bit 4 of kp
+    fldiv __exp_b, 4
+    sub __exp_kp, __exp_b       | itemmod:4
+    mov __exp_ifac, __exp_b     | itemmod:15
+    add __exp_ifac, 1                       ; 2^4 if the bit is set, else 1
+    mul __exp_p, __exp_ifac
+    mov __exp_b, __exp_kp                   ; bit 2 of kp
+    fldiv __exp_b, 2
+    sub __exp_kp, __exp_b       | itemmod:2
+    mov __exp_ifac, __exp_b     | itemmod:3
+    add __exp_ifac, 1                       ; 2^2 if the bit is set, else 1
+    mul __exp_p, __exp_ifac
+    mov __exp_b, __exp_kp                   ; bit 1 of kp
+    fldiv __exp_b, 1
+    sub __exp_kp, __exp_b       | itemmod:1
+    mov __exp_ifac, __exp_b     | itemmod:1
+    add __exp_ifac, 1                       ; 2^1 if the bit is set, else 1
+    mul __exp_p, __exp_ifac
+    mov __exp_kn, __exp_k       | itemmod:-1
+    mov __cs1, __exp_kn         | resmode:+                 ; __exp_f = __exp_kn > 0
+    add __cs2, __exp_kn, __cs1  | itemmod:2 divmod:true     ; max(d, 0)
+    mov __cs3, __cs2
+    add __cs3, 1
+    div __exp_f, __cs2, __cs3   | resmode:ceil
+    mul __exp_kn, __exp_f                   ; kn = max(-k, 0), at most 126
+    mov __exp_b, __exp_kn                   ; bit 64 of kn
+    fldiv __exp_b, 64
+    sub __exp_kn, __exp_b       | itemmod:64
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:18446744073709551616 divmod:true ; 2^-64 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_b, __exp_kn                   ; bit 32 of kn
+    fldiv __exp_b, 32
+    sub __exp_kn, __exp_b       | itemmod:32
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:4294967296 divmod:true ; 2^-32 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_b, __exp_kn                   ; bit 16 of kn
+    fldiv __exp_b, 16
+    sub __exp_kn, __exp_b       | itemmod:16
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:65536 divmod:true ; 2^-16 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_b, __exp_kn                   ; bit 8 of kn
+    fldiv __exp_b, 8
+    sub __exp_kn, __exp_b       | itemmod:8
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:256 divmod:true   ; 2^-8 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_b, __exp_kn                   ; bit 4 of kn
+    fldiv __exp_b, 4
+    sub __exp_kn, __exp_b       | itemmod:4
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:16 divmod:true    ; 2^-4 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_b, __exp_kn                   ; bit 2 of kn
+    fldiv __exp_b, 2
+    sub __exp_kn, __exp_b       | itemmod:2
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:4 divmod:true     ; 2^-2 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_b, __exp_kn                   ; bit 1 of kn
+    fldiv __exp_b, 1
+    sub __exp_kn, __exp_b       | itemmod:1
+    mov __exp_fac, __exp_b      | itemmod:-1                ; __exp_fac = 1 - __exp_b
+    add __exp_fac, 1
+    add __exp_fac, __exp_b      | itemmod:2 divmod:true     ; 2^-1 if the bit is set, else 1
+    mul __exp_p, __exp_fac
+    mov __exp_y, __exp_p
+
+; __ln_y = ln(__ln_x), for __ln_x > 0 (from about 1e-19 up).
+; Method: x = m * 2^k with 1/sqrt(2) <= m <= sqrt(2), then ln(m) = 2 atanh((m - 1) / (m + 1)) from its series.
+; @param __ln_x
+; @returns __ln_y
+; @0tick
+__ln:
+    mov __ln_m, __ln_x
+    mov __ln_k, 0
+    ; divide m by 2^v while m > 2^v, so that m <= 2
+    mov __ln_d, __ln_m
+    sub __ln_d, 65536
+    mov __ts1, __ln_d           | resmode:+                 ; m > 2^16
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f        | itemmod:65535
+    add __ln_fac, 1
+    div __ln_m, __ln_fac
+    add __ln_k, __ln_f          | itemmod:16
+    mov __ln_d, __ln_m
+    sub __ln_d, 256
+    mov __ts1, __ln_d           | resmode:+                 ; m > 2^8
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f        | itemmod:255
+    add __ln_fac, 1
+    div __ln_m, __ln_fac
+    add __ln_k, __ln_f          | itemmod:8
+    mov __ln_d, __ln_m
+    sub __ln_d, 16
+    mov __ts1, __ln_d           | resmode:+                 ; m > 2^4
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f        | itemmod:15
+    add __ln_fac, 1
+    div __ln_m, __ln_fac
+    add __ln_k, __ln_f          | itemmod:4
+    mov __ln_d, __ln_m
+    sub __ln_d, 4
+    mov __ts1, __ln_d           | resmode:+                 ; m > 2^2
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f        | itemmod:3
+    add __ln_fac, 1
+    div __ln_m, __ln_fac
+    add __ln_k, __ln_f          | itemmod:2
+    mov __ln_d, __ln_m
+    sub __ln_d, 2
+    mov __ts1, __ln_d           | resmode:+                 ; m > 2^1
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f        | itemmod:1
+    add __ln_fac, 1
+    div __ln_m, __ln_fac
+    add __ln_k, __ln_f          | itemmod:1
+    ; multiply m by 2^v while m < 2^-v, so that m >= 1/2
+    mov __ln_lo, 1
+    div __ln_lo, 4294967296
+    sub __ln_d, __ln_lo, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 2^-32
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mul __ln_g, __ln_f, __ln_m
+    add __ln_m, __ln_g          | itemmod:4294967296
+    sub __ln_m, __ln_g                      ; m = m * 2^32 if the flag is set
+    sub __ln_k, __ln_f          | itemmod:32
+    mov __ln_lo, 1
+    div __ln_lo, 65536
+    sub __ln_d, __ln_lo, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 2^-16
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mul __ln_g, __ln_f, __ln_m
+    add __ln_m, __ln_g          | itemmod:65536
+    sub __ln_m, __ln_g                      ; m = m * 2^16 if the flag is set
+    sub __ln_k, __ln_f          | itemmod:16
+    mov __ln_lo, 1
+    div __ln_lo, 256
+    sub __ln_d, __ln_lo, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 2^-8
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mul __ln_g, __ln_f, __ln_m
+    add __ln_m, __ln_g          | itemmod:256
+    sub __ln_m, __ln_g                      ; m = m * 2^8 if the flag is set
+    sub __ln_k, __ln_f          | itemmod:8
+    mov __ln_lo, 1
+    div __ln_lo, 16
+    sub __ln_d, __ln_lo, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 2^-4
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mul __ln_g, __ln_f, __ln_m
+    add __ln_m, __ln_g          | itemmod:16
+    sub __ln_m, __ln_g                      ; m = m * 2^4 if the flag is set
+    sub __ln_k, __ln_f          | itemmod:4
+    mov __ln_lo, 1
+    div __ln_lo, 4
+    sub __ln_d, __ln_lo, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 2^-2
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mul __ln_g, __ln_f, __ln_m
+    add __ln_m, __ln_g          | itemmod:4
+    sub __ln_m, __ln_g                      ; m = m * 2^2 if the flag is set
+    sub __ln_k, __ln_f          | itemmod:2
+    mov __ln_lo, 1
+    div __ln_lo, 2
+    sub __ln_d, __ln_lo, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 2^-1
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mul __ln_g, __ln_f, __ln_m
+    add __ln_m, __ln_g          | itemmod:2
+    sub __ln_m, __ln_g                      ; m = m * 2^1 if the flag is set
+    sub __ln_k, __ln_f          | itemmod:1
+    ; bring m into [1/sqrt(2), sqrt(2)]
+    mov __k, 11863283                       ; __ln_c = 1.414213562
+    mov __ln_c, __k             | itemmod:8388608 divmod:true
+    sub __ln_d, __ln_m, __ln_c
+    mov __ts1, __ln_d           | resmode:+                 ; m > sqrt(2)
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f
+    add __ln_fac, 1
+    div __ln_m, __ln_fac
+    add __ln_k, __ln_f
+    mov __k, 11863283                       ; __ln_c = 0.7071067812
+    mov __ln_c, __k             | itemmod:16777216 divmod:true
+    sub __ln_d, __ln_c, __ln_m
+    mov __ts1, __ln_d           | resmode:+                 ; m < 1/sqrt(2)
+    add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __ln_f, __ts2, __ts3    | resmode:ceil
+    mov __ln_fac, __ln_f
+    add __ln_fac, 1
+    mul __ln_m, __ln_fac
+    sub __ln_k, __ln_f
+    ; s = (m - 1) / (m + 1), |s| <= 0.172
+    mov __ln_d, __ln_m
+    sub __ln_d, 1
+    mov __ln_g, __ln_m
+    add __ln_g, 1
+    div __ln_s, __ln_d, __ln_g
+    mul __ln_s2, __ln_s, __ln_s
+    ; ln(m) = 2s(1 + s^2/3 + s^4/5 + ... + s^10/11), error below 1e-9
+    mov __one, 1
+    mov __ln_p, __one           | itemmod:11 divmod:true
+    mul __ln_p, __ln_s2
+    add __ln_p, __one           | itemmod:9 divmod:true
+    mul __ln_p, __ln_s2
+    add __ln_p, __one           | itemmod:7 divmod:true
+    mul __ln_p, __ln_s2
+    add __ln_p, __one           | itemmod:5 divmod:true
+    mul __ln_p, __ln_s2
+    add __ln_p, __one           | itemmod:3 divmod:true
+    mul __ln_p, __ln_s2
+    add __ln_p, __one
+    mul __ln_p, __ln_s
+    mul __ln_p, 2
+    ; ln(x) = k * ln 2 + ln(m), with ln 2 in two parts
+    mov __k, 12566158                       ; k * 1.428607e-06
+    mul __ln_g, __ln_k, __k     | itemmod:8796093022208 divmod:true
+    add __ln_p, __ln_g
+    mov __k, 22713
+    mul __ln_g, __ln_k, __k     | itemmod:32768 divmod:true ; k * 0.693145751953125
+    add __ln_y, __ln_p, __ln_g
+
+; __sqrt_y = sqrt(|__sqrt_x|).
+; Method: 30 steps of Newton's method g = (g + x/g) / 2, starting from (x + 1) / 2.
+; Every guess after the first is >= sqrt(x), so the steps halve the guess until they converge quadratically.
+; @param __sqrt_x
+; @returns __sqrt_y
+; @0tick
+__sqrt:
+    mov __sqrt_a, __sqrt_x      | resmode:+
+    mov __sqrt_g, __sqrt_a
+    div __sqrt_g, 2
+    add __sqrt_g, 0.5                       ; g = (x + 1) / 2, without storing x + 1
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    div __sqrt_q, __sqrt_a, __sqrt_g
+    add __sqrt_g, __sqrt_q
+    div __sqrt_g, 2
+    mov __ts1, __sqrt_a         | resmode:+ itemmod:2 divmod:true ; sqrt(0) is 0, not the last guess
+    mov __ts2, __ts1
+    add __ts2, 1
+    div __sqrt_f, __ts1, __ts2  | resmode:ceil
+    mul __sqrt_y, __sqrt_g, __sqrt_f
+
+; __sincos_s = sin(__sincos_x), __sincos_c = cos(__sincos_x).
+; Method: x = j * pi/2 + r with |r| <= pi/4, sin(r) and cos(r) from their Taylor series, then rotated by j quarter turns.
+; Accurate to about 1e-7 for |x| up to a few thousand; the reduction loses precision for larger x.
+; @param __sincos_x
+; @returns __sincos_s, __sincos_c
+; @0tick
+__sincos:
+    ; j = round(x / (pi/2))
+    mov __k, 10680707                       ; 0.6366197724 * 2^24
+    mul __sincos_jt, __sincos_x, __k | itemmod:16777216 divmod:true
+    add __sincos_jt, 0.5
+    mov __sincos_j, __sincos_jt | resmode:floor
+    ; r = x - j * pi/2, with pi/2 in three parts
+    mov __k, 201
+    mul __sincos_g, __sincos_j, __k | itemmod:128 divmod:true ; j * 1.5703125
+    sub __sincos_r, __sincos_x, __sincos_g
+    mov __k, 4058
+    mul __sincos_g, __sincos_j, __k | itemmod:8388608 divmod:true ; j * 4.837512969970703125e-4
+    sub __sincos_r, __sincos_g
+    mov __k, 10625385                       ; j * 7.549790e-08
+    mul __sincos_g, __sincos_j, __k | itemmod:140737488355328 divmod:true
+    sub __sincos_r, __sincos_g
+    mul __sincos_r2, __sincos_r, __sincos_r
+    mov __one, 1
+    ; sin(r) = r(1 - r^2/(2*3)(1 - r^2/(4*5)(... (1 - r^2/(10*11)))))
+    mov __sincos_sr, __sincos_r2 | itemmod:110 divmod:true
+    sub __sincos_sr, __one, __sincos_sr
+    mul __sincos_z, __sincos_sr, __sincos_r2 | itemmod:72 divmod:true
+    sub __sincos_sr, __one, __sincos_z
+    mul __sincos_z, __sincos_sr, __sincos_r2 | itemmod:42 divmod:true
+    sub __sincos_sr, __one, __sincos_z
+    mul __sincos_z, __sincos_sr, __sincos_r2 | itemmod:20 divmod:true
+    sub __sincos_sr, __one, __sincos_z
+    mul __sincos_z, __sincos_sr, __sincos_r2 | itemmod:6 divmod:true
+    sub __sincos_sr, __one, __sincos_z
+    mul __sincos_sr, __sincos_r
+    ; cos(r) = 1 - r^2/(1*2)(1 - r^2/(3*4)(... (1 - r^2/(11*12))))
+    mov __sincos_cr, __sincos_r2 | itemmod:132 divmod:true
+    sub __sincos_cr, __one, __sincos_cr
+    mul __sincos_z, __sincos_cr, __sincos_r2 | itemmod:90 divmod:true
+    sub __sincos_cr, __one, __sincos_z
+    mul __sincos_z, __sincos_cr, __sincos_r2 | itemmod:56 divmod:true
+    sub __sincos_cr, __one, __sincos_z
+    mul __sincos_z, __sincos_cr, __sincos_r2 | itemmod:30 divmod:true
+    sub __sincos_cr, __one, __sincos_z
+    mul __sincos_z, __sincos_cr, __sincos_r2 | itemmod:12 divmod:true
+    sub __sincos_cr, __one, __sincos_z
+    mul __sincos_z, __sincos_cr, __sincos_r2 | itemmod:2 divmod:true
+    sub __sincos_cr, __one, __sincos_z
+    ; q = j mod 4; cos(q pi/2) = |q - 2| - 1 and sin(q pi/2) = 1 - |q - 1| for q = 0..3
+    mov __sincos_q, __sincos_j
+    fldiv __sincos_q, 4
+    mul __sincos_q, -4
+    add __sincos_q, __sincos_j
+    mov __sincos_a, __sincos_q
+    sub __sincos_a, 2
+    mov __sincos_a, __sincos_a  | resmode:+
+    sub __sincos_a, 1
+    mov __sincos_b, __sincos_q
+    sub __sincos_b, 1
+    mov __sincos_b, __sincos_b  | resmode:-
+    add __sincos_b, 1
+    ; sin(x) = a sin(r) + b cos(r), cos(x) = a cos(r) - b sin(r)
+    mul __sincos_t1, __sincos_a, __sincos_sr
+    mul __sincos_t2, __sincos_b, __sincos_cr
+    add __sincos_s, __sincos_t1, __sincos_t2
+    mul __sincos_t1, __sincos_a, __sincos_cr
+    mul __sincos_t2, __sincos_b, __sincos_sr
+    sub __sincos_c, __sincos_t1, __sincos_t2
+
+; __atan_y = atan(__atan_x).
+; Method: atan(x) = pi/2 - atan(1/x) for |x| > 1, atan(x) = pi/6 + atan((x sqrt(3) - 1) / (x + sqrt(3))) for x > tan(pi/12),
+; then the series x - x^3/3 + x^5/5 - ... on |x| <= tan(pi/12).
+; @param __atan_x
+; @returns __atan_y
+; @0tick
+__atan:
+    mov __atan_a, __atan_x      | resmode:+
+    div __atan_sign, __atan_x, __atan_a     ; sign of x
+    mov __atan_d, __atan_a
+    sub __atan_d, 1
+    mov __ts1, __atan_d         | resmode:+                 ; |x| > 1
+    add __ts2, __atan_d, __ts1  | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __atan_inv, __ts2, __ts3 | resmode:ceil
+    mul __atan_rec, __atan_inv, __atan_a
+    add __atan_rec, 1
+    sub __atan_rec, __atan_inv              ; |x| if |x| > 1, else 1, so that 1/rec is never huge
+    mov __one, 1
+    div __atan_rec, __one, __atan_rec
+    mul __ts4, __atan_inv, __atan_rec       ; b = |x| <= 1 ? |x| : 1/|x|
+    mul __ts5, __atan_inv, __atan_a
+    sub __ts5, __atan_a, __ts5
+    add __atan_b, __ts4, __ts5
+    mov __k, 8990883                        ; tan(pi/12)
+    mov __atan_const, __k       | itemmod:33554432 divmod:true
+    sub __atan_d, __atan_b, __atan_const
+    mov __ts1, __atan_d         | resmode:+                 ; b > tan(pi/12)
+    add __ts2, __atan_d, __ts1  | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __atan_red, __ts2, __ts3 | resmode:ceil
+    mov __k, 14529495                       ; __atan_const = 1.732050808
+    mov __atan_const, __k       | itemmod:8388608 divmod:true
+    mul __atan_num, __atan_b, __atan_const
+    sub __atan_num, 1
+    add __atan_den, __atan_b, __atan_const
+    div __atan_num, __atan_den
+    mul __ts4, __atan_red, __atan_num       ; __atan_c = __atan_red ? __atan_num : __atan_b
+    mul __ts5, __atan_red, __atan_b
+    sub __ts5, __atan_b, __ts5
+    add __atan_c, __ts4, __ts5
+    ; atan(c) = c(1 - c^2/3 + c^4/5 - ... - c^14/15), error below 2e-10
+    mul __atan_cc, __atan_c, __atan_c
+    mov __one, 1
+    mov __atan_p, __one         | itemmod:-15 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one         | itemmod:13 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one         | itemmod:-11 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one         | itemmod:9 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one         | itemmod:-7 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one         | itemmod:5 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one         | itemmod:-3 divmod:true
+    mul __atan_p, __atan_cc
+    add __atan_p, __one
+    mul __atan_p, __atan_c
+    mov __k, 8784530                        ; __atan_const = 0.5235987756
+    mov __atan_const, __k       | itemmod:16777216 divmod:true
+    mul __atan_z, __atan_red, __atan_const
+    add __atan_p, __atan_z
+    mov __k, 13176795                       ; __atan_const = 1.570796327
+    mov __atan_const, __k       | itemmod:8388608 divmod:true
+    sub __atan_z, __atan_const, __atan_p
+    mul __ts4, __atan_inv, __atan_z         ; __atan_p = __atan_inv ? __atan_z : __atan_p
+    mul __ts5, __atan_inv, __atan_p
+    sub __ts5, __atan_p, __ts5
+    add __atan_p, __ts4, __ts5
+    mul __atan_y, __atan_p, __atan_sign
+
+; __atan2_out = atan2(__atan2_y, __atan2_x): the angle of the point (x, y), in (-pi, pi].
+; Method: atan(min(|x|, |y|) / max(|x|, |y|)) never divides by a small number, then the quadrant is fixed up.
+; @param __atan2_y
+; @param __atan2_x
+; @returns __atan2_out
+; @0tick
+__atan2:
+    mov __atan2_ax, __atan2_x   | resmode:+
+    mov __atan2_ay, __atan2_y   | resmode:+
+    sub __atan2_d, __atan2_ay, __atan2_ax
+    mov __ts1, __atan2_d        | resmode:+                 ; |y| > |x|
+    add __ts2, __atan2_d, __ts1 | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __atan2_big, __ts2, __ts3 | resmode:ceil
+    mul __ts4, __atan2_big, __atan2_ay      ; __atan2_max = __atan2_big ? __atan2_ay : __atan2_ax
+    mul __ts5, __atan2_big, __atan2_ax
+    sub __ts5, __atan2_ax, __ts5
+    add __atan2_max, __ts4, __ts5
+    mul __ts4, __atan2_big, __atan2_ax      ; __atan2_min = __atan2_big ? __atan2_ax : __atan2_ay
+    mul __ts5, __atan2_big, __atan2_ay
+    sub __ts5, __atan2_ay, __ts5
+    add __atan2_min, __ts4, __ts5
+    div __atan_x, __atan2_min, __atan2_max
+    spawn __atan                | ordered:false delay:0
+    mov __k, 13176795                       ; __atan2_const = 1.570796327
+    mov __atan2_const, __k      | itemmod:8388608 divmod:true
+    sub __atan2_z, __atan2_const, __atan_y
+    mul __ts4, __atan2_big, __atan2_z       ; atan(|y| / |x|)
+    mul __ts5, __atan2_big, __atan_y
+    sub __ts5, __atan_y, __ts5
+    add __atan2_base, __ts4, __ts5
+    mov __ts1, __atan2_x        | resmode:+                 ; __atan2_sx = sign(__atan2_x) = __atan2_x / |__atan2_x|
+    div __atan2_sx, __atan2_x, __ts1
+    mov __ts1, __atan2_y        | resmode:+                 ; __atan2_sy = sign(__atan2_y) = __atan2_y / |__atan2_y|
+    div __atan2_sy, __atan2_y, __ts1
+    mul __atan2_base, __atan2_sx
+    mul __atan2_base, __atan2_sy            ; atan(y / x)
+    mov __ts1, __atan2_x        | resmode:+                 ; __atan2_xpos = __atan2_x > 0
+    add __ts2, __atan2_x, __ts1 | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __atan2_xpos, __ts2, __ts3 | resmode:ceil
+    mov __atan2_d, __atan2_x    | itemmod:-1
+    mov __ts1, __atan2_d        | resmode:+                 ; __atan2_xneg = __atan2_d > 0
+    add __ts2, __atan2_d, __ts1 | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __atan2_xneg, __ts2, __ts3 | resmode:ceil
+    mov __atan2_xzero, 1
+    sub __atan2_xzero, __atan2_xpos
+    sub __atan2_xzero, __atan2_xneg         ; x == 0
+    mov __atan2_d, __atan2_y    | itemmod:-1
+    mov __ts1, __atan2_d        | resmode:+                 ; __atan2_yneg = __atan2_d > 0
+    add __ts2, __atan2_d, __ts1 | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __atan2_yneg, __ts2, __ts3 | resmode:ceil
+    mov __atan2_ys, __atan2_yneg | itemmod:-2
+    add __atan2_ys, 1                       ; 1 if y >= 0, -1 if y < 0
+    ; x > 0: atan(y/x). x < 0: atan(y/x) + pi (y >= 0) or - pi (y < 0). x == 0: sign(y) * pi/2
+    mov __k, 13176795                       ; __atan2_const = 3.141592654
+    mov __atan2_const, __k      | itemmod:4194304 divmod:true
+    mul __atan2_z, __atan2_ys, __atan2_const
+    add __atan2_z, __atan2_base
+    mul __atan2_z, __atan2_xneg
+    mul __atan2_out, __atan2_xpos, __atan2_base
+    add __atan2_out, __atan2_z
+    mov __k, 13176795                       ; __atan2_const = 1.570796327
+    mov __atan2_const, __k      | itemmod:8388608 divmod:true
+    mul __atan2_z, __atan2_sy, __atan2_const
+    mul __atan2_z, __atan2_xzero
+    add __atan2_out, __atan2_z
+
+; __expm1_y = e^__expm1_x - 1, accurate also for x close to 0.
+; Method: the Taylor series x(1 + x/2(1 + x/3(...))) for |x| < 1/2, e^x - 1 otherwise.
+; @param __expm1_x
+; @returns __expm1_y
+; @0tick
+__expm1:
+    mov __expm1_a, __expm1_x    | resmode:+
+    mov __expm1_d, __expm1_a    | itemmod:-1
+    add __expm1_d, 0.5
+    mov __ts1, __expm1_d        | resmode:+                 ; |x| < 1/2
+    add __ts2, __expm1_d, __ts1 | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __expm1_small, __ts2, __ts3 | resmode:ceil
+    mul __expm1_xs, __expm1_small, __expm1_x ; 0 when the series isn't used, so that it can't overflow
+    mov __expm1_series, __expm1_xs | itemmod:10 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:9 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:8 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:7 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:6 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:5 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:4 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:3 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs | itemmod:2 divmod:true
+    add __expm1_series, 1
+    mul __expm1_series, __expm1_xs
+    mov __exp_x, __expm1_x
+    spawn __exp                 | ordered:false delay:0
+    mov __expm1_big, __exp_y
+    sub __expm1_big, 1
+    mul __ts4, __expm1_small, __expm1_series ; __expm1_y = __expm1_small ? __expm1_series : __expm1_big
+    mul __ts5, __expm1_small, __expm1_big
+    sub __ts5, __expm1_big, __ts5
+    add __expm1_y, __ts4, __ts5
+
+; __log1p_y = ln(1 + __log1p_x), accurate also for x close to 0. Needs x > -1.
+; Method: with u = 1 + x (rounded), ln(1 + x) = ln(u) * x / (u - 1), which cancels the rounding of u.
+; @param __log1p_x
+; @returns __log1p_y
+; @0tick
+__log1p:
+    mov __log1p_u, __log1p_x
+    add __log1p_u, 1
+    mov __ln_x, __log1p_u
+    spawn __ln                  | ordered:false delay:0
+    mov __log1p_d, __log1p_u
+    sub __log1p_d, 1
+    div __log1p_w, __log1p_x, __log1p_d
+    mul __log1p_w, __ln_y
+    mov __ts1, __log1p_d        | resmode:+ itemmod:2 divmod:true ; u == 1 means x is too small to change 1, and ln(1 + x) = x
+    mov __ts2, __ts1
+    add __ts2, 1
+    div __log1p_f, __ts1, __ts2 | resmode:ceil
+    mul __ts4, __log1p_f, __log1p_w         ; __log1p_y = __log1p_f ? __log1p_w : __log1p_x
+    mul __ts5, __log1p_f, __log1p_x
+    sub __ts5, __log1p_x, __ts5
+    add __log1p_y, __ts4, __ts5
+
+; __hypot_y = sqrt(a^2 + b^2), without squaring large numbers.
+; Method: max(|a|, |b|) * sqrt(1 + (min(|a|, |b|) / max(|a|, |b|))^2).
+; @param __hypot_a
+; @param __hypot_b
+; @returns __hypot_y
+; @0tick
+__hypot:
+    mov __hypot_aa, __hypot_a   | resmode:+
+    mov __hypot_ab, __hypot_b   | resmode:+
+    sub __hypot_d, __hypot_aa, __hypot_ab
+    mov __ts1, __hypot_d        | resmode:+                 ; |a| > |b|
+    add __ts2, __hypot_d, __ts1 | itemmod:4 divmod:true     ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __hypot_f, __ts2, __ts3 | resmode:ceil
+    mul __ts4, __hypot_f, __hypot_aa        ; __hypot_max = __hypot_f ? __hypot_aa : __hypot_ab
+    mul __ts5, __hypot_f, __hypot_ab
+    sub __ts5, __hypot_ab, __ts5
+    add __hypot_max, __ts4, __ts5
+    mul __ts4, __hypot_f, __hypot_ab        ; __hypot_min = __hypot_f ? __hypot_ab : __hypot_aa
+    mul __ts5, __hypot_f, __hypot_aa
+    sub __ts5, __hypot_aa, __ts5
+    add __hypot_min, __ts4, __ts5
+    div __hypot_min, __hypot_max            ; ratio in [0, 1] (0 if both are 0)
+    mul __sqrt_x, __hypot_min, __hypot_min
+    add __sqrt_x, 1
+    spawn __sqrt                | ordered:false delay:0
+    mul __hypot_y, __hypot_max, __sqrt_y
+
+; __cbrt_y = the cube root of __cbrt_x (negative for negative x).
+; Method: 44 steps of Newton's method g = (2g + |x|/g^2) / 3, starting from |x| / 3 + 1.
+; @param __cbrt_x
+; @returns __cbrt_y
+; @0tick
+__cbrt:
+    mov __cbrt_a, __cbrt_x      | resmode:+
+    div __cbrt_sign, __cbrt_x, __cbrt_a     ; sign of x (0 for x = 0, which makes the result 0)
+    mov __cbrt_g, __cbrt_a
+    div __cbrt_g, 3
+    add __cbrt_g, 1                         ; g = |x| / 3 + 1
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    div __cbrt_q, __cbrt_a, __cbrt_g
+    div __cbrt_q, __cbrt_g
+    mul __cbrt_g, 2
+    add __cbrt_g, __cbrt_q
+    div __cbrt_g, 3
+    mul __cbrt_y, __cbrt_g, __cbrt_sign
+
+; __asincos_s = asin(x), __asincos_c = acos(x). x is clamped to [-1, 1].
+; Method: with c = sqrt(1 - x^2), asin(x) = atan2(x, c) and acos(x) = atan2(c, x).
+; @param __asincos_x
+; @returns __asincos_s, __asincos_c
+; @0tick
+__asincos:
+    mov __asincos_t, __asincos_x
+    mov __asincos_d, __asincos_t
+    sub __asincos_d, 1
+    mov __ts1, __asincos_d      | resmode:+                 ; __asincos_f = __asincos_d > 0
+    add __ts2, __asincos_d, __ts1 | itemmod:4 divmod:true   ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __asincos_f, __ts2, __ts3 | resmode:ceil
+    mul __asincos_g, __asincos_f, __asincos_d
+    sub __asincos_t, __asincos_g            ; x = min(x, 1)
+    mov __asincos_d, __asincos_t | itemmod:-1
+    sub __asincos_d, 1
+    mov __ts1, __asincos_d      | resmode:+                 ; __asincos_f = __asincos_d > 0
+    add __ts2, __asincos_d, __ts1 | itemmod:4 divmod:true   ; max(d, 0) / 2
+    mov __ts3, __ts2
+    add __ts3, 1
+    div __asincos_f, __ts2, __ts3 | resmode:ceil
+    mul __asincos_g, __asincos_f, __asincos_d
+    add __asincos_t, __asincos_g            ; x = max(x, -1)
+    mov __asincos_d, __asincos_t | itemmod:-1
+    add __asincos_d, 1
+    mov __asincos_g, __asincos_t
+    add __asincos_g, 1
+    mul __sqrt_x, __asincos_d, __asincos_g  ; (1 - x)(1 + x) = 1 - x^2, more precise near |x| = 1
+    spawn __sqrt                | ordered:false delay:0
+    mov __asincos_cos, __sqrt_y
+    mov __atan2_y, __asincos_t
+    mov __atan2_x, __asincos_cos
+    spawn __atan2               | ordered:false delay:0
+    mov __asincos_s, __atan2_out
+    mov __atan2_y, __asincos_cos
+    mov __atan2_x, __asincos_t
+    spawn __atan2               | ordered:false delay:0
+    mov __asincos_c, __atan2_out

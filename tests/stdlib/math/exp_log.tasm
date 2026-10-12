@@ -1,0 +1,76 @@
+; Tests for math::exp, expm1, ln, log2, log10 and log1p.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias exp_1,   t10
+    alias exp_2,   t11
+    alias exp_3,   t12
+    alias exp_4,   t13
+    alias expm1_1, t14
+    alias expm1_2, t15
+    alias expm1_3, t16
+    alias ln_1,    t17
+    alias ln_2,    t18
+    alias ln_3,    t19
+    alias ln_4,    t20
+    alias log2_1,  t21
+    alias log2_2,  t22
+    alias log10_1, t23
+    alias log10_2, t24
+    alias log1p_1, t25
+    alias log1p_2, t26
+
+    display exp_1      ; expected: 2.72   (exp(1))
+    display exp_2      ; expected: 0.37   (exp(-1))
+    display exp_3      ; expected: 1.00   (exp(0))
+    display exp_4      ; expected: 148.41   (exp(5))
+    display expm1_1    ; expected: 6.39   (expm1(2))
+    display expm1_2    ; expected: -0.63   (expm1(-1))
+    display expm1_3    ; expected: 0.00   (expm1(0.001) = 0.0010005)
+    display ln_1       ; expected: 2.30   (ln(10))
+    display ln_2       ; expected: -0.69   (ln(0.5))
+    display ln_3       ; expected: 0.00   (ln(1))
+    display ln_4       ; expected: 13.82   (ln(1000000))
+    display log2_1     ; expected: 10.00   (log2(1024))
+    display log2_2     ; expected: 1.58   (log2(3))
+    display log10_1    ; expected: 3.00   (log10(1000))
+    display log10_2    ; expected: 0.30   (log10(2))
+    display log1p_1    ; expected: 0.69   (log1p(1))
+    display log1p_2    ; expected: -0.69   (log1p(-0.5))
+
+
+_start:
+    mov t1, 1
+    spawn math::exp             | ordered:false delay:0 remap: {t2 = exp_1}
+    mov t1, -1
+    spawn math::exp             | ordered:false delay:0 remap: {t2 = exp_2}
+    mov t1, 0
+    spawn math::exp             | ordered:false delay:0 remap: {t2 = exp_3}
+    mov t1, 5
+    spawn math::exp             | ordered:false delay:0 remap: {t2 = exp_4}
+    mov t1, 2
+    spawn math::expm1           | ordered:false delay:0 remap: {t2 = expm1_1}
+    mov t1, -1
+    spawn math::expm1           | ordered:false delay:0 remap: {t2 = expm1_2}
+    mov t1, 0.001
+    spawn math::expm1           | ordered:false delay:0 remap: {t2 = expm1_3}
+    mov t1, 10
+    spawn math::ln              | ordered:false delay:0 remap: {t2 = ln_1}
+    mov t1, 0.5
+    spawn math::ln              | ordered:false delay:0 remap: {t2 = ln_2}
+    mov t1, 1
+    spawn math::ln              | ordered:false delay:0 remap: {t2 = ln_3}
+    mov t1, 1000000
+    spawn math::ln              | ordered:false delay:0 remap: {t2 = ln_4}
+    mov t1, 1024
+    spawn math::log2            | ordered:false delay:0 remap: {t2 = log2_1}
+    mov t1, 3
+    spawn math::log2            | ordered:false delay:0 remap: {t2 = log2_2}
+    mov t1, 1000
+    spawn math::log10           | ordered:false delay:0 remap: {t2 = log10_1}
+    mov t1, 2
+    spawn math::log10           | ordered:false delay:0 remap: {t2 = log10_2}
+    mov t1, 1
+    spawn math::log1p           | ordered:false delay:0 remap: {t2 = log1p_1}
+    mov t1, -0.5
+    spawn math::log1p           | ordered:false delay:0 remap: {t2 = log1p_2}

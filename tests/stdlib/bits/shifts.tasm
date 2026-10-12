@@ -1,0 +1,53 @@
+; Tests for bits::fast_shift_left and fast_shift_right.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/bits
+    alias fast_shift_left_1,  c10
+    alias fast_shift_left_2,  c11
+    alias fast_shift_left_3,  c12
+    alias fast_shift_left_4,  c13
+    alias fast_shift_left_5,  c14
+    alias fast_shift_right_1, c15
+    alias fast_shift_right_2, c16
+    alias fast_shift_right_3, c17
+    alias fast_shift_right_4, c18
+
+    display fast_shift_left_1     ; expected: 131072   (fast_shift_left(2, 16))
+    display fast_shift_left_2     ; expected: -48   (fast_shift_left(-3, 4))
+    display fast_shift_left_3     ; expected: 1073741824   (3 << 30: bit 31 is dropped)
+    display fast_shift_left_4     ; expected: 5   (fast_shift_left(5, 0))
+    display fast_shift_left_5     ; expected: 0   (1 << 31: shifted out)
+    display fast_shift_right_1    ; expected: 73429   (fast_shift_right(587432, 3))
+    display fast_shift_right_2    ; expected: 0   (fast_shift_right(3, 2))
+    display fast_shift_right_3    ; expected: -2   (-5 >> 1: the sign is kept, the magnitude shifted)
+    display fast_shift_right_4    ; expected: 0   (100 >> 40: shifted out)
+
+
+_start:
+    mov c1, 2
+    mov c2, 16
+    spawn bits::fast_shift_left | ordered:false delay:0 remap: {c3 = fast_shift_left_1}
+    mov c1, -3
+    mov c2, 4
+    spawn bits::fast_shift_left | ordered:false delay:0 remap: {c3 = fast_shift_left_2}
+    mov c1, 3
+    mov c2, 30
+    spawn bits::fast_shift_left | ordered:false delay:0 remap: {c3 = fast_shift_left_3}
+    mov c1, 5
+    mov c2, 0
+    spawn bits::fast_shift_left | ordered:false delay:0 remap: {c3 = fast_shift_left_4}
+    mov c1, 1
+    mov c2, 31
+    spawn bits::fast_shift_left | ordered:false delay:0 remap: {c3 = fast_shift_left_5}
+    mov c1, 587432
+    mov c2, 3
+    spawn bits::fast_shift_right| ordered:false delay:0 remap: {c3 = fast_shift_right_1}
+    mov c1, 3
+    mov c2, 2
+    spawn bits::fast_shift_right| ordered:false delay:0 remap: {c3 = fast_shift_right_2}
+    mov c1, -5
+    mov c2, 1
+    spawn bits::fast_shift_right| ordered:false delay:0 remap: {c3 = fast_shift_right_3}
+    mov c1, 100
+    mov c2, 40
+    spawn bits::fast_shift_right| ordered:false delay:0 remap: {c3 = fast_shift_right_4}

@@ -1,0 +1,48 @@
+; Tests for math::pow.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias pow_1, t10
+    alias pow_2, t11
+    alias pow_3, t12
+    alias pow_4, t13
+    alias pow_5, t14
+    alias pow_6, t15
+    alias pow_7, t16
+    alias pow_8, t17
+
+    display pow_1    ; expected: 1024.00   (pow(2, 10))
+    display pow_2    ; expected: 1.41   (pow(2, 0.5))
+    display pow_3    ; expected: -8.00   (pow(-2, 3))
+    display pow_4    ; expected: 4.00   (pow(-2, 2))
+    display pow_5    ; expected: 0.01   (pow(10, -2))
+    display pow_6    ; expected: 1.00   (pow(0, 0) is defined as 1)
+    display pow_7    ; expected: 0.00   (pow(0, 5))
+    display pow_8    ; expected: 2.76   (pow(1.5, 2.5))
+
+
+_start:
+    mov t1, 2
+    mov t2, 10
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_1}
+    mov t1, 2
+    mov t2, 0.5
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_2}
+    mov t1, -2
+    mov t2, 3
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_3}
+    mov t1, -2
+    mov t2, 2
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_4}
+    mov t1, 10
+    mov t2, -2
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_5}
+    mov t1, 0
+    mov t2, 0
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_6}
+    mov t1, 0
+    mov t2, 5
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_7}
+    mov t1, 1.5
+    mov t2, 2.5
+    spawn math::pow             | ordered:false delay:0 remap: {t3 = pow_8}

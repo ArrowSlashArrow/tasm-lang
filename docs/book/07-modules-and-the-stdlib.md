@@ -78,10 +78,10 @@ Imports can be nested: `shapes` imports `consts`, and `use_shapes` doesn't need 
 | Module | Contains |
 | ------ | -------- |
 | `consts` | Constants: `PI`, `TAU`, `E`, `SQRT_2`, `LN_2`, `INT_LIMIT`, `MAX_SAFE_INT` and more. |
-| `math` | `modulo` (reads `c1` and `c2`, writes `c1 mod c2` to `c3`) and `sign`. |
-| `compare` | Branchless comparisons: `greater`, `less` and `less_eq` write `1` or `0` to `c3`. |
+| `math` | Real-number functions on timers (`exp`, `ln`, `sqrt`, `pow`, `sin`, `atan2`, `tanh`, ...), integer functions on counters (`modulo`, `gcd`, `ipow`, `isqrt`, ...), and `min`/`max`/`clamp`/`lerp` for both. |
+| `compare` | Branchless comparisons (`greater`, `less`, `less_eq`) and boolean gates (`and`, `or`, `not`, `xor`, ...) that write `1` or `0` to `c3`. |
 | `debug` | Assertions that flash the background green or red. |
-| `bits` | Logic operations on items that hold 0 or 1. |
+| `bits` | Bitwise operations on integers (`bitwise_and`, `bitwise_or`, `bitwise_xor`, `bitwise_not`) and bit shifts. |
 | `core` | Helpers for returning early and waiting for a signal. |
 | `mem_8bit`, `mem_14bit` | Reading and writing items by address. See [chapter 9](09-memory.md). |
 | `vec` | A list built on `mem_8bit`. Still in development. |

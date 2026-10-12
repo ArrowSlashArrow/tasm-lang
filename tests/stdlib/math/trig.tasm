@@ -1,0 +1,80 @@
+; Tests for math::sin, cos, tan, cot, sec and csc.
+; Each display shows one result; the expected value is in the comment next to it.
+_init:
+    import ../../../stdlib/math
+    alias sin_1, t10
+    alias cos_1, t11
+    alias tan_1, t12
+    alias cot_1, t13
+    alias sec_1, t14
+    alias csc_1, t15
+    alias sin_2, t16
+    alias cos_2, t17
+    alias tan_2, t18
+    alias cot_2, t19
+    alias sec_2, t20
+    alias csc_2, t21
+    alias sin_3, t22
+    alias cos_3, t23
+    alias tan_3, t24
+    alias cot_3, t25
+    alias sec_3, t26
+    alias csc_3, t27
+
+    display sin_1    ; expected: 0.84   (sin(1))
+    display cos_1    ; expected: 0.54   (cos(1))
+    display tan_1    ; expected: 1.56   (tan(1))
+    display cot_1    ; expected: 0.64   (cot(1))
+    display sec_1    ; expected: 1.85   (sec(1))
+    display csc_1    ; expected: 1.19   (csc(1))
+    display sin_2    ; expected: -0.91   (sin(-2))
+    display cos_2    ; expected: -0.42   (cos(-2))
+    display tan_2    ; expected: 2.19   (tan(-2))
+    display cot_2    ; expected: 0.46   (cot(-2))
+    display sec_2    ; expected: -2.40   (sec(-2))
+    display csc_2    ; expected: -1.10   (csc(-2))
+    display sin_3    ; expected: -0.51   (sin(100))
+    display cos_3    ; expected: 0.86   (cos(100))
+    display tan_3    ; expected: -0.59   (tan(100))
+    display cot_3    ; expected: -1.70   (cot(100))
+    display sec_3    ; expected: 1.16   (sec(100))
+    display csc_3    ; expected: -1.97   (csc(100))
+
+
+_start:
+    mov t1, 1
+    spawn math::sin             | ordered:false delay:0 remap: {t2 = sin_1}
+    mov t1, 1
+    spawn math::cos             | ordered:false delay:0 remap: {t2 = cos_1}
+    mov t1, 1
+    spawn math::tan             | ordered:false delay:0 remap: {t2 = tan_1}
+    mov t1, 1
+    spawn math::cot             | ordered:false delay:0 remap: {t2 = cot_1}
+    mov t1, 1
+    spawn math::sec             | ordered:false delay:0 remap: {t2 = sec_1}
+    mov t1, 1
+    spawn math::csc             | ordered:false delay:0 remap: {t2 = csc_1}
+    mov t1, -2
+    spawn math::sin             | ordered:false delay:0 remap: {t2 = sin_2}
+    mov t1, -2
+    spawn math::cos             | ordered:false delay:0 remap: {t2 = cos_2}
+    mov t1, -2
+    spawn math::tan             | ordered:false delay:0 remap: {t2 = tan_2}
+    mov t1, -2
+    spawn math::cot             | ordered:false delay:0 remap: {t2 = cot_2}
+    mov t1, -2
+    spawn math::sec             | ordered:false delay:0 remap: {t2 = sec_2}
+    mov t1, -2
+    spawn math::csc             | ordered:false delay:0 remap: {t2 = csc_2}
+    mov t1, 100
+    spawn math::sin             | ordered:false delay:0 remap: {t2 = sin_3}
+    mov t1, 100
+    spawn math::cos             | ordered:false delay:0 remap: {t2 = cos_3}
+    mov t1, 100
+    spawn math::tan             | ordered:false delay:0 remap: {t2 = tan_3}
+    mov t1, 100
+    spawn math::cot             | ordered:false delay:0 remap: {t2 = cot_3}
+    mov t1, 100
+    spawn math::sec             | ordered:false delay:0 remap: {t2 = sec_3}
+    mov t1, 100
+    spawn math::csc             | ordered:false delay:0 remap: {t2 = csc_3}
