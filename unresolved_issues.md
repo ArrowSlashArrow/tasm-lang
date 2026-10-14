@@ -157,7 +157,7 @@ So:
 
 **Potential fixes:** Emit an error ("instruction outside of a routine").
 
-### 2.9 🟠 Item and group IDs above 9,999 are accepted; out-of-range `i16` IDs become strings (verified)
+<!-- ### 2.9 🟠 Item and group IDs above 9,999 are accepted; out-of-range `i16` IDs become strings (verified)
 **File:** `rtasm/src/core/structs.rs:209-226`
 
 **Problem:**
@@ -174,7 +174,7 @@ So:
 
 **Problem:** `nan`, `inf` and `infinity` parse as numbers (`MOV C1, nan` compiles). Float *flags* reject non-finite values (`flags.rs:152`), so arguments and flags are inconsistent.
 
-**Potential fixes:** Reject non-finite numbers in `to_value`, or document them.
+**Potential fixes:** Reject non-finite numbers in `to_value`, or document them. -->
 
 ### 2.11 🟡 Inconsistent hex syntax
 **File:** `rtasm/src/core/structs.rs:173-177, 243-253`
@@ -223,7 +223,7 @@ So:
 
 **Potential fixes:** Return an error instead of panicking. Look in `$TASM_STDLIB`, then next to `current_exe()`, then the install directory.
 
-### 2.17 ⚪ Outdated module docs in `lexer.rs`
+<!-- ### 2.17 ⚪ Outdated module docs in `lexer.rs`
 **File:** `rtasm/src/lexer.rs:1-38`
 
 **Problem:** The doc comment mentions `MALLOC` and memory cells (removed), says instructions are "separated by 1 unit" (only in release mode), and says `_start` is "assigned group 1" (it's assigned in declaration order). It also says to indent "by at least 2 or 4 spaces" (any indentation works).
@@ -236,8 +236,8 @@ So:
 - `Routine::empty` and the "legacy: N" comments on `RoutineData` are leftovers.
 - `HandlerData` comments mention `malloc`.
 - `InstrType::Debug` says "only used by the emulator" (the emulator is legacy).
-- `Tasm.lines` keeps the whole file.
-- The `unsafe { unreachable_unchecked() }` calls (lines 201, 235) are unnecessary and become undefined behaviour if the match arms are ever edited. Use `unreachable!()`.
+- `Tasm.lines` keeps the whole file.  
+- The `unsafe { unreachable_unchecked() }` calls (lines 201, 235) are unnecessary and become undefined behaviour if the match arms are ever edited. Use `unreachable!()`. -->
 
 ---
 
@@ -250,12 +250,12 @@ So:
 
 **Potential fixes:** Add the accepted flags to each `INSTR_SPEC` entry and emit an error (or warning) for unused flags. This also documents flags in code.
 
-### 3.2 🔴 `COLL` reads unregistered flags
+<!-- ### 3.2 🔴 `COLL` reads unregistered flags
 **File:** `rtasm/src/instr/fns.rs:964-969`, `rtasm/src/core/flags.rs:288-316`
 
 **Problem:** `coll` reads `nospawn` and `onexit`, but they are missing from `get_flag_type`, so using them gives E0031. `docs/index.md:204, 562-563` advertises them.
 
-**Potential fixes:** Add `"nospawn" | "onexit" => Bool` to `get_flag_type`.
+**Potential fixes:** Add `"nospawn" | "onexit" => Bool` to `get_flag_type`. -->
 
 ### 3.3 🟠 Duplicate flags are silently accepted (verified)
 **File:** `rtasm/src/core/mod.rs:223-227`
@@ -310,19 +310,19 @@ So:
 
 **Possibly linked bugs:** `stdlib/compare.tasm` (`div c3, c3, 2 | resmode:+ iter:/`) may depend on the current multiply behaviour (`d / (|d|*2)`). Check and adjust it when fixing.-->
 
-### 4.2 🟠 `ADDM`/`SUBM`/`ADDD`/`SUBD` removed but still referenced (uncommitted change)
+<!-- ### 4.2 🟠 `ADDM`/`SUBM`/`ADDD`/`SUBD` removed but still referenced (uncommitted change)
 **Files:** `rtasm/src/instr/mod.rs`, `rtasm/src/instr/fns.rs` (working tree), `tests/all_instructions.tasm:19-22`, `docs/index.md:100-115`, `docs/updated_docs_v1.md` §3.1.2.1.2, `docs/book/09-debugging.md` §9.5, `vscode-ext/syntaxes/tasm.tmLanguage.json`
 
 **Problem:** The instructions are gone from `INSTR_SPEC`, so `cargo test` fails (`compile_success_all_instructions`). The docs, book and syntax highlighting still describe them, including the old "modifier swapped" bug.
 
-**Potential fixes:** Remove them from the test, docs, book and grammar, and mention the replacement (`ADD ... | itemmod:x [divmod:true]`). Or restore them with the modifier fixed (they previously compiled with the multiply/divide modifier swapped).
+**Potential fixes:** Remove them from the test, docs, book and grammar, and mention the replacement (`ADD ... | itemmod:x [divmod:true]`). Or restore them with the modifier fixed (they previously compiled with the multiply/divide modifier swapped). -->
 
-### 4.3 🟡 `WAITS` is scaled by the build mode but `WAIT`/`NOP` aren't
+<!-- ### 4.3 🟡 `WAITS` is scaled by the build mode but `WAIT`/`NOP` aren't
 **File:** `rtasm/src/instr/fns.rs:99-108`
 
 **Problem:** `WAIT n` means "n spaces" (n ticks in release, 30n in debug), while `WAITS s` means real time in both modes. The same program can have different relative timing between debug and release. `WAITS` also truncates (`as i32`), so `WAITS 0.003` is 0 ticks with no warning.
 
-**Potential fixes:** Pick one model (spaces or real time) and document it, or add a separate debug-mode time-scale flag. Warn when `WAITS` rounds to 0.
+**Potential fixes:** Pick one model (spaces or real time) and document it, or add a separate debug-mode time-scale flag. Warn when `WAITS` rounds to 0. -->
 
 ### 4.4 🟡 IOBlock positions aren't validated
 **File:** `rtasm/src/instr/fns.rs:763-790`
@@ -515,6 +515,12 @@ So:
 **Files:** `rtasm/src/core/mod.rs:305-310`, `rtasm/src/main.rs`
 
 **Problem:** All diagnostics use `println!`. Use `eprintln!` so that `tasmc -d file > out.tasm` and similar redirections stay clean.
+
+### 6.8 🟠 Floats with more than 6 sigfigs are silently written
+**Problem:** Floats with more than 6 sigfigs of precision are written to the level without any warning or error, which is a problem since GD will not save them correctly when saving the level - `1234567` is saved as `1.23456e6`.
+  - A float will be saved correctly if it meets the condition: `format!("{num:.6}").parse::<f32>() == num` 
+
+**Potential fixes:** Throw an error or warning when there is a float that will not be saved by GD corretly.
 
 ---
 

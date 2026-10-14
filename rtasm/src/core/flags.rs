@@ -147,16 +147,7 @@ impl FlagValue {
     ) -> Option<Self> {
         match t {
             FlagValueType::RoundSign => Some(string_to_roundsign(value)),
-            FlagValueType::Float => match value.parse::<f64>() {
-                Ok(f) => {
-                    if f.is_finite() {
-                        Some(Self::Float(f))
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => None,
-            },
+            FlagValueType::Float => value.parse::<f64>().ok().map(|f| Self::Float(f)),
             FlagValueType::Op => match value {
                 "+" => Some(Self::Op(Op::Add)),
                 "-" => Some(Self::Op(Op::Sub)),

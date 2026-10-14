@@ -458,7 +458,7 @@ pub fn index_routine_deps(
         routine.ident
     );
     // log this routine as "incomplete" in the cache
-    routine_cache.insert(symbol_path.hashable(), (Routine::empty(), false));
+    routine_cache.insert(symbol_path.hashable(), (Routine::default(), false));
     let symbols = scan_referenced_symbols(routine, false);
     if symbols.is_empty() {
         log!(silent, "Routine has no external symbols.");

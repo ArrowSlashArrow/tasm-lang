@@ -36,7 +36,6 @@ pub enum TasmValue {
     ModulePath(PathBuf), // PathBuf serves the same function here
     /// Default
     String(String),
-    UnresolvedAlias(String), // temporary state
 }
 
 /// Options for colliders in collision triggers
@@ -166,6 +165,8 @@ impl TasmValue {
         let remaining = iter.collect::<String>();
         let second_char = remaining.chars().next().unwrap_or(0 as char);
         let remaining_i16 = remaining.parse::<i16>();
+        // this one is used to capture an int that is too large to fit into an i16
+        let remaining_i128 = remaining.parse::<i128>();
         let remaining_i16_hex = if remaining.len() == 0 {
             "fail".parse()
         } else {
@@ -198,11 +199,7 @@ impl TasmValue {
                 "COLL_P2" => Ok(Self::CollBlock(Hitbox::Player2)),
                 _ => unsafe { unreachable_unchecked() },
             }
-        } else if pref.to_ascii_lowercase() == 'b'
-            && let Ok(n) = remaining_i16
-        {
-            Ok(Self::CollBlock(Hitbox::CollBlock(n)))
-        } else if matches!(pref, 'T' | 't' | 'C' | 'c' | 'G' | 'g') {
+        } else if matches!(pref.to_ascii_lowercase(), 't' | 'c' | 'g' | 'b') {
             // the only possible value here is an item or a string
             let id = if let Ok(id) = remaining_i16 {
                 id
@@ -210,6 +207,14 @@ impl TasmValue {
                 && let Ok(id) = remaining_i16_hex
             {
                 id
+            } else if let Ok(_big) = remaining_i128 {
+                // if there's an integer ID after an item/counter specifier
+                // but the id is invalid
+                return Err((
+                    ParseErrorType::BadID,
+                    format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+                    17,
+                ));
             } else {
                 return Ok(Self::String(s.into()));
             };
@@ -223,13 +228,11 @@ impl TasmValue {
                 ));
             }
 
-            match pref {
-                'T' => Ok(Self::Timer(id)),
+            match pref.to_ascii_lowercase() {
                 't' => Ok(Self::Timer(id)),
-                'C' => Ok(Self::Counter(id)),
                 'c' => Ok(Self::Counter(id)),
-                'G' => Ok(Self::Group(id)),
                 'g' => Ok(Self::Group(id)),
+                'b' => Ok(Self::CollBlock(Hitbox::CollBlock(id))),
                 _ => unsafe {
                     // this is guaranteed to never trigger
                     unreachable_unchecked()
@@ -272,7 +275,6 @@ impl TasmValue {
             Self::String(_) => TasmPrimitive::String,
             Self::RoutineRef(_) => TasmPrimitive::RoutineRef,
             Self::ModulePath(_) => TasmPrimitive::ModulePath,
-            Self::UnresolvedAlias(_) => TasmPrimitive::String,
             Self::CollBlock(_) => TasmPrimitive::CollBlock,
         }
     }
@@ -435,7 +437,6 @@ pub struct HandlerData {
     pub skip_spaces: i32,
     // extra used groups
     pub used_extra_groups: i16,
-    // both set in malloc, keeps track of the groups of the respective objects
     // set in display instr handler to tell the tasm object to bump displays counter
     pub added_item_display: bool,
 }
@@ -489,14 +490,6 @@ pub struct Instruction {
 }
 
 impl Routine {
-    pub fn empty() -> Self {
-        Routine {
-            ident: String::new(),
-            group: 0,
-            instructions: vec![],
-        }
-    }
-
     pub fn group(mut self, group: i16) -> Self {
         self.group = group;
         self

@@ -11,7 +11,6 @@ this error will be tripped.
 As of GD 2.208, this limit is 9,999 groups.",
     // deprecated
     "E0002: ---",
-    // deprecated
     "E0003: ---",
 "E0004: Cannot overwrite value of counter.
 
