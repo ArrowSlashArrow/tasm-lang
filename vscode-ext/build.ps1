@@ -1,1 +1,0 @@
-code --extensionDevelopmentPath="C:\Users\Arrow\Documents\GitHub\tasm-lang\vscode-ext" 
