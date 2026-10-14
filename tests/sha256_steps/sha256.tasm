@@ -1,0 +1,461 @@
+; sha256 of the string starting at offset 100
+_init:
+
+    alias strlen, 50        ; maximum length: the string ends at its first 0 byte or after 50 bytes
+    alias str_offset, 100
+
+    ; the hash, one byte per counter (bottom display = first byte)
+    display c20         ; expected: 49
+    display c21         ; expected: 95
+    display c22         ; expected: 91
+    display c23         ; expected: 219
+    display c24         ; expected: 118
+    display c25         ; expected: 208
+    display c26         ; expected: 120
+    display c27         ; expected: 196
+    display c28         ; expected: 59
+    display c29         ; expected: 138
+    display c30         ; expected: 192
+    display c31         ; expected: 6
+    display c32         ; expected: 78
+    display c33         ; expected: 74
+    display c34         ; expected: 1
+    display c35         ; expected: 100
+    display c36         ; expected: 97
+    display c37         ; expected: 43
+    display c38         ; expected: 31
+    display c39         ; expected: 206
+    display c40         ; expected: 119
+    display c41         ; expected: 200
+    display c42         ; expected: 105
+    display c43         ; expected: 52
+    display c44         ; expected: 91
+    display c45         ; expected: 252
+    display c46         ; expected: 148
+    display c47         ; expected: 199
+    display c48         ; expected: 88
+    display c49         ; expected: 148
+    display c50         ; expected: 237
+    display c51         ; expected: 211
+
+_start:
+    ; load string: "Hello, world!"
+    ; expected sha256 hash: 315f5bdb76d078c43b8ac0064e4a0164612b1fce77c869345bfc94c75894edd3
+    mov C100, 72        ; H
+    mov C101, 101       ; e
+    mov C102, 108       ; l
+    mov C103, 108       ; l
+    mov C104, 111       ; o
+    mov C105, 44        ; ,
+    mov C106, 32        ; (space)
+    mov C107, 119       ; w
+    mov C108, 111       ; o
+    mov C109, 114       ; r
+    mov C110, 108       ; l
+    mov C111, 100       ; d
+    mov C112, 33        ; !
+    spawn sha256                | ordered:false delay:0
+
+; SHA-256 of the string at c100.. (bytes 0-255; it ends at its first 0 byte or after 50 bytes).
+; The hash ends up in c20 - c51. Every 32-bit word is two counters (high and low 16 bits).
+; c1200-c1208 / c1210-c1218: high / low halves of h, g, f, e, d, c, b, a, T1
+; c1300-c1316 / c1320-c1336: W[t] .. W[t + 16], c1400-c1463: K[t] .. K[63] (signed)
+; c3030-c3046: 2^0 .. 2^16, c3028: 0, c3100 and up: scratch and the helpers' arguments
+; @0tick, but the rounds run afterwards, one per tick (64 ticks)
+sha256:
+    mov c3030, 1
+    mov c3031, 2
+    mov c3032, 4
+    mov c3033, 8
+    mov c3034, 16
+    mov c3035, 32
+    mov c3036, 64
+    mov c3037, 128
+    mov c3038, 256
+    mov c3039, 512
+    mov c3040, 1024
+    mov c3041, 2048
+    mov c3042, 4096
+    mov c3043, 8192
+    mov c3044, 16384
+    mov c3045, 32768
+    mov c3046, 65536
+    mov c3028, 0
+    mov c3029, 0                                    ; rounds done
+    mov c3154, 1                                    ; alive: 1 until the string has ended
+    mov c1335, 0                                    ; the length in bits
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c100, c3151 = c101, c3152 = c1300 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c102, c3151 = c103, c3152 = c1320 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c104, c3151 = c105, c3152 = c1301 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c106, c3151 = c107, c3152 = c1321 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c108, c3151 = c109, c3152 = c1302 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c110, c3151 = c111, c3152 = c1322 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c112, c3151 = c113, c3152 = c1303 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c114, c3151 = c115, c3152 = c1323 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c116, c3151 = c117, c3152 = c1304 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c118, c3151 = c119, c3152 = c1324 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c120, c3151 = c121, c3152 = c1305 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c122, c3151 = c123, c3152 = c1325 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c124, c3151 = c125, c3152 = c1306 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c126, c3151 = c127, c3152 = c1326 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c128, c3151 = c129, c3152 = c1307 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c130, c3151 = c131, c3152 = c1327 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c132, c3151 = c133, c3152 = c1308 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c134, c3151 = c135, c3152 = c1328 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c136, c3151 = c137, c3152 = c1309 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c138, c3151 = c139, c3152 = c1329 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c140, c3151 = c141, c3152 = c1310 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c142, c3151 = c143, c3152 = c1330 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c144, c3151 = c145, c3152 = c1311 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c146, c3151 = c147, c3152 = c1331 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c148, c3151 = c149, c3152 = c1312 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c3028, c3151 = c3028, c3152 = c1332 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c3028, c3151 = c3028, c3152 = c1313 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c3028, c3151 = c3028, c3152 = c1333 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c3028, c3151 = c3028, c3152 = c1314 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c3028, c3151 = c3028, c3152 = c1334 }
+    spawn bytepair          | ordered:false delay:0 remap: { c3150 = c3028, c3151 = c3028, c3152 = c1315 }
+    mov c1207, 27145                                ; a = 0x6a09e667
+    mov c1217, 58983
+    mov c1206, 47975                                ; b = 0xbb67ae85
+    mov c1216, 44677
+    mov c1205, 15470                                ; c = 0x3c6ef372
+    mov c1215, 62322
+    mov c1204, 42319                                ; d = 0xa54ff53a
+    mov c1214, 62778
+    mov c1203, 20750                                ; e = 0x510e527f
+    mov c1213, 21119
+    mov c1202, 39685                                ; f = 0x9b05688c
+    mov c1212, 26764
+    mov c1201, 8067                                 ; g = 0x1f83d9ab
+    mov c1211, 55723
+    mov c1200, 23520                                ; h = 0x5be0cd19
+    mov c1210, 52505
+    mov c1400, 1116340224                           ; K[0] = 0x428a2f98
+    add c1400, 12184
+    mov c1401, 1899429888                           ; K[1] = 0x71374491
+    add c1401, 17553
+    mov c1402, -1245708288                          ; K[2] = 0xb5c0fbcf
+    add c1402, 64463
+    mov c1403, -374013952                           ; K[3] = 0xe9b5dba5
+    add c1403, 56229
+    mov c1404, 961937408                            ; K[4] = 0x3956c25b
+    add c1404, 49755
+    mov c1405, 1508966400                           ; K[5] = 0x59f111f1
+    add c1405, 4593
+    mov c1406, -1841364992                          ; K[6] = 0x923f82a4
+    add c1406, 33444
+    mov c1407, -1424228352                          ; K[7] = 0xab1c5ed5
+    add c1407, 24277
+    mov c1408, -670629888                           ; K[8] = 0xd807aa98
+    add c1408, 43672
+    mov c1409, 310575104                            ; K[9] = 0x12835b01
+    add c1409, 23297
+    mov c1410, 607191040                            ; K[10] = 0x243185be
+    add c1410, 34238
+    mov c1411, 1426849792                           ; K[11] = 0x550c7dc3
+    add c1411, 32195
+    mov c1412, 1925054464                           ; K[12] = 0x72be5d74
+    add c1412, 23924
+    mov c1413, -2132934656                          ; K[13] = 0x80deb1fe
+    add c1413, 45566
+    mov c1414, -1680080896                          ; K[14] = 0x9bdc06a7
+    add c1414, 1703
+    mov c1415, -1046806528                          ; K[15] = 0xc19bf174
+    add c1415, 61812
+    mov c1416, -459603968                           ; K[16] = 0xe49b69c1
+    add c1416, 27073
+    mov c1417, -272760832                           ; K[17] = 0xefbe4786
+    add c1417, 18310
+    mov c1418, 264306688                            ; K[18] = 0x0fc19dc6
+    add c1418, 40390
+    mov c1419, 604766208                            ; K[19] = 0x240ca1cc
+    add c1419, 41420
+    mov c1420, 770244608                            ; K[20] = 0x2de92c6f
+    add c1420, 11375
+    mov c1421, 1249116160                           ; K[21] = 0x4a7484aa
+    add c1421, 33962
+    mov c1422, 1555038208                           ; K[22] = 0x5cb0a9dc
+    add c1422, 43484
+    mov c1423, 1996029952                           ; K[23] = 0x76f988da
+    add c1423, 35034
+    mov c1424, -1740767232                          ; K[24] = 0x983e5152
+    add c1424, 20818
+    mov c1425, -1473183744                          ; K[25] = 0xa831c66d
+    add c1425, 50797
+    mov c1426, -1341980672                          ; K[26] = 0xb00327c8
+    add c1426, 10184
+    mov c1427, -1084686336                          ; K[27] = 0xbf597fc7
+    add c1427, 32711
+    mov c1428, -958398464                           ; K[28] = 0xc6e00bf3
+    add c1428, 3059
+    mov c1429, -710475776                           ; K[29] = 0xd5a79147
+    add c1429, 37191
+    mov c1430, 113901568                            ; K[30] = 0x06ca6351
+    add c1430, 25425
+    mov c1431, 338231296                            ; K[31] = 0x14292967
+    add c1431, 10599
+    mov c1432, 666304512                            ; K[32] = 0x27b70a85
+    add c1432, 2693
+    mov c1433, 773521408                            ; K[33] = 0x2e1b2138
+    add c1433, 8504
+    mov c1434, 1294729216                           ; K[34] = 0x4d2c6dfc
+    add c1434, 28156
+    mov c1435, 1396178944                           ; K[35] = 0x53380d13
+    add c1435, 3347
+    mov c1436, 1695154176                           ; K[36] = 0x650a7354
+    add c1436, 29524
+    mov c1437, 1986658304                           ; K[37] = 0x766a0abb
+    add c1437, 2747
+    mov c1438, -2117992448                          ; K[38] = 0x81c2c92e
+    add c1438, 51502
+    mov c1439, -1838022656                          ; K[39] = 0x92722c85
+    add c1439, 11397
+    mov c1440, -1564540928                          ; K[40] = 0xa2bfe8a1
+    add c1440, 59553
+    mov c1441, -1474691072                          ; K[41] = 0xa81a664b
+    add c1441, 26187
+    mov c1442, -1035272192                          ; K[42] = 0xc24b8b70
+    add c1442, 35696
+    mov c1443, -949223424                           ; K[43] = 0xc76c51a3
+    add c1443, 20899
+    mov c1444, -778960896                           ; K[44] = 0xd192e819
+    add c1444, 59417
+    mov c1445, -694616064                           ; K[45] = 0xd6990624
+    add c1445, 1572
+    mov c1446, -200409088                           ; K[46] = 0xf40e3585
+    add c1446, 13701
+    mov c1447, 275382272                            ; K[47] = 0x106aa070
+    add c1447, 41072
+    mov c1448, 430178304                            ; K[48] = 0x19a4c116
+    add c1448, 49430
+    mov c1449, 506920960                            ; K[49] = 0x1e376c08
+    add c1449, 27656
+    mov c1450, 659030016                            ; K[50] = 0x2748774c
+    add c1450, 30540
+    mov c1451, 883949568                            ; K[51] = 0x34b0bcb5
+    add c1451, 48309
+    mov c1452, 958136320                            ; K[52] = 0x391c0cb3
+    add c1452, 3251
+    mov c1453, 1322778624                           ; K[53] = 0x4ed8aa4a
+    add c1453, 43594
+    mov c1454, 1536950272                           ; K[54] = 0x5b9cca4f
+    add c1454, 51791
+    mov c1455, 1747845120                           ; K[55] = 0x682e6ff3
+    add c1455, 28659
+    mov c1456, 1955528704                           ; K[56] = 0x748f82ee
+    add c1456, 33518
+    mov c1457, 2024079360                           ; K[57] = 0x78a5636f
+    add c1457, 25455
+    mov c1458, -2067267584                          ; K[58] = 0x84c87814
+    add c1458, 30740
+    mov c1459, -1933115392                          ; K[59] = 0x8cc70208
+    add c1459, 520
+    mov c1460, -1866596352                          ; K[60] = 0x90befffa
+    add c1460, 65530
+    mov c1461, -1538260992                          ; K[61] = 0xa4506ceb
+    add c1461, 27883
+    mov c1462, -1090977792                          ; K[62] = 0xbef9a3f7
+    add c1462, 41975
+    mov c1463, -965672960                           ; K[63] = 0xc67178f2
+    add c1463, 30962
+    spawn sha256_round      | ordered:false         ; the next tick
+
+; One round, and the next schedule word. Loops by spawning itself (64 ticks).
+sha256_round:
+    add c1208, c1200, c1300                         ; T1 = h + W[t] + K[t] (K whole into the low half)
+    add c1218, c1210, c1400
+    add c1218, c1320
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1203, c3101 = c1213, c3102 = c1213, c3103 = c3036, c3104 = c3040, c3105 = c3170, c3106 = c3171 } ; rot 6
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1203, c3101 = c1213, c3102 = c1213, c3103 = c3041, c3104 = c3035, c3105 = c3172, c3106 = c3173 } ; rot 11
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1213, c3101 = c1203, c3102 = c1203, c3103 = c3039, c3104 = c3037, c3105 = c3174, c3106 = c3175 } ; rot 25
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3170, c3111 = c3172, c3112 = c3174, c3113 = c1208 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3171, c3111 = c3173, c3112 = c3175, c3113 = c1218 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c1203, c3111 = c1202, c3112 = c3028, c3114 = c1208 } ; + (e & f)
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c1203, c3111 = c1201, c3112 = c3028, c3115 = c1208 } ; - (e & g)
+    add c1208, c1201                                ; + g: Ch(e, f, g) = (e & f) + g - (e & g)
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c1213, c3111 = c1212, c3112 = c3028, c3114 = c1218 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c1213, c3111 = c1211, c3112 = c3028, c3115 = c1218 }
+    add c1218, c1211
+    add c1204, c1208                                ; d = d + T1, which becomes e
+    add c1214, c1218
+    spawn norm              | ordered:false delay:0 remap: { c3130 = c1204, c3131 = c1214 }
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1207, c3101 = c1217, c3102 = c1217, c3103 = c3032, c3104 = c3044, c3105 = c3176, c3106 = c3177 } ; rot 2
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1207, c3101 = c1217, c3102 = c1217, c3103 = c3043, c3104 = c3033, c3105 = c3178, c3106 = c3179 } ; rot 13
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1217, c3101 = c1207, c3102 = c1207, c3103 = c3036, c3104 = c3040, c3105 = c3180, c3106 = c3181 } ; rot 22
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3176, c3111 = c3178, c3112 = c3180, c3113 = c1208 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3177, c3111 = c3179, c3112 = c3181, c3113 = c1218 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c1207, c3111 = c1206, c3112 = c1205, c3114 = c1208 } ; T1 + S0(a) + Maj(a, b, c), which becomes a
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c1217, c3111 = c1216, c3112 = c1215, c3114 = c1218 }
+    spawn norm              | ordered:false delay:0 remap: { c3130 = c1208, c3131 = c1218 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1200, c3141 = c1201, c3142 = c1202, c3143 = c1203, c3144 = c1204, c3145 = c1205, c3146 = c1206, c3147 = c1207, c3148 = c1208 } ; h = g, g = f, ..., b = a, a = T1
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1210, c3141 = c1211, c3142 = c1212, c3143 = c1213, c3144 = c1214, c3145 = c1215, c3146 = c1216, c3147 = c1217, c3148 = c1218 }
+    add c1316, c1309, c1300                         ; W[t + 16] = W[t + 9] + W[t] + s0(W[t + 1]) + s1(W[t + 14])
+    add c1336, c1329, c1320
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1301, c3101 = c1321, c3102 = c1321, c3103 = c3037, c3104 = c3039, c3105 = c3182, c3106 = c3183 } ; rot 7
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1321, c3101 = c1301, c3102 = c1301, c3103 = c3032, c3104 = c3044, c3105 = c3184, c3106 = c3185 } ; rot 18
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1301, c3101 = c1321, c3102 = c3028, c3103 = c3033, c3104 = c3043, c3105 = c3186, c3106 = c3187 } ; shr 3
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3182, c3111 = c3184, c3112 = c3186, c3113 = c1316 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3183, c3111 = c3185, c3112 = c3187, c3113 = c1336 }
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1334, c3101 = c1314, c3102 = c1314, c3103 = c3031, c3104 = c3045, c3105 = c3188, c3106 = c3189 } ; rot 17
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1334, c3101 = c1314, c3102 = c1314, c3103 = c3033, c3104 = c3043, c3105 = c3190, c3106 = c3191 } ; rot 19
+    spawn rot               | ordered:false delay:0 remap: { c3100 = c1314, c3101 = c1334, c3102 = c3028, c3103 = c3040, c3104 = c3036, c3105 = c3192, c3106 = c3193 } ; shr 10
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3188, c3111 = c3190, c3112 = c3192, c3113 = c1316 }
+    spawn bitwise           | ordered:false delay:0 remap: { c3110 = c3189, c3111 = c3191, c3112 = c3193, c3113 = c1336 }
+    spawn norm              | ordered:false delay:0 remap: { c3130 = c1316, c3131 = c1336 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1300, c3141 = c1301, c3142 = c1302, c3143 = c1303, c3144 = c1304, c3145 = c1305, c3146 = c1306, c3147 = c1307, c3148 = c1308 } ; move W along
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1308, c3141 = c1309, c3142 = c1310, c3143 = c1311, c3144 = c1312, c3145 = c1313, c3146 = c1314, c3147 = c1315, c3148 = c1316 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1320, c3141 = c1321, c3142 = c1322, c3143 = c1323, c3144 = c1324, c3145 = c1325, c3146 = c1326, c3147 = c1327, c3148 = c1328 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1328, c3141 = c1329, c3142 = c1330, c3143 = c1331, c3144 = c1332, c3145 = c1333, c3146 = c1334, c3147 = c1335, c3148 = c1336 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1400, c3141 = c1401, c3142 = c1402, c3143 = c1403, c3144 = c1404, c3145 = c1405, c3146 = c1406, c3147 = c1407, c3148 = c1408 } ; move K along
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1408, c3141 = c1409, c3142 = c1410, c3143 = c1411, c3144 = c1412, c3145 = c1413, c3146 = c1414, c3147 = c1415, c3148 = c1416 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1416, c3141 = c1417, c3142 = c1418, c3143 = c1419, c3144 = c1420, c3145 = c1421, c3146 = c1422, c3147 = c1423, c3148 = c1424 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1424, c3141 = c1425, c3142 = c1426, c3143 = c1427, c3144 = c1428, c3145 = c1429, c3146 = c1430, c3147 = c1431, c3148 = c1432 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1432, c3141 = c1433, c3142 = c1434, c3143 = c1435, c3144 = c1436, c3145 = c1437, c3146 = c1438, c3147 = c1439, c3148 = c1440 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1440, c3141 = c1441, c3142 = c1442, c3143 = c1443, c3144 = c1444, c3145 = c1445, c3146 = c1446, c3147 = c1447, c3148 = c1448 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1448, c3141 = c1449, c3142 = c1450, c3143 = c1451, c3144 = c1452, c3145 = c1453, c3146 = c1454, c3147 = c1455, c3148 = c1456 }
+    spawn shift8            | ordered:false delay:0 remap: { c3140 = c1456, c3141 = c1457, c3142 = c1458, c3143 = c1459, c3144 = c1460, c3145 = c1461, c3146 = c1462, c3147 = c1463, c3148 = c1464 }
+    add c3029, 1
+    fl sha256_round, sha256_finish, c3029, 64 | ordered:false
+
+; hash = initial hash values + a..h
+; @0tick
+sha256_finish:
+    add c1207, 27145                                ; H0 = 0x6a09e667 + a
+    add c1217, 58983
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1207, c3161 = c1217, c3162 = c20, c3163 = c21, c3164 = c22, c3165 = c23 }
+    add c1206, 47975                                ; H1 = 0xbb67ae85 + b
+    add c1216, 44677
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1206, c3161 = c1216, c3162 = c24, c3163 = c25, c3164 = c26, c3165 = c27 }
+    add c1205, 15470                                ; H2 = 0x3c6ef372 + c
+    add c1215, 62322
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1205, c3161 = c1215, c3162 = c28, c3163 = c29, c3164 = c30, c3165 = c31 }
+    add c1204, 42319                                ; H3 = 0xa54ff53a + d
+    add c1214, 62778
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1204, c3161 = c1214, c3162 = c32, c3163 = c33, c3164 = c34, c3165 = c35 }
+    add c1203, 20750                                ; H4 = 0x510e527f + e
+    add c1213, 21119
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1203, c3161 = c1213, c3162 = c36, c3163 = c37, c3164 = c38, c3165 = c39 }
+    add c1202, 39685                                ; H5 = 0x9b05688c + f
+    add c1212, 26764
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1202, c3161 = c1212, c3162 = c40, c3163 = c41, c3164 = c42, c3165 = c43 }
+    add c1201, 8067                                 ; H6 = 0x1f83d9ab + g
+    add c1211, 55723
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1201, c3161 = c1211, c3162 = c44, c3163 = c45, c3164 = c46, c3165 = c47 }
+    add c1200, 23520                                ; H7 = 0x5be0cd19 + h
+    add c1210, 52505
+    spawn outw              | ordered:false delay:0 remap: { c3160 = c1200, c3161 = c1210, c3162 = c48, c3163 = c49, c3164 = c50, c3165 = c51 }
+
+; c3105 = high half, c3106 = low half of the word (c3100, c3101) shifted right by n, where c3103 = 2^n,
+; c3104 = 2^(16 - n). The bits that come in at the top of the high half are from c3102: c3101 for a
+; rotation, 0 for a shift.
+; @0tick
+rot:
+    fldiv c3107, c3100, c3103
+    fldiv c3108, c3101, c3103
+    fldiv c3109, c3102, c3103
+    mul c3105, c3102, c3104
+    sub c3105, c3109        | itemmod:65536         ; the low n bits of c3102, on top
+    add c3105, c3107
+    mul c3106, c3100, c3104
+    sub c3106, c3107        | itemmod:65536         ; the low n bits of c3100, on top
+    add c3106, c3108
+
+; For three 16-bit halves x = c3110, y = c3111, z = c3112:
+; c3113 += x ^ y ^ z, c3114 += Maj(x, y, z), c3115 -= Maj(x, y, z)   (x & y = Maj(x, y, 0))
+; With T_k = (x >> k) + (y >> k) + (z >> k), bit k of Maj is floor(T_k / 2) - T_(k+1),
+; and x ^ y ^ z = x + y + z - 2 * Maj.
+; @0tick
+bitwise:
+    mov c3116, c3110
+    mov c3117, c3111
+    mov c3118, c3112
+    add c3119, c3116, c3117                         ; T_0
+    add c3119, c3118
+    add c3113, c3119
+    mov c3121, 0                                    ; Maj
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3030 } ; bit 0 .. bit 15
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3031 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3032 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3033 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3034 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3035 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3036 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3037 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3038 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3039 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3040 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3041 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3042 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3043 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3044 }
+    spawn bitstep           | ordered:false delay:0 remap: { c3122 = c3045 }
+    add c3114, c3121
+    sub c3115, c3121
+    sub c3113, c3121        | itemmod:2
+
+; One bit of bitwise: c3119 = T_k becomes T_(k+1), c3121 += 2^k (= c3122) * bit k of Maj.
+; @0tick
+bitstep:
+    fldiv c3116, 2
+    fldiv c3117, 2
+    fldiv c3118, 2
+    add c3120, c3116, c3117                         ; T_(k+1)
+    add c3120, c3118
+    sub c3119, c3120        | itemmod:2             ; bit k of x + y + z
+    fldiv c3119, 2                                  ; bit k of Maj
+    mul c3119, c3122
+    add c3121, c3119
+    mov c3119, c3120
+
+; (c3130, c3131) mod 2^32: both halves end up in 0 .. 65535 (they may start negative).
+; @0tick
+norm:
+    fldiv c3132, c3131, c3046
+    sub c3131, c3132        | itemmod:65536
+    add c3130, c3132
+    fldiv c3132, c3130, c3046
+    sub c3130, c3132        | itemmod:65536
+
+; c3140 = c3141, c3141 = c3142, ..., c3147 = c3148
+; @0tick
+shift8:
+    mov c3140, c3141
+    mov c3141, c3142
+    mov c3142, c3143
+    mov c3143, c3144
+    mov c3144, c3145
+    mov c3145, c3146
+    mov c3146, c3147
+    mov c3147, c3148
+
+; c3152 = the next two bytes of the padded block, c3150 and c3151. A byte counts while c3154 (alive) is 1;
+; the first 0 byte becomes 0x80 and clears alive. Adds 8 * alive per byte to the length.
+; @0tick
+bytepair:
+    mov c3152, c3154        | itemmod:32768         ; 128 * 256 * alive
+    mul c3153, c3150, c3154                         ; the byte, or 0 once the string has ended
+    div c3154, c3153, c3046 | resmode:ceil          ; alive: still 1 if that's non-zero
+    add c3152, c3153        | itemmod:256
+    sub c3152, c3154        | itemmod:32640         ; the 0x80 goes where alive dropped to 0
+    add c1335, c3154        | itemmod:8
+    mul c3153, c3151, c3154                         ; the byte, or 0 once the string has ended
+    div c3154, c3153, c3046 | resmode:ceil          ; alive: still 1 if that's non-zero
+    add c3152, c3153
+    sub c3152, c3154        | itemmod:128           ; the 0x80 goes where alive dropped to 0
+    add c1335, c3154        | itemmod:8
+
+; c3162 .. c3165 = the 4 bytes of the word (c3160, c3161), reduced mod 2^32 first.
+; @0tick
+outw:
+    fldiv c3132, c3161, c3046
+    sub c3161, c3132        | itemmod:65536
+    add c3160, c3132
+    fldiv c3132, c3160, c3046
+    sub c3160, c3132        | itemmod:65536
+    fldiv c3162, c3160, c3038
+    mov c3163, c3160
+    sub c3163, c3162        | itemmod:256
+    fldiv c3164, c3161, c3038
+    mov c3165, c3161
+    sub c3165, c3164        | itemmod:256

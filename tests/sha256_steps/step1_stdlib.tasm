@@ -1,0 +1,973 @@
+; sha256 of the string starting at offset 100
+_init:
+    import ../../stdlib/bits
+
+    alias strlen, 50        ; maximum length: the string ends at its first 0 byte or after 50 bytes
+    alias str_offset, 100
+
+    alias a_hi,           c1200    ; working variable a
+    alias a_lo,           c1201
+    alias b_hi,           c1202    ; working variable b
+    alias b_lo,           c1203
+    alias c_hi,           c1204    ; working variable c
+    alias c_lo,           c1205
+    alias d_hi,           c1206    ; working variable d
+    alias d_lo,           c1207
+    alias e_hi,           c1208    ; working variable e
+    alias e_lo,           c1209
+    alias f_hi,           c1210    ; working variable f
+    alias f_lo,           c1211
+    alias g_hi,           c1212    ; working variable g
+    alias g_lo,           c1213
+    alias h_hi,           c1214    ; working variable h
+    alias h_lo,           c1215
+    alias t1_hi,          c1600    ; T1, not reduced mod 2^32
+    alias t1_lo,          c1601
+    alias t2_hi,          c1602    ; S0(a) + Maj(a, b, c), not reduced
+    alias t2_lo,          c1603
+    alias sha_round,      c3000    ; rounds done
+    alias sha_tmp,        c3001    ; scratch
+    alias carry,          c3002    ; carry between the halves
+    alias alive,          c3003    ; 1 while the string hasn't ended
+    alias arg_x,          c3010    ; operands: one 16-bit half each
+    alias arg_y,          c3011
+    alias arg_z,          c3012
+    alias res_xor,        c3013    ; x ^ y ^ z, and x & y or Maj(x, y, z)
+    alias res_maj,        c3014
+    alias sum_a,          c3015    ; scratch
+    alias sum_b,          c3016
+    alias rot_q0,         c3020    ; rotations: each half shifted right
+    alias rot_q1,         c3021
+    alias rot_q2,         c3022
+    alias rot_q3,         c3023
+    alias rot_q4,         c3024
+    alias rot_q5,         c3025
+    alias pow1,           c3031    ; 2^n, for fldiv
+    alias pow2,           c3032
+    alias pow3,           c3033
+    alias pow6,           c3036
+    alias pow7,           c3037
+    alias pow8,           c3038
+    alias pow9,           c3039
+    alias pow10,          c3040
+    alias pow11,          c3041
+    alias pow13,          c3043
+    alias pow16,          c3046
+
+    ; the hash, one byte per counter (bottom display = first byte)
+    display c20         ; expected: 49
+    display c21         ; expected: 95
+    display c22         ; expected: 91
+    display c23         ; expected: 219
+    display c24         ; expected: 118
+    display c25         ; expected: 208
+    display c26         ; expected: 120
+    display c27         ; expected: 196
+    display c28         ; expected: 59
+    display c29         ; expected: 138
+    display c30         ; expected: 192
+    display c31         ; expected: 6
+    display c32         ; expected: 78
+    display c33         ; expected: 74
+    display c34         ; expected: 1
+    display c35         ; expected: 100
+    display c36         ; expected: 97
+    display c37         ; expected: 43
+    display c38         ; expected: 31
+    display c39         ; expected: 206
+    display c40         ; expected: 119
+    display c41         ; expected: 200
+    display c42         ; expected: 105
+    display c43         ; expected: 52
+    display c44         ; expected: 91
+    display c45         ; expected: 252
+    display c46         ; expected: 148
+    display c47         ; expected: 199
+    display c48         ; expected: 88
+    display c49         ; expected: 148
+    display c50         ; expected: 237
+    display c51         ; expected: 211
+
+_start:
+    ; load string: "Hello, world!"
+    ; expected sha256 hash: 315f5bdb76d078c43b8ac0064e4a0164612b1fce77c869345bfc94c75894edd3
+    mov C100, 72        ; H
+    mov C101, 101       ; e
+    mov C102, 108       ; l
+    mov C103, 108       ; l
+    mov C104, 111       ; o
+    mov C105, 44        ; ,
+    mov C106, 32        ; (space)
+    mov C107, 119       ; w
+    mov C108, 111       ; o
+    mov C109, 114       ; r
+    mov C110, 108       ; l
+    mov C111, 100       ; d
+    mov C112, 33        ; !
+    spawn sha256                | ordered:false delay:0
+
+; SHA-256 of the string at c100.. (one byte per counter, 0-255). The string ends at its first 0
+; byte or after 50 bytes, so it always fits in one 512-bit block. The 32 bytes of the hash
+; end up in c20 - c51, most significant byte first.
+;
+; Every 32-bit word is two counters holding its high and low 16 bits. Item layout:
+;     c1200-c1215: the working variables a..h (a_hi, a_lo, b_hi, ...)
+;     c1300-c1333: the message schedule W[t] .. W[t + 16], as hi/lo pairs
+;     c1400-c1463: the round constants that are still to come, as signed int32 (K - 2^32 if K >= 2^31)
+;     c1600-c1603: sums used during a round
+;     c3000-c3025: scratch, c3030-c3046: powers of two
+; @0tick, but the rounds run afterwards, one per tick (64 ticks)
+sha256:
+    mov sha_round, 0
+    mov pow1, 2
+    mov pow2, 4
+    mov pow3, 8
+    mov pow6, 64
+    mov pow7, 128
+    mov pow8, 256
+    mov pow9, 512
+    mov pow10, 1024
+    mov pow11, 2048
+    mov pow13, 8192
+    mov pow16, 65536
+    ; the padded block, straight into W[0..15]: each 16-bit half is two bytes. Byte i is
+    ;     alive_i * str_i + 128 * (alive_(i-1) - alive_i),   alive_i = 1 while bytes 0..i are all non-zero
+    ; which puts 0x80 after the string. The last half (bytes 62-63) is the length in bits.
+    mov c1331, 0
+    mov alive, 1
+    mov c1300, alive                | itemmod:32768         ; bytes 0, 1: 128 * 256 * alive_-1
+    mul sha_tmp, c100, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1300, sha_tmp              | itemmod:256
+    sub c1300, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c101, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1300, sha_tmp
+    sub c1300, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1301, alive                | itemmod:32768         ; bytes 2, 3: 128 * 256 * alive_1
+    mul sha_tmp, c102, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1301, sha_tmp              | itemmod:256
+    sub c1301, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c103, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1301, sha_tmp
+    sub c1301, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1302, alive                | itemmod:32768         ; bytes 4, 5: 128 * 256 * alive_3
+    mul sha_tmp, c104, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1302, sha_tmp              | itemmod:256
+    sub c1302, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c105, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1302, sha_tmp
+    sub c1302, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1303, alive                | itemmod:32768         ; bytes 6, 7: 128 * 256 * alive_5
+    mul sha_tmp, c106, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1303, sha_tmp              | itemmod:256
+    sub c1303, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c107, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1303, sha_tmp
+    sub c1303, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1304, alive                | itemmod:32768         ; bytes 8, 9: 128 * 256 * alive_7
+    mul sha_tmp, c108, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1304, sha_tmp              | itemmod:256
+    sub c1304, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c109, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1304, sha_tmp
+    sub c1304, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1305, alive                | itemmod:32768         ; bytes 10, 11: 128 * 256 * alive_9
+    mul sha_tmp, c110, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1305, sha_tmp              | itemmod:256
+    sub c1305, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c111, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1305, sha_tmp
+    sub c1305, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1306, alive                | itemmod:32768         ; bytes 12, 13: 128 * 256 * alive_11
+    mul sha_tmp, c112, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1306, sha_tmp              | itemmod:256
+    sub c1306, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c113, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1306, sha_tmp
+    sub c1306, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1307, alive                | itemmod:32768         ; bytes 14, 15: 128 * 256 * alive_13
+    mul sha_tmp, c114, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1307, sha_tmp              | itemmod:256
+    sub c1307, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c115, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1307, sha_tmp
+    sub c1307, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1308, alive                | itemmod:32768         ; bytes 16, 17: 128 * 256 * alive_15
+    mul sha_tmp, c116, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1308, sha_tmp              | itemmod:256
+    sub c1308, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c117, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1308, sha_tmp
+    sub c1308, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1309, alive                | itemmod:32768         ; bytes 18, 19: 128 * 256 * alive_17
+    mul sha_tmp, c118, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1309, sha_tmp              | itemmod:256
+    sub c1309, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c119, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1309, sha_tmp
+    sub c1309, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1310, alive                | itemmod:32768         ; bytes 20, 21: 128 * 256 * alive_19
+    mul sha_tmp, c120, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1310, sha_tmp              | itemmod:256
+    sub c1310, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c121, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1310, sha_tmp
+    sub c1310, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1311, alive                | itemmod:32768         ; bytes 22, 23: 128 * 256 * alive_21
+    mul sha_tmp, c122, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1311, sha_tmp              | itemmod:256
+    sub c1311, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c123, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1311, sha_tmp
+    sub c1311, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1312, alive                | itemmod:32768         ; bytes 24, 25: 128 * 256 * alive_23
+    mul sha_tmp, c124, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1312, sha_tmp              | itemmod:256
+    sub c1312, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c125, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1312, sha_tmp
+    sub c1312, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1313, alive                | itemmod:32768         ; bytes 26, 27: 128 * 256 * alive_25
+    mul sha_tmp, c126, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1313, sha_tmp              | itemmod:256
+    sub c1313, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c127, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1313, sha_tmp
+    sub c1313, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1314, alive                | itemmod:32768         ; bytes 28, 29: 128 * 256 * alive_27
+    mul sha_tmp, c128, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1314, sha_tmp              | itemmod:256
+    sub c1314, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c129, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1314, sha_tmp
+    sub c1314, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1315, alive                | itemmod:32768         ; bytes 30, 31: 128 * 256 * alive_29
+    mul sha_tmp, c130, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1315, sha_tmp              | itemmod:256
+    sub c1315, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c131, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1315, sha_tmp
+    sub c1315, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1316, alive                | itemmod:32768         ; bytes 32, 33: 128 * 256 * alive_31
+    mul sha_tmp, c132, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1316, sha_tmp              | itemmod:256
+    sub c1316, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c133, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1316, sha_tmp
+    sub c1316, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1317, alive                | itemmod:32768         ; bytes 34, 35: 128 * 256 * alive_33
+    mul sha_tmp, c134, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1317, sha_tmp              | itemmod:256
+    sub c1317, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c135, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1317, sha_tmp
+    sub c1317, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1318, alive                | itemmod:32768         ; bytes 36, 37: 128 * 256 * alive_35
+    mul sha_tmp, c136, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1318, sha_tmp              | itemmod:256
+    sub c1318, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c137, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1318, sha_tmp
+    sub c1318, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1319, alive                | itemmod:32768         ; bytes 38, 39: 128 * 256 * alive_37
+    mul sha_tmp, c138, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1319, sha_tmp              | itemmod:256
+    sub c1319, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c139, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1319, sha_tmp
+    sub c1319, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1320, alive                | itemmod:32768         ; bytes 40, 41: 128 * 256 * alive_39
+    mul sha_tmp, c140, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1320, sha_tmp              | itemmod:256
+    sub c1320, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c141, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1320, sha_tmp
+    sub c1320, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1321, alive                | itemmod:32768         ; bytes 42, 43: 128 * 256 * alive_41
+    mul sha_tmp, c142, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1321, sha_tmp              | itemmod:256
+    sub c1321, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c143, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1321, sha_tmp
+    sub c1321, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1322, alive                | itemmod:32768         ; bytes 44, 45: 128 * 256 * alive_43
+    mul sha_tmp, c144, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1322, sha_tmp              | itemmod:256
+    sub c1322, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c145, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1322, sha_tmp
+    sub c1322, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1323, alive                | itemmod:32768         ; bytes 46, 47: 128 * 256 * alive_45
+    mul sha_tmp, c146, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1323, sha_tmp              | itemmod:256
+    sub c1323, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c147, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1323, sha_tmp
+    sub c1323, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1324, alive                | itemmod:32768         ; bytes 48, 49: 128 * 256 * alive_47
+    mul sha_tmp, c148, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1324, sha_tmp              | itemmod:256
+    sub c1324, alive                | itemmod:32640         ; -128 * 256 * alive_i + 128 * alive_i
+    add c1331, alive                | itemmod:8
+    mul sha_tmp, c149, alive                                ; str_i * alive_(i-1) = str_i * alive_i
+    div alive, sha_tmp, pow16       | resmode:ceil          ; alive_i: 1 if that's non-zero
+    add c1324, sha_tmp
+    sub c1324, alive                | itemmod:128
+    add c1331, alive                | itemmod:8
+    mov c1325, alive                | itemmod:32768         ; byte 50: 0x80 if all 50 bytes are non-zero
+    mov c1326, 0
+    mov c1327, 0
+    mov c1328, 0
+    mov c1329, 0
+    mov c1330, 0
+    ; a..h = the initial hash values, and the round constants
+    mov a_hi, 27145                                         ; a = 0x6a09e667
+    mov a_lo, 58983
+    mov b_hi, 47975                                         ; b = 0xbb67ae85
+    mov b_lo, 44677
+    mov c_hi, 15470                                         ; c = 0x3c6ef372
+    mov c_lo, 62322
+    mov d_hi, 42319                                         ; d = 0xa54ff53a
+    mov d_lo, 62778
+    mov e_hi, 20750                                         ; e = 0x510e527f
+    mov e_lo, 21119
+    mov f_hi, 39685                                         ; f = 0x9b05688c
+    mov f_lo, 26764
+    mov g_hi, 8067                                          ; g = 0x1f83d9ab
+    mov g_lo, 55723
+    mov h_hi, 23520                                         ; h = 0x5be0cd19
+    mov h_lo, 52505
+    ; (each loaded in two parts that 32-bit floats hold exactly: a multiple of 65536, then the rest)
+    mov c1400, 1116340224                                   ; K[0] = 0x428a2f98
+    add c1400, 12184
+    mov c1401, 1899429888                                   ; K[1] = 0x71374491
+    add c1401, 17553
+    mov c1402, -1245708288                                  ; K[2] = 0xb5c0fbcf
+    add c1402, 64463
+    mov c1403, -374013952                                   ; K[3] = 0xe9b5dba5
+    add c1403, 56229
+    mov c1404, 961937408                                    ; K[4] = 0x3956c25b
+    add c1404, 49755
+    mov c1405, 1508966400                                   ; K[5] = 0x59f111f1
+    add c1405, 4593
+    mov c1406, -1841364992                                  ; K[6] = 0x923f82a4
+    add c1406, 33444
+    mov c1407, -1424228352                                  ; K[7] = 0xab1c5ed5
+    add c1407, 24277
+    mov c1408, -670629888                                   ; K[8] = 0xd807aa98
+    add c1408, 43672
+    mov c1409, 310575104                                    ; K[9] = 0x12835b01
+    add c1409, 23297
+    mov c1410, 607191040                                    ; K[10] = 0x243185be
+    add c1410, 34238
+    mov c1411, 1426849792                                   ; K[11] = 0x550c7dc3
+    add c1411, 32195
+    mov c1412, 1925054464                                   ; K[12] = 0x72be5d74
+    add c1412, 23924
+    mov c1413, -2132934656                                  ; K[13] = 0x80deb1fe
+    add c1413, 45566
+    mov c1414, -1680080896                                  ; K[14] = 0x9bdc06a7
+    add c1414, 1703
+    mov c1415, -1046806528                                  ; K[15] = 0xc19bf174
+    add c1415, 61812
+    mov c1416, -459603968                                   ; K[16] = 0xe49b69c1
+    add c1416, 27073
+    mov c1417, -272760832                                   ; K[17] = 0xefbe4786
+    add c1417, 18310
+    mov c1418, 264306688                                    ; K[18] = 0x0fc19dc6
+    add c1418, 40390
+    mov c1419, 604766208                                    ; K[19] = 0x240ca1cc
+    add c1419, 41420
+    mov c1420, 770244608                                    ; K[20] = 0x2de92c6f
+    add c1420, 11375
+    mov c1421, 1249116160                                   ; K[21] = 0x4a7484aa
+    add c1421, 33962
+    mov c1422, 1555038208                                   ; K[22] = 0x5cb0a9dc
+    add c1422, 43484
+    mov c1423, 1996029952                                   ; K[23] = 0x76f988da
+    add c1423, 35034
+    mov c1424, -1740767232                                  ; K[24] = 0x983e5152
+    add c1424, 20818
+    mov c1425, -1473183744                                  ; K[25] = 0xa831c66d
+    add c1425, 50797
+    mov c1426, -1341980672                                  ; K[26] = 0xb00327c8
+    add c1426, 10184
+    mov c1427, -1084686336                                  ; K[27] = 0xbf597fc7
+    add c1427, 32711
+    mov c1428, -958398464                                   ; K[28] = 0xc6e00bf3
+    add c1428, 3059
+    mov c1429, -710475776                                   ; K[29] = 0xd5a79147
+    add c1429, 37191
+    mov c1430, 113901568                                    ; K[30] = 0x06ca6351
+    add c1430, 25425
+    mov c1431, 338231296                                    ; K[31] = 0x14292967
+    add c1431, 10599
+    mov c1432, 666304512                                    ; K[32] = 0x27b70a85
+    add c1432, 2693
+    mov c1433, 773521408                                    ; K[33] = 0x2e1b2138
+    add c1433, 8504
+    mov c1434, 1294729216                                   ; K[34] = 0x4d2c6dfc
+    add c1434, 28156
+    mov c1435, 1396178944                                   ; K[35] = 0x53380d13
+    add c1435, 3347
+    mov c1436, 1695154176                                   ; K[36] = 0x650a7354
+    add c1436, 29524
+    mov c1437, 1986658304                                   ; K[37] = 0x766a0abb
+    add c1437, 2747
+    mov c1438, -2117992448                                  ; K[38] = 0x81c2c92e
+    add c1438, 51502
+    mov c1439, -1838022656                                  ; K[39] = 0x92722c85
+    add c1439, 11397
+    mov c1440, -1564540928                                  ; K[40] = 0xa2bfe8a1
+    add c1440, 59553
+    mov c1441, -1474691072                                  ; K[41] = 0xa81a664b
+    add c1441, 26187
+    mov c1442, -1035272192                                  ; K[42] = 0xc24b8b70
+    add c1442, 35696
+    mov c1443, -949223424                                   ; K[43] = 0xc76c51a3
+    add c1443, 20899
+    mov c1444, -778960896                                   ; K[44] = 0xd192e819
+    add c1444, 59417
+    mov c1445, -694616064                                   ; K[45] = 0xd6990624
+    add c1445, 1572
+    mov c1446, -200409088                                   ; K[46] = 0xf40e3585
+    add c1446, 13701
+    mov c1447, 275382272                                    ; K[47] = 0x106aa070
+    add c1447, 41072
+    mov c1448, 430178304                                    ; K[48] = 0x19a4c116
+    add c1448, 49430
+    mov c1449, 506920960                                    ; K[49] = 0x1e376c08
+    add c1449, 27656
+    mov c1450, 659030016                                    ; K[50] = 0x2748774c
+    add c1450, 30540
+    mov c1451, 883949568                                    ; K[51] = 0x34b0bcb5
+    add c1451, 48309
+    mov c1452, 958136320                                    ; K[52] = 0x391c0cb3
+    add c1452, 3251
+    mov c1453, 1322778624                                   ; K[53] = 0x4ed8aa4a
+    add c1453, 43594
+    mov c1454, 1536950272                                   ; K[54] = 0x5b9cca4f
+    add c1454, 51791
+    mov c1455, 1747845120                                   ; K[55] = 0x682e6ff3
+    add c1455, 28659
+    mov c1456, 1955528704                                   ; K[56] = 0x748f82ee
+    add c1456, 33518
+    mov c1457, 2024079360                                   ; K[57] = 0x78a5636f
+    add c1457, 25455
+    mov c1458, -2067267584                                  ; K[58] = 0x84c87814
+    add c1458, 30740
+    mov c1459, -1933115392                                  ; K[59] = 0x8cc70208
+    add c1459, 520
+    mov c1460, -1866596352                                  ; K[60] = 0x90befffa
+    add c1460, 65530
+    mov c1461, -1538260992                                  ; K[61] = 0xa4506ceb
+    add c1461, 27883
+    mov c1462, -1090977792                                  ; K[62] = 0xbef9a3f7
+    add c1462, 41975
+    mov c1463, -965672960                                   ; K[63] = 0xc67178f2
+    add c1463, 30962
+    spawn sha256_round              | ordered:false         ; the next tick
+
+; One round of the compression function, and the next word of the message schedule.
+; not 0-tickable: loops by spawning itself (64 times, one tick each)
+sha256_round:
+    ; T1 = h + K[t] + W[t] + S1(e) + Ch(e, f, g). K[t] goes into the low half whole (it can be negative):
+    ; the carry steps after e = d + T1 and a = T1 + T2 move it into the high half
+    add t1_hi, h_hi, c1300
+    add t1_lo, h_lo, c1400
+    add t1_lo, c1301
+    ; S1(e) = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
+    fldiv rot_q0, e_hi, pow6                                ; rotr 6
+    fldiv rot_q1, e_lo, pow6
+    fldiv rot_q2, e_hi, pow11                               ; rotr 11
+    fldiv rot_q3, e_lo, pow11
+    fldiv rot_q4, e_lo, pow9                                ; rotr 25
+    fldiv rot_q5, e_hi, pow9
+    mov arg_x, e_lo                 | itemmod:1024
+    sub arg_x, rot_q1               | itemmod:65536
+    add arg_x, rot_q0
+    mov arg_y, e_lo                 | itemmod:32
+    sub arg_y, rot_q3               | itemmod:65536
+    add arg_y, rot_q2
+    mov arg_z, e_hi                 | itemmod:128
+    sub arg_z, rot_q5               | itemmod:65536
+    add arg_z, rot_q4
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -1 = -1001 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -2 = -1002 }
+    add t1_hi, res_xor
+    mov arg_x, e_hi                 | itemmod:1024
+    sub arg_x, rot_q0               | itemmod:65536
+    add arg_x, rot_q1
+    mov arg_y, e_hi                 | itemmod:32
+    sub arg_y, rot_q2               | itemmod:65536
+    add arg_y, rot_q3
+    mov arg_z, e_lo                 | itemmod:128
+    sub arg_z, rot_q4               | itemmod:65536
+    add arg_z, rot_q5
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -3 = -1003 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -4 = -1004 }
+    add t1_lo, res_xor
+    ; Ch(e, f, g) = (e & f) + g - (e & g)
+    mov arg_x, e_hi
+    mov arg_y, f_hi
+    spawn bits::bitwise_and         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = res_maj, -5 = -1005 }
+    add t1_hi, res_maj
+    add t1_hi, g_hi
+    mov arg_x, e_hi
+    mov arg_y, g_hi
+    spawn bits::bitwise_and         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = res_maj, -6 = -1006 }
+    sub t1_hi, res_maj
+    mov arg_x, e_lo
+    mov arg_y, f_lo
+    spawn bits::bitwise_and         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = res_maj, -7 = -1007 }
+    add t1_lo, res_maj
+    add t1_lo, g_lo
+    mov arg_x, e_lo
+    mov arg_y, g_lo
+    spawn bits::bitwise_and         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = res_maj, -8 = -1008 }
+    sub t1_lo, res_maj
+    ; T2 = S0(a) + Maj(a, b, c), with S0(a) = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
+    fldiv rot_q0, a_hi, pow2                                ; rotr 2
+    fldiv rot_q1, a_lo, pow2
+    fldiv rot_q2, a_hi, pow13                               ; rotr 13
+    fldiv rot_q3, a_lo, pow13
+    fldiv rot_q4, a_lo, pow6                                ; rotr 22
+    fldiv rot_q5, a_hi, pow6
+    mov arg_x, a_lo                 | itemmod:16384
+    sub arg_x, rot_q1               | itemmod:65536
+    add arg_x, rot_q0
+    mov arg_y, a_lo                 | itemmod:8
+    sub arg_y, rot_q3               | itemmod:65536
+    add arg_y, rot_q2
+    mov arg_z, a_hi                 | itemmod:1024
+    sub arg_z, rot_q5               | itemmod:65536
+    add arg_z, rot_q4
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -9 = -1009 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -10 = -1010 }
+    mov t2_hi, res_xor
+    mov arg_x, a_hi                 | itemmod:16384
+    sub arg_x, rot_q0               | itemmod:65536
+    add arg_x, rot_q1
+    mov arg_y, a_hi                 | itemmod:8
+    sub arg_y, rot_q2               | itemmod:65536
+    add arg_y, rot_q3
+    mov arg_z, a_lo                 | itemmod:1024
+    sub arg_z, rot_q4               | itemmod:65536
+    add arg_z, rot_q5
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -11 = -1011 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -12 = -1012 }
+    mov t2_lo, res_xor
+    mov arg_x, a_hi
+    mov arg_y, b_hi
+    mov arg_z, c_hi
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -13 = -1013 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -14 = -1014 }
+    add sum_b, arg_x, arg_y                                 ; Maj = (x + y + z - (x ^ y ^ z)) / 2
+    add sum_b, arg_z
+    sub sum_b, res_xor
+    fldiv res_maj, sum_b, pow1
+    add t2_hi, res_maj
+    mov arg_x, a_lo
+    mov arg_y, b_lo
+    mov arg_z, c_lo
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -15 = -1015 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -16 = -1016 }
+    add sum_b, arg_x, arg_y                                 ; Maj = (x + y + z - (x ^ y ^ z)) / 2
+    add sum_b, arg_z
+    sub sum_b, res_xor
+    fldiv res_maj, sum_b, pow1
+    add t2_lo, res_maj
+    ; h = g, g = f, f = e, e = d + T1, d = c, c = b, b = a, a = T1 + T2
+    mov h_hi, g_hi
+    mov h_lo, g_lo
+    mov g_hi, f_hi
+    mov g_lo, f_lo
+    mov f_hi, e_hi
+    mov f_lo, e_lo
+    add e_hi, d_hi, t1_hi
+    add e_lo, d_lo, t1_lo
+    fldiv carry, e_lo, pow16
+    sub e_lo, carry                 | itemmod:65536
+    add e_hi, carry                                         ; carry into the high half
+    fldiv carry, e_hi, pow16
+    sub e_hi, carry                 | itemmod:65536         ; mod 2^32
+    mov d_hi, c_hi
+    mov d_lo, c_lo
+    mov c_hi, b_hi
+    mov c_lo, b_lo
+    mov b_hi, a_hi
+    mov b_lo, a_lo
+    add a_hi, t1_hi, t2_hi
+    add a_lo, t1_lo, t2_lo
+    fldiv carry, a_lo, pow16
+    sub a_lo, carry                 | itemmod:65536
+    add a_hi, carry                                         ; carry into the high half
+    fldiv carry, a_hi, pow16
+    sub a_hi, carry                 | itemmod:65536         ; mod 2^32
+    ; W[t + 16] = s1(W[t + 14]) + W[t + 9] + s0(W[t + 1]) + W[t], with
+    ; s0(x) = rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3), s1(x) = rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10)
+    add c1332, c1318, c1300
+    add c1333, c1319, c1301
+    fldiv rot_q0, c1302, pow7                               ; rotr 7
+    fldiv rot_q1, c1303, pow7
+    fldiv rot_q2, c1303, pow2                               ; rotr 18
+    fldiv rot_q3, c1302, pow2
+    fldiv rot_q4, c1302, pow3                               ; shr 3
+    fldiv rot_q5, c1303, pow3
+    mov arg_x, c1303                | itemmod:512
+    sub arg_x, rot_q1               | itemmod:65536
+    add arg_x, rot_q0
+    mov arg_y, c1302                | itemmod:16384
+    sub arg_y, rot_q3               | itemmod:65536
+    add arg_y, rot_q2
+    mov arg_z, rot_q4
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -17 = -1017 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -18 = -1018 }
+    add c1332, res_xor
+    mov arg_x, c1302                | itemmod:512
+    sub arg_x, rot_q0               | itemmod:65536
+    add arg_x, rot_q1
+    mov arg_y, c1303                | itemmod:16384
+    sub arg_y, rot_q2               | itemmod:65536
+    add arg_y, rot_q3
+    mov arg_z, c1302                | itemmod:8192
+    sub arg_z, rot_q4               | itemmod:65536
+    add arg_z, rot_q5
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -19 = -1019 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -20 = -1020 }
+    add c1333, res_xor
+    fldiv rot_q0, c1329, pow1                               ; rotr 17
+    fldiv rot_q1, c1328, pow1
+    fldiv rot_q2, c1329, pow3                               ; rotr 19
+    fldiv rot_q3, c1328, pow3
+    fldiv rot_q4, c1328, pow10                              ; shr 10
+    fldiv rot_q5, c1329, pow10
+    mov arg_x, c1328                | itemmod:32768
+    sub arg_x, rot_q1               | itemmod:65536
+    add arg_x, rot_q0
+    mov arg_y, c1328                | itemmod:8192
+    sub arg_y, rot_q3               | itemmod:65536
+    add arg_y, rot_q2
+    mov arg_z, rot_q4
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -21 = -1021 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -22 = -1022 }
+    add c1332, res_xor
+    mov arg_x, c1329                | itemmod:32768
+    sub arg_x, rot_q0               | itemmod:65536
+    add arg_x, rot_q1
+    mov arg_y, c1329                | itemmod:8192
+    sub arg_y, rot_q2               | itemmod:65536
+    add arg_y, rot_q3
+    mov arg_z, c1328                | itemmod:64
+    sub arg_z, rot_q4               | itemmod:65536
+    add arg_z, rot_q5
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = arg_x, c2 = arg_y, c3 = sum_a, -23 = -1023 }
+    spawn bits::bitwise_xor         | ordered:false delay:0 remap: { c1 = sum_a, c2 = arg_z, c3 = res_xor, -24 = -1024 }
+    add c1333, res_xor
+    fldiv carry, c1333, pow16
+    sub c1333, carry                | itemmod:65536
+    add c1332, carry                                        ; carry into the high half
+    fldiv carry, c1332, pow16
+    sub c1332, carry                | itemmod:65536         ; mod 2^32
+    ; move the schedule window and the constants along by one
+    mov c1300, c1302
+    mov c1301, c1303
+    mov c1302, c1304
+    mov c1303, c1305
+    mov c1304, c1306
+    mov c1305, c1307
+    mov c1306, c1308
+    mov c1307, c1309
+    mov c1308, c1310
+    mov c1309, c1311
+    mov c1310, c1312
+    mov c1311, c1313
+    mov c1312, c1314
+    mov c1313, c1315
+    mov c1314, c1316
+    mov c1315, c1317
+    mov c1316, c1318
+    mov c1317, c1319
+    mov c1318, c1320
+    mov c1319, c1321
+    mov c1320, c1322
+    mov c1321, c1323
+    mov c1322, c1324
+    mov c1323, c1325
+    mov c1324, c1326
+    mov c1325, c1327
+    mov c1326, c1328
+    mov c1327, c1329
+    mov c1328, c1330
+    mov c1329, c1331
+    mov c1330, c1332
+    mov c1331, c1333
+    mov c1400, c1401
+    mov c1401, c1402
+    mov c1402, c1403
+    mov c1403, c1404
+    mov c1404, c1405
+    mov c1405, c1406
+    mov c1406, c1407
+    mov c1407, c1408
+    mov c1408, c1409
+    mov c1409, c1410
+    mov c1410, c1411
+    mov c1411, c1412
+    mov c1412, c1413
+    mov c1413, c1414
+    mov c1414, c1415
+    mov c1415, c1416
+    mov c1416, c1417
+    mov c1417, c1418
+    mov c1418, c1419
+    mov c1419, c1420
+    mov c1420, c1421
+    mov c1421, c1422
+    mov c1422, c1423
+    mov c1423, c1424
+    mov c1424, c1425
+    mov c1425, c1426
+    mov c1426, c1427
+    mov c1427, c1428
+    mov c1428, c1429
+    mov c1429, c1430
+    mov c1430, c1431
+    mov c1431, c1432
+    mov c1432, c1433
+    mov c1433, c1434
+    mov c1434, c1435
+    mov c1435, c1436
+    mov c1436, c1437
+    mov c1437, c1438
+    mov c1438, c1439
+    mov c1439, c1440
+    mov c1440, c1441
+    mov c1441, c1442
+    mov c1442, c1443
+    mov c1443, c1444
+    mov c1444, c1445
+    mov c1445, c1446
+    mov c1446, c1447
+    mov c1447, c1448
+    mov c1448, c1449
+    mov c1449, c1450
+    mov c1450, c1451
+    mov c1451, c1452
+    mov c1452, c1453
+    mov c1453, c1454
+    mov c1454, c1455
+    mov c1455, c1456
+    mov c1456, c1457
+    mov c1457, c1458
+    mov c1458, c1459
+    mov c1459, c1460
+    mov c1460, c1461
+    mov c1461, c1462
+    mov c1462, c1463
+    add sha_round, 1
+    fl sha256_round, sha256_finish, sha_round, 64 | ordered:false
+
+; hash = initial hash values + a..h, written as bytes to c20 - c51.
+; @0tick
+sha256_finish:
+    add a_hi, 27145                                         ; H0 = 0x6a09e667 + a
+    add a_lo, 58983
+    fldiv carry, a_lo, pow16
+    sub a_lo, carry                 | itemmod:65536
+    add a_hi, carry                                         ; carry into the high half
+    fldiv carry, a_hi, pow16
+    sub a_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c20, a_hi, pow8
+    mov c21, a_hi
+    sub c21, c20                    | itemmod:256
+    fldiv c22, a_lo, pow8
+    mov c23, a_lo
+    sub c23, c22                    | itemmod:256
+    add b_hi, 47975                                         ; H1 = 0xbb67ae85 + b
+    add b_lo, 44677
+    fldiv carry, b_lo, pow16
+    sub b_lo, carry                 | itemmod:65536
+    add b_hi, carry                                         ; carry into the high half
+    fldiv carry, b_hi, pow16
+    sub b_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c24, b_hi, pow8
+    mov c25, b_hi
+    sub c25, c24                    | itemmod:256
+    fldiv c26, b_lo, pow8
+    mov c27, b_lo
+    sub c27, c26                    | itemmod:256
+    add c_hi, 15470                                         ; H2 = 0x3c6ef372 + c
+    add c_lo, 62322
+    fldiv carry, c_lo, pow16
+    sub c_lo, carry                 | itemmod:65536
+    add c_hi, carry                                         ; carry into the high half
+    fldiv carry, c_hi, pow16
+    sub c_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c28, c_hi, pow8
+    mov c29, c_hi
+    sub c29, c28                    | itemmod:256
+    fldiv c30, c_lo, pow8
+    mov c31, c_lo
+    sub c31, c30                    | itemmod:256
+    add d_hi, 42319                                         ; H3 = 0xa54ff53a + d
+    add d_lo, 62778
+    fldiv carry, d_lo, pow16
+    sub d_lo, carry                 | itemmod:65536
+    add d_hi, carry                                         ; carry into the high half
+    fldiv carry, d_hi, pow16
+    sub d_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c32, d_hi, pow8
+    mov c33, d_hi
+    sub c33, c32                    | itemmod:256
+    fldiv c34, d_lo, pow8
+    mov c35, d_lo
+    sub c35, c34                    | itemmod:256
+    add e_hi, 20750                                         ; H4 = 0x510e527f + e
+    add e_lo, 21119
+    fldiv carry, e_lo, pow16
+    sub e_lo, carry                 | itemmod:65536
+    add e_hi, carry                                         ; carry into the high half
+    fldiv carry, e_hi, pow16
+    sub e_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c36, e_hi, pow8
+    mov c37, e_hi
+    sub c37, c36                    | itemmod:256
+    fldiv c38, e_lo, pow8
+    mov c39, e_lo
+    sub c39, c38                    | itemmod:256
+    add f_hi, 39685                                         ; H5 = 0x9b05688c + f
+    add f_lo, 26764
+    fldiv carry, f_lo, pow16
+    sub f_lo, carry                 | itemmod:65536
+    add f_hi, carry                                         ; carry into the high half
+    fldiv carry, f_hi, pow16
+    sub f_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c40, f_hi, pow8
+    mov c41, f_hi
+    sub c41, c40                    | itemmod:256
+    fldiv c42, f_lo, pow8
+    mov c43, f_lo
+    sub c43, c42                    | itemmod:256
+    add g_hi, 8067                                          ; H6 = 0x1f83d9ab + g
+    add g_lo, 55723
+    fldiv carry, g_lo, pow16
+    sub g_lo, carry                 | itemmod:65536
+    add g_hi, carry                                         ; carry into the high half
+    fldiv carry, g_hi, pow16
+    sub g_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c44, g_hi, pow8
+    mov c45, g_hi
+    sub c45, c44                    | itemmod:256
+    fldiv c46, g_lo, pow8
+    mov c47, g_lo
+    sub c47, c46                    | itemmod:256
+    add h_hi, 23520                                         ; H7 = 0x5be0cd19 + h
+    add h_lo, 52505
+    fldiv carry, h_lo, pow16
+    sub h_lo, carry                 | itemmod:65536
+    add h_hi, carry                                         ; carry into the high half
+    fldiv carry, h_hi, pow16
+    sub h_hi, carry                 | itemmod:65536         ; mod 2^32
+    fldiv c48, h_hi, pow8
+    mov c49, h_hi
+    sub c49, c48                    | itemmod:256
+    fldiv c50, h_lo, pow8
+    mov c51, h_lo
+    sub c51, c50                    | itemmod:256
