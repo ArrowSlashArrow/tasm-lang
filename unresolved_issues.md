@@ -63,12 +63,12 @@ So:
 
 **Possibly linked bugs:** Any `IFE x, nothing, ...` pattern where `nothing:` is empty.
 
-### 1.4 🟠 Group limit is checked before, not after, auxiliary groups
+<!-- ### 1.4 🟠 Group limit is checked before, not after, auxiliary groups
 **File:** `rtasm/src/core/mod.rs:93-102`
 
 **Problem:** `curr_group > GROUP_LIMIT` is only checked at the start of each routine. Auxiliary groups allocated by the last routine's instructions can exceed 9,999 without E0001. The check also happens during placement, so it can't account for all groups up front.
 
-**Potential fixes:** Check after allocating groups for every instruction, or compute the total before placement.
+**Potential fixes:** Check after allocating groups for every instruction, or compute the total before placement. -->
 
 ### 1.5 🟠 Imported modules reserve groups for routines that are never linked
 **File:** `rtasm/src/linker.rs:154-156`
@@ -79,7 +79,7 @@ So:
 
 **Possibly linked bugs:** 5.2 (unreferenced routines are also linked).
 
-### 1.6 🟠 `Using groups X - Y` excludes auxiliary groups
+<!-- ### 1.6 🟠 `Using groups X - Y` excludes auxiliary groups
 **File:** `rtasm/src/main.rs:264-269`
 
 **Problem:** The printed range only covers routine groups. Users choosing `--group-offset` or placing their own objects can't tell which groups the program really uses.
@@ -91,7 +91,7 @@ So:
 
 **Problem:** `--group-offset=-5` compiles and prints `Using groups -4 - -4`. Negative and zero group IDs are invalid in GD.
 
-**Potential fixes:** Use `clap::value_parser!(i16).range(0..GROUP_LIMIT)`.
+**Potential fixes:** Use `clap::value_parser!(i16).range(0..GROUP_LIMIT)`. -->
 
 ---
 
