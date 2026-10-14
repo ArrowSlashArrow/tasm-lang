@@ -7,15 +7,16 @@
 ;     spawn math::sqrt  | ordered:false delay:0
 ;     mov t5, t2        ; t2 = 1.4142135
 ;
-; They are branchless: no compares, so they use no extra groups. They use t9500-t9608 and c9500-c9569
+; They are branchless: no compares, so they use no extra groups. They use t9500-t9609 and c9500-c9569
 ; internally; don't use those items for anything else.
 ; Many routines spawn internal `__*` routines. When passing arguments with a remap, make sure
 ; that no remapped ID is the group of one of these routines (check with `tasmc -l`), since remaps
 ; apply to groups too.
 ;
-; GD's arithmetic has float precision (about 7 significant digits), timers can't hold values above
-; 9,999,999 and integer results are only exact below 16,777,216; the limits of each routine are
-; listed with it.
+; Item values are exact, but timers can't hold values above 9,999,999 and counters hold 32-bit
+; integers. Modifiers (the constants in item edits) are 32-bit floats with at most 3 decimals, so
+; other constants are loaded in two parts, which makes them accurate to about 14 significant digits.
+; The limits of each routine are listed with it.
 
 _init:
     import core
@@ -28,88 +29,89 @@ _init:
     alias __ts3,            t9502           ; scratch
     alias __ts4,            t9503           ; scratch
     alias __ts5,            t9504           ; scratch
+    alias __kt,             t9505           ; low part of a constant
     alias __cs1,            c9502           ; scratch
     alias __cs2,            c9503           ; scratch
     alias __cs3,            c9504           ; scratch
     alias __cs4,            c9505           ; scratch
     alias __cs5,            c9506           ; scratch
-    alias __exp_x,          t9505           ; input of __exp
-    alias __exp_y,          t9506           ; output of __exp
-    alias __exp_t,          t9507           ; clamped input
-    alias __exp_d,          t9508
-    alias __exp_g,          t9509
-    alias __exp_kt,         t9510
-    alias __exp_r,          t9511           ; reduced argument
-    alias __exp_p,          t9512           ; e^r
-    alias __exp_fac,        t9513
+    alias __exp_x,          t9506           ; input of __exp
+    alias __exp_y,          t9507           ; output of __exp
+    alias __exp_t,          t9508           ; clamped input
+    alias __exp_d,          t9509
+    alias __exp_g,          t9510
+    alias __exp_kt,         t9511
+    alias __exp_r,          t9512           ; reduced argument
+    alias __exp_p,          t9513           ; e^r
+    alias __exp_fac,        t9514
     alias __exp_f,          c9507
     alias __exp_k,          c9508           ; power of 2
     alias __exp_kp,         c9509
     alias __exp_kn,         c9510
     alias __exp_b,          c9511
     alias __exp_ifac,       c9512
-    alias __ln_x,           t9514           ; input of __ln
-    alias __ln_y,           t9515           ; output of __ln
-    alias __ln_m,           t9516           ; mantissa
-    alias __ln_d,           t9517
-    alias __ln_g,           t9518
-    alias __ln_lo,          t9519
-    alias __ln_c,           t9520
-    alias __ln_s,           t9521
-    alias __ln_s2,          t9522
-    alias __ln_p,           t9523
+    alias __ln_x,           t9515           ; input of __ln
+    alias __ln_y,           t9516           ; output of __ln
+    alias __ln_m,           t9517           ; mantissa
+    alias __ln_d,           t9518
+    alias __ln_g,           t9519
+    alias __ln_lo,          t9520
+    alias __ln_c,           t9521
+    alias __ln_s,           t9522
+    alias __ln_s2,          t9523
+    alias __ln_p,           t9524
     alias __ln_f,           c9513
     alias __ln_fac,         c9514
     alias __ln_k,           c9515           ; exponent
-    alias __sqrt_x,         t9524           ; input of __sqrt
-    alias __sqrt_y,         t9525           ; output of __sqrt
-    alias __sqrt_a,         t9526
-    alias __sqrt_g,         t9527           ; current guess
-    alias __sqrt_q,         t9528
+    alias __sqrt_x,         t9525           ; input of __sqrt
+    alias __sqrt_y,         t9526           ; output of __sqrt
+    alias __sqrt_a,         t9527
+    alias __sqrt_g,         t9528           ; current guess
+    alias __sqrt_q,         t9529
     alias __sqrt_f,         c9516
-    alias __sincos_x,       t9529           ; input of __sincos
-    alias __sincos_s,       t9530           ; sine output of __sincos
-    alias __sincos_c,       t9531           ; cosine output of __sincos
-    alias __sincos_jt,      t9532
-    alias __sincos_g,       t9533
-    alias __sincos_r,       t9534           ; reduced argument
-    alias __sincos_r2,      t9535
-    alias __sincos_sr,      t9536           ; sin(r)
-    alias __sincos_cr,      t9537           ; cos(r)
-    alias __sincos_z,       t9538
-    alias __sincos_t1,      t9539
-    alias __sincos_t2,      t9540
+    alias __sincos_x,       t9530           ; input of __sincos
+    alias __sincos_s,       t9531           ; sine output of __sincos
+    alias __sincos_c,       t9532           ; cosine output of __sincos
+    alias __sincos_jt,      t9533
+    alias __sincos_g,       t9534
+    alias __sincos_r,       t9535           ; reduced argument
+    alias __sincos_r2,      t9536
+    alias __sincos_sr,      t9537           ; sin(r)
+    alias __sincos_cr,      t9538           ; cos(r)
+    alias __sincos_z,       t9539
+    alias __sincos_t1,      t9540
+    alias __sincos_t2,      t9541
     alias __sincos_j,       c9517           ; quarter turns
     alias __sincos_q,       c9518           ; quadrant
     alias __sincos_a,       c9519           ; cos(q * pi/2)
     alias __sincos_b,       c9520           ; sin(q * pi/2)
-    alias __atan_x,         t9541           ; input of __atan
-    alias __atan_y,         t9542           ; output of __atan
-    alias __atan_a,         t9543
-    alias __atan_sign,      t9544
-    alias __atan_d,         t9545
-    alias __atan_rec,       t9546
-    alias __atan_b,         t9547
-    alias __atan_const,     t9548
-    alias __atan_num,       t9549
-    alias __atan_den,       t9550
-    alias __atan_c,         t9551
-    alias __atan_cc,        t9552
-    alias __atan_p,         t9553
-    alias __atan_z,         t9554
+    alias __atan_x,         t9542           ; input of __atan
+    alias __atan_y,         t9543           ; output of __atan
+    alias __atan_a,         t9544
+    alias __atan_sign,      t9545
+    alias __atan_d,         t9546
+    alias __atan_rec,       t9547
+    alias __atan_b,         t9548
+    alias __atan_const,     t9549
+    alias __atan_num,       t9550
+    alias __atan_den,       t9551
+    alias __atan_c,         t9552
+    alias __atan_cc,        t9553
+    alias __atan_p,         t9554
+    alias __atan_z,         t9555
     alias __atan_inv,       c9521
     alias __atan_red,       c9522
-    alias __atan2_y,        t9555           ; first input (y) of __atan2
-    alias __atan2_x,        t9556           ; second input (x) of __atan2
-    alias __atan2_out,      t9557           ; output of __atan2
-    alias __atan2_ax,       t9558
-    alias __atan2_ay,       t9559
-    alias __atan2_d,        t9560
-    alias __atan2_max,      t9561
-    alias __atan2_min,      t9562
-    alias __atan2_base,     t9563
-    alias __atan2_const,    t9564
-    alias __atan2_z,        t9565
+    alias __atan2_y,        t9556           ; first input (y) of __atan2
+    alias __atan2_x,        t9557           ; second input (x) of __atan2
+    alias __atan2_out,      t9558           ; output of __atan2
+    alias __atan2_ax,       t9559
+    alias __atan2_ay,       t9560
+    alias __atan2_d,        t9561
+    alias __atan2_max,      t9562
+    alias __atan2_min,      t9563
+    alias __atan2_base,     t9564
+    alias __atan2_const,    t9565
+    alias __atan2_z,        t9566
     alias __atan2_sx,       c9523
     alias __atan2_sy,       c9524
     alias __atan2_big,      c9525
@@ -118,39 +120,39 @@ _init:
     alias __atan2_xzero,    c9528
     alias __atan2_yneg,     c9529
     alias __atan2_ys,       c9530
-    alias __expm1_x,        t9566           ; input of __expm1
-    alias __expm1_y,        t9567           ; output of __expm1
-    alias __expm1_a,        t9568
-    alias __expm1_d,        t9569
-    alias __expm1_xs,       t9570
-    alias __expm1_series,   t9571
-    alias __expm1_big,      t9572
+    alias __expm1_x,        t9567           ; input of __expm1
+    alias __expm1_y,        t9568           ; output of __expm1
+    alias __expm1_a,        t9569
+    alias __expm1_d,        t9570
+    alias __expm1_xs,       t9571
+    alias __expm1_series,   t9572
+    alias __expm1_big,      t9573
     alias __expm1_small,    c9531
-    alias __log1p_x,        t9573           ; input of __log1p
-    alias __log1p_y,        t9574           ; output of __log1p
-    alias __log1p_u,        t9575
-    alias __log1p_d,        t9576
-    alias __log1p_w,        t9577
+    alias __log1p_x,        t9574           ; input of __log1p
+    alias __log1p_y,        t9575           ; output of __log1p
+    alias __log1p_u,        t9576
+    alias __log1p_d,        t9577
+    alias __log1p_w,        t9578
     alias __log1p_f,        c9532
-    alias __hypot_a,        t9578           ; first input of __hypot
-    alias __hypot_b,        t9579           ; second input of __hypot
-    alias __hypot_y,        t9580           ; output of __hypot
-    alias __hypot_aa,       t9581
-    alias __hypot_ab,       t9582
-    alias __hypot_d,        t9583
-    alias __hypot_max,      t9584
-    alias __hypot_min,      t9585
+    alias __hypot_a,        t9579           ; first input of __hypot
+    alias __hypot_b,        t9580           ; second input of __hypot
+    alias __hypot_y,        t9581           ; output of __hypot
+    alias __hypot_aa,       t9582
+    alias __hypot_ab,       t9583
+    alias __hypot_d,        t9584
+    alias __hypot_max,      t9585
+    alias __hypot_min,      t9586
     alias __hypot_f,        c9533
-    alias __cbrt_x,         t9586           ; input of __cbrt
-    alias __cbrt_y,         t9587           ; output of __cbrt
-    alias __cbrt_a,         t9588
-    alias __cbrt_sign,      t9589
-    alias __cbrt_g,         t9590           ; current guess
-    alias __cbrt_q,         t9591
-    alias __pow_exponent,   t9592           ; t2, clamped
-    alias __pow_d,          t9593
-    alias __pow_g,          t9594
-    alias __pow_res,        t9595
+    alias __cbrt_x,         t9587           ; input of __cbrt
+    alias __cbrt_y,         t9588           ; output of __cbrt
+    alias __cbrt_a,         t9589
+    alias __cbrt_sign,      t9590
+    alias __cbrt_g,         t9591           ; current guess
+    alias __cbrt_q,         t9592
+    alias __pow_exponent,   t9593           ; t2, clamped
+    alias __pow_d,          t9594
+    alias __pow_g,          t9595
+    alias __pow_res,        t9596
     alias __pow_f,          c9534
     alias __pow_floor,      c9535
     alias __pow_odd,        c9536
@@ -160,24 +162,24 @@ _init:
     alias __pow_nze,        c9540
     alias __pow_zb,         c9541
     alias __pow_ze,         c9542
-    alias __asincos_x,      t9596           ; input of __asincos
-    alias __asincos_s,      t9597           ; asin output of __asincos
-    alias __asincos_c,      t9598           ; acos output of __asincos
-    alias __asincos_t,      t9599
-    alias __asincos_d,      t9600
-    alias __asincos_g,      t9601
-    alias __asincos_cos,    t9602
+    alias __asincos_x,      t9597           ; input of __asincos
+    alias __asincos_s,      t9598           ; asin output of __asincos
+    alias __asincos_c,      t9599           ; acos output of __asincos
+    alias __asincos_t,      t9600
+    alias __asincos_d,      t9601
+    alias __asincos_g,      t9602
+    alias __asincos_cos,    t9603
     alias __asincos_f,      c9543
-    alias __hyp_a,          t9603
-    alias __hyp_sign,       t9604
-    alias __hyp_u,          t9605
-    alias __hyp_v,          t9606
-    alias __hyp_d,          t9607
+    alias __hyp_a,          t9604
+    alias __hyp_sign,       t9605
+    alias __hyp_u,          t9606
+    alias __hyp_v,          t9607
+    alias __hyp_d,          t9608
     alias __hyp_f,          c9544
     alias __minmax_int_f,   c9545
     alias __clamp_int_t,    c9546
     alias __minmax_float_f, c9547
-    alias __clamp_float_t,  t9608
+    alias __clamp_float_t,  t9609
     alias __gcd_a,          c9548
     alias __gcd_b,          c9549
     alias __gcd_q,          c9550
@@ -270,8 +272,11 @@ ln:
 log2:
     mov __ln_x, t1
     spawn __ln                  | ordered:false delay:0
-    mov __k, 12102203                       ; 1 / ln(2)
+    mov __k, 2710552                        ; 1 / ln(2)
+    mul __kt, __ln_y, __k       | itemmod:140737488355328 divmod:true
+    mov __k, 12102203
     mul t2, __ln_y, __k         | itemmod:8388608 divmod:true
+    add t2, __kt
 
 ; Returns the base-10 logarithm of `t1`. `t1` must be positive.
 ; @param t1 the number
@@ -280,8 +285,11 @@ log2:
 log10:
     mov __ln_x, t1
     spawn __ln                  | ordered:false delay:0
-    mov __k, 14572505                       ; 1 / ln(10)
+    mov __k, -5687512                       ; 1 / ln(10)
+    mul __kt, __ln_y, __k       | itemmod:562949953421312 divmod:true
+    mov __k, 14572505
     mul t2, __ln_y, __k         | itemmod:33554432 divmod:true
+    add t2, __kt
 
 ; Returns ln(1 + `t1`). More accurate than `ln` when `t1` is close to 0. `t1` must be greater than -1.
 ; @param t1 the number
@@ -493,8 +501,10 @@ asec:
 acot:
     mov __atan_x, t1
     spawn __atan                | ordered:false delay:0
-    mov __k, 13176795                       ; t2 = 1.570796327
+    mov __k, 13176795                       ; t2 = 1.5707963267949
     mov t2, __k                 | itemmod:8388608 divmod:true
+    mov __k, -6151831
+    add t2, __k                 | itemmod:140737488355328 divmod:true
     sub t2, __atan_y
 
 ; Returns the hyperbolic sine of `t1`. Results are limited like `exp` (|`t1`| up to about 16.8).
@@ -536,21 +546,22 @@ tanh:
     mov __hyp_a, t1             | resmode:+
     div __hyp_sign, t1, __hyp_a             ; sign of t1
     mov __hyp_d, __hyp_a
-    sub __hyp_d, 9
+    sub __hyp_d, 20
     mov __ts1, __hyp_d          | resmode:+                 ; __hyp_f = __hyp_d > 0
     add __ts2, __hyp_d, __ts1   | itemmod:4 divmod:true     ; max(d, 0) / 2
     mov __ts3, __ts2
     add __ts3, 1
     div __hyp_f, __ts2, __ts3   | resmode:ceil
     mul __hyp_v, __hyp_f, __hyp_d
-    sub __hyp_a, __hyp_v                    ; |x| = min(|x|, 9): tanh(9) rounds to 1
-    mov __expm1_x, __hyp_a      | itemmod:2
+    sub __hyp_a, __hyp_v                    ; |x| = min(|x|, 20): 1 - tanh(20) is below 10^-17
+    mov __expm1_x, __hyp_a      | itemmod:-2
     spawn __expm1               | ordered:false delay:0
-    ; with u = e^(2|x|) - 1: tanh|x| = u / (u + 2)
+    ; with u = e^(-2|x|) - 1, in (-1, 0]: tanh|x| = -u / (u + 2)
     mov __hyp_v, __expm1_y
     add __hyp_v, 2
     div __hyp_v, __expm1_y, __hyp_v
     mul t2, __hyp_v, __hyp_sign
+    mul t2, -1
 
 ; Returns the inverse hyperbolic sine of `t1`.
 ; @param t1 the number
@@ -618,16 +629,22 @@ atanh:
 ; @returns t2 the angle in radians
 ; @0tick
 deg_to_rad:
-    mov __k, 9370165                        ; pi / 180
+    mov __k, 1217770                        ; pi / 180
+    mul __kt, t1, __k           | itemmod:9007199254740992 divmod:true
+    mov __k, 9370165
     mul t2, t1, __k             | itemmod:536870912 divmod:true
+    add t2, __kt
 
 ; Converts `t1` from radians to degrees.
 ; @param t1 the angle in radians
 ; @returns t2 the angle in degrees
 ; @0tick
 rad_to_deg:
-    mov __k, 15019745                       ; 180 / pi
+    mov __k, -2941424                       ; 180 / pi
+    mul __kt, t1, __k           | itemmod:4398046511104 divmod:true
+    mov __k, 15019745
     mul t2, t1, __k             | itemmod:262144 divmod:true
+    add t2, __kt
 
 ; Returns the fractional part of `t1`, `t1` - floor(`t1`). Always in [0, 1), also for negative numbers.
 ; @param t1 the number
@@ -662,12 +679,8 @@ sign_int:
 ; @returns c3 min(c1, c2)
 ; @0tick
 min_int:
-    sub c3, c1, c2
-    mov __cs1, c3               | resmode:+                 ; c1 > c2
-    add __cs2, c3, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mov __minmax_int_f, 0                   ; c1 > c2
+    sub __minmax_int_f, c1, c2  | iter:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __cs4, __minmax_int_f, c2           ; c3 = __minmax_int_f ? c2 : c1
     mul __cs5, __minmax_int_f, c1
     sub __cs5, c1, __cs5
@@ -679,12 +692,8 @@ min_int:
 ; @returns c3 max(c1, c2)
 ; @0tick
 max_int:
-    sub c3, c1, c2
-    mov __cs1, c3               | resmode:+                 ; c1 > c2
-    add __cs2, c3, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mov __minmax_int_f, 0                   ; c1 > c2
+    sub __minmax_int_f, c1, c2  | iter:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __cs4, __minmax_int_f, c1           ; c3 = __minmax_int_f ? c1 : c2
     mul __cs5, __minmax_int_f, c2
     sub __cs5, c2, __cs5
@@ -697,22 +706,14 @@ max_int:
 ; @returns c4 min(max(c1, c2), c3)
 ; @0tick
 clamp_int:
-    sub c4, c2, c1
-    mov __cs1, c4               | resmode:+                 ; c1 < c2
-    add __cs2, c4, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mov __minmax_int_f, 0                   ; __minmax_int_f = c1 < c2
+    sub __minmax_int_f, c2, c1  | iter:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __cs4, __minmax_int_f, c2           ; c4 = __minmax_int_f ? c2 : c1
     mul __cs5, __minmax_int_f, c1
     sub __cs5, c1, __cs5
     add c4, __cs4, __cs5
-    sub __clamp_int_t, c4, c3
-    mov __cs1, __clamp_int_t    | resmode:+                 ; result > c3
-    add __cs2, __clamp_int_t, __cs1 | itemmod:2 divmod:true ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __minmax_int_f, __cs2, __cs3 | resmode:ceil
+    mov __minmax_int_f, 0                   ; result > c3
+    sub __minmax_int_f, c4, c3  | iter:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __cs4, __minmax_int_f, c3           ; c4 = __minmax_int_f ? c3 : c4
     mul __cs5, __minmax_int_f, c4
     sub __cs5, c4, __cs5
@@ -811,8 +812,8 @@ lerp_float:
     add t4, t1
 
 ; Returns the greatest common divisor of `c1` and `c2` (always >= 0; gcd(0, 0) is 0).
-; Euclid's algorithm, unrolled to 38 steps, which is enough for any inputs below 16,777,216.
-; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; Euclid's algorithm, unrolled to 46 steps, which is enough for any two counter values.
+; -2147483648 can't be used as an input, since its absolute value doesn't fit in a counter.
 ; @param c1 the first integer
 ; @param c2 the second integer
 ; @returns c3 gcd(c1, c2)
@@ -824,9 +825,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b         ; step 1
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -834,9 +834,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -844,9 +843,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -854,9 +852,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -864,9 +861,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -874,9 +870,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -884,9 +879,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -894,9 +888,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -904,9 +897,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -914,9 +906,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -924,9 +915,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -934,9 +924,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -944,9 +933,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -954,9 +942,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -964,9 +951,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -974,9 +960,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -984,9 +969,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -994,9 +978,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1004,9 +987,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1014,9 +996,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1024,9 +1005,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1034,9 +1014,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1044,9 +1023,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1054,9 +1032,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1064,9 +1041,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1074,9 +1050,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1084,9 +1059,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1094,9 +1068,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1104,9 +1077,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1114,9 +1086,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1124,9 +1095,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1134,9 +1104,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1144,9 +1113,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1154,9 +1122,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1164,9 +1131,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1174,9 +1140,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1184,9 +1149,8 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1194,9 +1158,80 @@ gcd:
     fldiv __gcd_q, __gcd_a, __gcd_b
     mul __gcd_q, __gcd_b
     sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
-    mov __gcd_t, __gcd_b
-    add __gcd_t, 1
-    div __gcd_f, __gcd_b, __gcd_t | resmode:ceil            ; f = b != 0
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mul __gcd_t, __gcd_f, __gcd_a
+    sub __gcd_a, __gcd_t
+    add __gcd_a, __gcd_b                    ; a = f ? b : a
+    mul __gcd_b, __gcd_f, __gcd_r           ; b = f ? r : 0
+    fldiv __gcd_q, __gcd_a, __gcd_b
+    mul __gcd_q, __gcd_b
+    sub __gcd_r, __gcd_a, __gcd_q           ; r = a mod b (a if b is 0)
+    mov __gcd_f, 0                          ; f = b != 0
+    add __gcd_f, __gcd_b        | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mul __gcd_t, __gcd_f, __gcd_a
     sub __gcd_a, __gcd_t
     add __gcd_a, __gcd_b                    ; a = f ? b : a
@@ -1204,7 +1239,8 @@ gcd:
     mov c3, __gcd_a
 
 ; Returns the least common multiple of `c1` and `c2` (always >= 0; 0 if either is 0).
-; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; The result must fit in a counter (below 2,147,483,648).
+; -2147483648 can't be used as an input, since its absolute value doesn't fit in a counter.
 ; @param c1 the first integer
 ; @param c2 the second integer
 ; @returns c3 lcm(c1, c2)
@@ -1218,26 +1254,19 @@ lcm:
 
 ; Returns `c1` raised to the power of `c2`, for integers and `c2` >= 0 (negative exponents count as 0). 0^0 is 1.
 ; Results must fit in a counter; for bases other than -1, 0 and 1 that means exponents up to 31.
-; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
 ; @param c1 the base
 ; @param c2 the exponent
 ; @returns c3 c1^c2
 ; @0tick
 ipow:
-    mov __cs1, c2               | resmode:+                 ; c2 > 0
-    add __cs2, c2, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; c2 > 0
+    add __gcd_f, c2             | itemmod:4294967296 divmod:true finmode:ceil
     mul __ipow_e, __gcd_f, c2               ; e = max(c2, 0)
     ; only bases -1, 0 and 1 allow exponents above 31, and for them only the parity matters: use 30 or 31
     mov __gcd_t, __ipow_e
     sub __gcd_t, 31
-    mov __cs1, __gcd_t          | resmode:+                 ; e > 31
-    add __cs2, __gcd_t, __cs1   | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __ipow_big, __cs2, __cs3 | resmode:ceil
+    mov __ipow_big, 0                       ; e > 31
+    add __ipow_big, __gcd_t     | itemmod:4294967296 divmod:true finmode:ceil
     mov __ipow_parity, __ipow_e
     fldiv __ipow_parity, 2
     mul __ipow_parity, -2
@@ -1297,7 +1326,7 @@ ipow:
     mov c3, __ipow_res
 
 ; Returns (`c1` ^ `c2`) mod `c3`, in [0, `c3`), for integers, `c2` >= 0 and `c3` >= 1.
-; Exact while `c2` is below 16,777,216 and (`c3` - 1)^2 is too, i.e. for `c3` up to 4097.
+; (`c3` - 1)^2 must fit in a counter, i.e. `c3` can be at most 46341.
 ; @param c1 the base
 ; @param c2 the exponent (negative counts as 0)
 ; @param c3 the modulus
@@ -1306,23 +1335,17 @@ ipow:
 modpow:
     mov __modpow_base, c1
     fldiv __modpow_q, __modpow_base, c3
-    mul __modpow_q, c3
-    sub __modpow_base, __modpow_q           ; __modpow_base mod c3
-    mov __cs1, c2               | resmode:+                 ; c2 > 0
-    add __cs2, c2, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mul __modpow_base, __modpow_q, c3 | iter:-              ; __modpow_base -= floor(__modpow_base / c3) * c3, without storing the product
+    mov __gcd_f, 0                          ; c2 > 0
+    add __gcd_f, c2             | itemmod:4294967296 divmod:true finmode:ceil
     mul __modpow_e, __gcd_f, c2
     mov __modpow_res, 1
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     ; square-and-multiply over the 31 bits of the exponent, reducing after every product
     mul __modpow_res, __modpow_res          ; bit 30
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 1073741824
     sub __modpow_e, __modpow_bit | itemmod:1073741824
@@ -1332,12 +1355,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 29
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 536870912
     sub __modpow_e, __modpow_bit | itemmod:536870912
@@ -1347,12 +1368,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 28
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 268435456
     sub __modpow_e, __modpow_bit | itemmod:268435456
@@ -1362,12 +1381,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 27
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 134217728
     sub __modpow_e, __modpow_bit | itemmod:134217728
@@ -1377,12 +1394,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 26
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 67108864
     sub __modpow_e, __modpow_bit | itemmod:67108864
@@ -1392,12 +1407,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 25
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 33554432
     sub __modpow_e, __modpow_bit | itemmod:33554432
@@ -1407,12 +1420,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 24
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 16777216
     sub __modpow_e, __modpow_bit | itemmod:16777216
@@ -1422,12 +1433,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 23
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 8388608
     sub __modpow_e, __modpow_bit | itemmod:8388608
@@ -1437,12 +1446,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 22
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 4194304
     sub __modpow_e, __modpow_bit | itemmod:4194304
@@ -1452,12 +1459,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 21
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 2097152
     sub __modpow_e, __modpow_bit | itemmod:2097152
@@ -1467,12 +1472,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 20
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 1048576
     sub __modpow_e, __modpow_bit | itemmod:1048576
@@ -1482,12 +1485,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 19
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 524288
     sub __modpow_e, __modpow_bit | itemmod:524288
@@ -1497,12 +1498,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 18
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 262144
     sub __modpow_e, __modpow_bit | itemmod:262144
@@ -1512,12 +1511,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 17
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 131072
     sub __modpow_e, __modpow_bit | itemmod:131072
@@ -1527,12 +1524,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 16
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 65536
     sub __modpow_e, __modpow_bit | itemmod:65536
@@ -1542,12 +1537,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 15
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 32768
     sub __modpow_e, __modpow_bit | itemmod:32768
@@ -1557,12 +1550,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 14
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 16384
     sub __modpow_e, __modpow_bit | itemmod:16384
@@ -1572,12 +1563,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 13
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 8192
     sub __modpow_e, __modpow_bit | itemmod:8192
@@ -1587,12 +1576,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 12
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 4096
     sub __modpow_e, __modpow_bit | itemmod:4096
@@ -1602,12 +1589,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 11
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 2048
     sub __modpow_e, __modpow_bit | itemmod:2048
@@ -1617,12 +1602,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 10
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 1024
     sub __modpow_e, __modpow_bit | itemmod:1024
@@ -1632,12 +1615,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 9
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 512
     sub __modpow_e, __modpow_bit | itemmod:512
@@ -1647,12 +1628,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 8
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 256
     sub __modpow_e, __modpow_bit | itemmod:256
@@ -1662,12 +1641,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 7
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 128
     sub __modpow_e, __modpow_bit | itemmod:128
@@ -1677,12 +1654,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 6
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 64
     sub __modpow_e, __modpow_bit | itemmod:64
@@ -1692,12 +1667,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 5
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 32
     sub __modpow_e, __modpow_bit | itemmod:32
@@ -1707,12 +1680,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 4
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 16
     sub __modpow_e, __modpow_bit | itemmod:16
@@ -1722,12 +1693,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 3
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 8
     sub __modpow_e, __modpow_bit | itemmod:8
@@ -1737,12 +1706,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 2
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 4
     sub __modpow_e, __modpow_bit | itemmod:4
@@ -1752,12 +1719,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 1
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 2
     sub __modpow_e, __modpow_bit | itemmod:2
@@ -1767,12 +1732,10 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mul __modpow_res, __modpow_res          ; bit 0
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov __modpow_bit, __modpow_e
     fldiv __modpow_bit, 1
     sub __modpow_e, __modpow_bit | itemmod:1
@@ -1782,22 +1745,17 @@ modpow:
     add __modpow_fac, 1
     mul __modpow_res, __modpow_fac
     fldiv __modpow_q, __modpow_res, c3
-    mul __modpow_q, c3
-    sub __modpow_res, __modpow_q            ; __modpow_res mod c3
+    mul __modpow_res, __modpow_q, c3 | iter:-               ; __modpow_res -= floor(__modpow_res / c3) * c3, without storing the product
     mov c4, __modpow_res
 
 ; Returns the integer square root of `c1`: the largest integer whose square is at most `c1`. Negative `c1` gives 0.
-; Builds the result one bit at a time, from 2^15 down.
-; Exact while all values stay below 16,777,216 (GD's arithmetic is only exact up to there).
+; Builds the result one bit at a time, from 2^15 down. Works for every counter value.
 ; @param c1 the integer
 ; @returns c2 floor(sqrt(c1))
 ; @0tick
 isqrt:
-    mov __cs1, c1               | resmode:+                 ; c1 > 0
-    add __cs2, c1, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; c1 > 0
+    add __gcd_f, c1             | itemmod:4294967296 divmod:true finmode:ceil
     mul __isqrt_n, __gcd_f, c1              ; n = max(c1, 0)
     mov __isqrt_res, 0
     mov __isqrt_cand, __isqrt_res
@@ -1805,176 +1763,128 @@ isqrt:
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:32768
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 16384                 ; try adding 2^14
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:16384
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 8192                  ; try adding 2^13
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:8192
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 4096                  ; try adding 2^12
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:4096
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 2048                  ; try adding 2^11
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:2048
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 1024                  ; try adding 2^10
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:1024
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 512                   ; try adding 2^9
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:512
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 256                   ; try adding 2^8
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:256
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 128                   ; try adding 2^7
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:128
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 64                    ; try adding 2^6
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:64
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 32                    ; try adding 2^5
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:32
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 16                    ; try adding 2^4
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:16
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 8                     ; try adding 2^3
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:8
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 4                     ; try adding 2^2
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:4
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 2                     ; try adding 2^1
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:2
     mov __isqrt_cand, __isqrt_res
     add __isqrt_cand, 1                     ; try adding 2^0
     fldiv __isqrt_q, __isqrt_n, __isqrt_cand
     sub __isqrt_q, __isqrt_cand
     add __isqrt_q, 1                        ; > 0 exactly when cand^2 <= n
-    mov __cs1, __isqrt_q        | resmode:+                 ; __gcd_f = __isqrt_q > 0
-    add __cs2, __isqrt_q, __cs1 | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __gcd_f, __cs2, __cs3   | resmode:ceil
+    mov __gcd_f, 0                          ; __gcd_f = __isqrt_q > 0
+    add __gcd_f, __isqrt_q      | itemmod:4294967296 divmod:true finmode:ceil
     add __isqrt_res, __gcd_f    | itemmod:1
     mov c2, __isqrt_res
 
@@ -2008,16 +1918,22 @@ __exp:
     mul __exp_g, __exp_f, __exp_d
     add __exp_t, __exp_g                    ; x = max(x, -87)
     ; k = round(x / ln 2)
-    mov __k, 12102203                       ; 1.442695041 * 2^23
+    mov __k, 2710552                        ; * 1.44269504088896
+    mul __kt, __exp_t, __k      | itemmod:140737488355328 divmod:true
+    mov __k, 12102203
     mul __exp_kt, __exp_t, __k  | itemmod:8388608 divmod:true
+    add __exp_kt, __kt
     add __exp_kt, 0.5
     mov __exp_k, __exp_kt       | resmode:floor
     ; r = x - k * ln 2, with ln 2 split in two parts so that k * (high part) is exact
     mov __k, 22713
     mul __exp_g, __exp_k, __k   | itemmod:32768 divmod:true ; k * 0.693145751953125
     sub __exp_r, __exp_t, __exp_g
-    mov __k, 12566158                       ; k * 1.428607e-06
+    mov __k, 8110080                        ; k * 1.428607e-06
+    mul __kt, __exp_k, __k      | itemmod:147573952589676412928 divmod:true
+    mov __k, 12566158
     mul __exp_g, __exp_k, __k   | itemmod:8796093022208 divmod:true
+    add __exp_g, __kt
     sub __exp_r, __exp_g
     ; e^r = 1 + r(1 + r/2(1 + r/3(... (1 + r/8)))), error below 2e-10
     mov __exp_p, __exp_r        | itemmod:8 divmod:true
@@ -2037,11 +1953,8 @@ __exp:
     mul __exp_p, __exp_r
     add __exp_p, 1
     ; multiply by 2^k one bit of k at a time, so that no step stores a value above the result
-    mov __cs1, __exp_k          | resmode:+                 ; __exp_f = __exp_k > 0
-    add __cs2, __exp_k, __cs1   | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __exp_f, __cs2, __cs3   | resmode:ceil
+    mov __exp_f, 0                          ; __exp_f = __exp_k > 0
+    add __exp_f, __exp_k        | itemmod:4294967296 divmod:true finmode:ceil
     mul __exp_kp, __exp_f, __exp_k          ; kp = max(k, 0), at most 24
     mov __exp_b, __exp_kp                   ; bit 16 of kp
     fldiv __exp_b, 16
@@ -2074,11 +1987,8 @@ __exp:
     add __exp_ifac, 1                       ; 2^1 if the bit is set, else 1
     mul __exp_p, __exp_ifac
     mov __exp_kn, __exp_k       | itemmod:-1
-    mov __cs1, __exp_kn         | resmode:+                 ; __exp_f = __exp_kn > 0
-    add __cs2, __exp_kn, __cs1  | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __exp_f, __cs2, __cs3   | resmode:ceil
+    mov __exp_f, 0                          ; __exp_f = __exp_kn > 0
+    add __exp_f, __exp_kn       | itemmod:4294967296 divmod:true finmode:ceil
     mul __exp_kn, __exp_f                   ; kn = max(-k, 0), at most 126
     mov __exp_b, __exp_kn                   ; bit 64 of kn
     fldiv __exp_b, 64
@@ -2269,8 +2179,10 @@ __ln:
     sub __ln_m, __ln_g                      ; m = m * 2^1 if the flag is set
     sub __ln_k, __ln_f          | itemmod:1
     ; bring m into [1/sqrt(2), sqrt(2)]
-    mov __k, 11863283                       ; __ln_c = 1.414213562
+    mov __k, 11863283                       ; __ln_c = 1.4142135623731
     mov __ln_c, __k             | itemmod:8388608 divmod:true
+    mov __k, 3406302
+    add __ln_c, __k             | itemmod:140737488355328 divmod:true
     sub __ln_d, __ln_m, __ln_c
     mov __ts1, __ln_d           | resmode:+                 ; m > sqrt(2)
     add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
@@ -2281,8 +2193,10 @@ __ln:
     add __ln_fac, 1
     div __ln_m, __ln_fac
     add __ln_k, __ln_f
-    mov __k, 11863283                       ; __ln_c = 0.7071067812
+    mov __k, 11863283                       ; __ln_c = 0.707106781186548
     mov __ln_c, __k             | itemmod:16777216 divmod:true
+    mov __k, 3406302
+    add __ln_c, __k             | itemmod:281474976710656 divmod:true
     sub __ln_d, __ln_c, __ln_m
     mov __ts1, __ln_d           | resmode:+                 ; m < 1/sqrt(2)
     add __ts2, __ln_d, __ts1    | itemmod:4 divmod:true     ; max(d, 0) / 2
@@ -2316,8 +2230,11 @@ __ln:
     mul __ln_p, __ln_s
     mul __ln_p, 2
     ; ln(x) = k * ln 2 + ln(m), with ln 2 in two parts
-    mov __k, 12566158                       ; k * 1.428607e-06
+    mov __k, 8110080                        ; k * 1.428607e-06
+    mul __kt, __ln_k, __k       | itemmod:147573952589676412928 divmod:true
+    mov __k, 12566158
     mul __ln_g, __ln_k, __k     | itemmod:8796093022208 divmod:true
+    add __ln_g, __kt
     add __ln_p, __ln_g
     mov __k, 22713
     mul __ln_g, __ln_k, __k     | itemmod:32768 divmod:true ; k * 0.693145751953125
@@ -2438,8 +2355,11 @@ __sqrt:
 ; @0tick
 __sincos:
     ; j = round(x / (pi/2))
-    mov __k, 10680707                       ; 0.6366197724 * 2^24
+    mov __k, 7228996                        ; * 0.636619772367581
+    mul __kt, __sincos_x, __k   | itemmod:281474976710656 divmod:true
+    mov __k, 10680707
     mul __sincos_jt, __sincos_x, __k | itemmod:16777216 divmod:true
+    add __sincos_jt, __kt
     add __sincos_jt, 0.5
     mov __sincos_j, __sincos_jt | resmode:floor
     ; r = x - j * pi/2, with pi/2 in three parts
@@ -2449,8 +2369,11 @@ __sincos:
     mov __k, 4058
     mul __sincos_g, __sincos_j, __k | itemmod:8388608 divmod:true ; j * 4.837512969970703125e-4
     sub __sincos_r, __sincos_g
-    mov __k, 10625385                       ; j * 7.549790e-08
+    mov __k, -4194304                       ; j * 7.549790e-08
+    mul __kt, __sincos_j, __k   | itemmod:2361183241434822606848 divmod:true
+    mov __k, 10625385
     mul __sincos_g, __sincos_j, __k | itemmod:140737488355328 divmod:true
+    add __sincos_g, __kt
     sub __sincos_r, __sincos_g
     mul __sincos_r2, __sincos_r, __sincos_r
     mov __one, 1
@@ -2527,14 +2450,18 @@ __atan:
     add __atan_b, __ts4, __ts5
     mov __k, 8990883                        ; tan(pi/12)
     mov __atan_const, __k       | itemmod:33554432 divmod:true
+    mov __k, -723349
+    add __atan_const, __k       | itemmod:562949953421312 divmod:true
     sub __atan_d, __atan_b, __atan_const
     mov __ts1, __atan_d         | resmode:+                 ; b > tan(pi/12)
     add __ts2, __atan_d, __ts1  | itemmod:4 divmod:true     ; max(d, 0) / 2
     mov __ts3, __ts2
     add __ts3, 1
     div __atan_red, __ts2, __ts3 | resmode:ceil
-    mov __k, 14529495                       ; __atan_const = 1.732050808
+    mov __k, 14529495                       ; __atan_const = 1.73205080756888
     mov __atan_const, __k       | itemmod:8388608 divmod:true
+    mov __k, 4375141
+    add __atan_const, __k       | itemmod:140737488355328 divmod:true
     mul __atan_num, __atan_b, __atan_const
     sub __atan_num, 1
     add __atan_den, __atan_b, __atan_const
@@ -2562,12 +2489,16 @@ __atan:
     mul __atan_p, __atan_cc
     add __atan_p, __one
     mul __atan_p, __atan_c
-    mov __k, 8784530                        ; __atan_const = 0.5235987756
+    mov __k, 8784530                        ; __atan_const = 0.523598775598299
     mov __atan_const, __k       | itemmod:16777216 divmod:true
+    mov __k, -4101221
+    add __atan_const, __k       | itemmod:281474976710656 divmod:true
     mul __atan_z, __atan_red, __atan_const
     add __atan_p, __atan_z
-    mov __k, 13176795                       ; __atan_const = 1.570796327
+    mov __k, 13176795                       ; __atan_const = 1.5707963267949
     mov __atan_const, __k       | itemmod:8388608 divmod:true
+    mov __k, -6151831
+    add __atan_const, __k       | itemmod:140737488355328 divmod:true
     sub __atan_z, __atan_const, __atan_p
     mul __ts4, __atan_inv, __atan_z         ; __atan_p = __atan_inv ? __atan_z : __atan_p
     mul __ts5, __atan_inv, __atan_p
@@ -2600,8 +2531,10 @@ __atan2:
     add __atan2_min, __ts4, __ts5
     div __atan_x, __atan2_min, __atan2_max
     spawn __atan                | ordered:false delay:0
-    mov __k, 13176795                       ; __atan2_const = 1.570796327
+    mov __k, 13176795                       ; __atan2_const = 1.5707963267949
     mov __atan2_const, __k      | itemmod:8388608 divmod:true
+    mov __k, -6151831
+    add __atan2_const, __k      | itemmod:140737488355328 divmod:true
     sub __atan2_z, __atan2_const, __atan_y
     mul __ts4, __atan2_big, __atan2_z       ; atan(|y| / |x|)
     mul __ts5, __atan2_big, __atan_y
@@ -2636,15 +2569,19 @@ __atan2:
     mov __atan2_ys, __atan2_yneg | itemmod:-2
     add __atan2_ys, 1                       ; 1 if y >= 0, -1 if y < 0
     ; x > 0: atan(y/x). x < 0: atan(y/x) + pi (y >= 0) or - pi (y < 0). x == 0: sign(y) * pi/2
-    mov __k, 13176795                       ; __atan2_const = 3.141592654
+    mov __k, 13176795                       ; __atan2_const = 3.14159265358979
     mov __atan2_const, __k      | itemmod:4194304 divmod:true
+    mov __k, -6151831
+    add __atan2_const, __k      | itemmod:70368744177664 divmod:true
     mul __atan2_z, __atan2_ys, __atan2_const
     add __atan2_z, __atan2_base
     mul __atan2_z, __atan2_xneg
     mul __atan2_out, __atan2_xpos, __atan2_base
     add __atan2_out, __atan2_z
-    mov __k, 13176795                       ; __atan2_const = 1.570796327
+    mov __k, 13176795                       ; __atan2_const = 1.5707963267949
     mov __atan2_const, __k      | itemmod:8388608 divmod:true
+    mov __k, -6151831
+    add __atan2_const, __k      | itemmod:140737488355328 divmod:true
     mul __atan2_z, __atan2_sy, __atan2_const
     mul __atan2_z, __atan2_xzero
     add __atan2_out, __atan2_z

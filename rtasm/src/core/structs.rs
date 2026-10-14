@@ -164,16 +164,14 @@ impl TasmValue {
             }
         };
         let remaining = iter.collect::<String>();
-        let second_char = if remaining.len() == 0 {
-            "\x00" // null byte doesn't match anything            
-        } else {
-            &remaining[0..1].to_lowercase()
-        };
+        let second_char = remaining.chars().next().unwrap_or(0 as char);
         let remaining_i16 = remaining.parse::<i16>();
         let remaining_i16_hex = if remaining.len() == 0 {
             "fail".parse()
         } else {
-            i16::from_str_radix(&remaining[1..], 16)
+            let mut chars = remaining.chars();
+            let _ = chars.next();
+            i16::from_str_radix(&chars.collect::<String>(), 16)
         };
 
         // string escapes are checked first
@@ -208,7 +206,7 @@ impl TasmValue {
             // the only possible value here is an item or a string
             let id = if let Ok(id) = remaining_i16 {
                 id
-            } else if second_char == "x"
+            } else if second_char == 'x'
                 && let Ok(id) = remaining_i16_hex
             {
                 id

@@ -308,7 +308,11 @@ fn complete_arg(
     // `module::symbol` from imported modules
     for_each_import(world, index, |module, m| {
         if accepts(&TasmValue::Group(1)) {
-            for r in m.routines.iter().filter(|r| r.name != INIT_ROUTINE) {
+            for r in m
+                .routines
+                .iter()
+                .filter(|r| r.name != INIT_ROUTINE && !is_internal(&r.name))
+            {
                 let label = format!("{module}::{}", r.name);
                 let mut item = ctx.item(
                     label.clone(),
@@ -319,7 +323,7 @@ fn complete_arg(
                 items.push(item);
             }
         }
-        for a in &m.aliases {
+        for a in m.aliases.iter().filter(|a| !is_internal(&a.name)) {
             if let Ok(v) = safe_to_value(&a.value)
                 && accepts(&v)
             {
@@ -345,6 +349,12 @@ fn complete_arg(
         &|a| safe_to_value(&a.value).is_ok_and(|v| accepts(&v)),
     ));
     items
+}
+
+/// Whether a symbol of another module is internal (`__name`) and so isn't suggested there.
+/// The module's own `__` symbols are still suggested inside it.
+fn is_internal(ident: &str) -> bool {
+    ident.starts_with("__")
 }
 
 /// Calls `f` once per imported module (first import wins for duplicate identifiers).
@@ -572,7 +582,11 @@ fn complete_dict_entry(
         }
     }
     for_each_import(world, index, |module, m| {
-        for r in m.routines.iter().filter(|r| r.name != INIT_ROUTINE) {
+        for r in m
+            .routines
+            .iter()
+            .filter(|r| r.name != INIT_ROUTINE && !is_internal(&r.name))
+        {
             let label = format!("{module}::{}", r.name);
             let mut item = ctx.item(
                 label.clone(),
@@ -582,7 +596,7 @@ fn complete_dict_entry(
             describe(&mut item, "external routine");
             items.push(item);
         }
-        for a in &m.aliases {
+        for a in m.aliases.iter().filter(|a| !is_internal(&a.name)) {
             let label = format!("{module}::{}", a.name);
             if world.resolve_dict_entry(index, &label).is_ok() {
                 let mut item = ctx.item(
@@ -710,8 +724,7 @@ fn unimported_symbols(
     for c in import_candidates(world, src.uri, index) {
         let edit = import_edit(src.lines, index, &c.import);
         let mut add = |ident: &str, kind: CompletionItemKind, detail: String| {
-            // `__` marks internal symbols
-            if ident.starts_with("__") || !could_complete(typed, ident) {
+            if is_internal(ident) || !could_complete(typed, ident) {
                 return;
             }
             let label = format!("{}::{ident}", c.module);
@@ -845,6 +858,46 @@ mod tests {
         // without `_init`, one is created
         let no_init = found("routine:\n    spawn sq\n", Position::new(1, 12));
         assert_eq!(no_init[0].2, "_init:\n    importstd math\n\n");
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn internal_symbols_of_other_modules_are_hidden() {
+        let dir = std::env::temp_dir().join(format!("tasm-lsp-int-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("lib.tasm"),
+            "_init:\n    alias pub_g, g5\n    alias __priv_g, g6\n\npublic:\n    nop\n__private:\n    nop\n",
+        )
+        .unwrap();
+        let main = "_init:\n    import lib\n    alias __mine, g7\n\n__local:\n    nop\nroutine:\n    spawn \n    spawn public | remap: {\n";
+        let path = dir.join("main.tasm");
+        fs::write(&path, main).unwrap();
+        let uri = Url::from_file_path(&path).unwrap();
+        let mut world = World::new(dir.join("stdlib"), false);
+        world
+            .docs
+            .insert(uri.clone(), Document { text: main.into() });
+
+        for pos in [Position::new(7, 10), Position::new(8, 28)] {
+            let labels: Vec<String> = complete(&world, &uri, main, pos)
+                .into_iter()
+                .map(|i| i.label)
+                .collect();
+            for shown in ["lib::public", "lib::pub_g", "__local", "__mine"] {
+                assert!(
+                    labels.iter().any(|l| l == shown),
+                    "{shown} missing at {pos:?}: {labels:?}"
+                );
+            }
+            for hidden in ["lib::__private", "lib::__priv_g"] {
+                assert!(
+                    !labels.iter().any(|l| l == hidden),
+                    "{hidden} shown at {pos:?}"
+                );
+            }
+        }
 
         let _ = fs::remove_dir_all(dir);
     }

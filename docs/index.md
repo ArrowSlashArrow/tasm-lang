@@ -947,7 +947,7 @@ User-defined [aliases](#3128-the-alias-instruction) are substituted before any o
 ### 3.3.1. Number literals
 A number literal is any string that may be parsed as a float. Unless specified to be strictly an integer, all numbers are parsed as double-precision floats (f64).  
 It is important to make the distinction between number literals and numbers stored in items. While both are numbers, number literals are used more as specific values, while items represent containers for values in the actual program/level.  
-It is also important to recognize that all floats in GD are 32-bit floats. This means that any integer values above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself.
+It is also important to recognize that GD stores the modifier of an item edit trigger (the number literal in instructions like `add c1, 5`) as a 32-bit float. This means that any integer literals above 2^24, or 16 777 216, while correctly parsed by the compiler, may be incorrectly rounded by GD itself. Arithmetic on the values stored in items is not affected.
 
 Where an instruction requires an `<int>`, the number must have no fractional part (`5` and `5.0` are both accepted, `5.5` is not).
 

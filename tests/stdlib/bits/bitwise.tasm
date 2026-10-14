@@ -9,8 +9,10 @@ _init:
     alias bitwise_and_3, c14
     alias bitwise_or_2,  c15
     alias bitwise_xor_2, c16
-    alias bitwise_not_1, c17
-    alias bitwise_not_2, c18
+    alias bitwise_and_4, c17
+    alias bitwise_xor_3, c18
+    alias bitwise_not_1, c19
+    alias bitwise_not_2, c20
 
     display bitwise_and_1    ; expected: 8   (bitwise_and(12, 10))
     display bitwise_or_1     ; expected: 14   (bitwise_or(12, 10))
@@ -19,8 +21,10 @@ _init:
     display bitwise_and_3    ; expected: 999936   (bitwise_and(1000000, 999999))
     display bitwise_or_2     ; expected: 1000063   (bitwise_or(1000000, 999999))
     display bitwise_xor_2    ; expected: 127   (bitwise_xor(1000000, 999999))
-    display bitwise_not_1    ; expected: 1147483647   (bitwise_not(1000000000): above 2^24, so GD may round the last digits)
-    display bitwise_not_2    ; expected: 2147483642   (bitwise_not(5): close to 2^31, where 32-bit floats can't be exact)
+    display bitwise_and_4    ; expected: 1431655765   (bitwise_and(2147483647, 1431655765))
+    display bitwise_xor_3    ; expected: 2047   (bitwise_xor(2000000000, 1999999999))
+    display bitwise_not_1    ; expected: 1147483647   (bitwise_not(1000000000))
+    display bitwise_not_2    ; expected: 2147483642   (bitwise_not(5))
 
 
 _start:
@@ -45,6 +49,15 @@ _start:
     mov c1, 1000000
     mov c2, 999999
     spawn bits::bitwise_xor     | ordered:false delay:0 remap: {c3 = bitwise_xor_2}
+    mov c1, 2147479552          ; 2147483647 doesn't fit in a 32-bit float constant,
+    add c1, 4095                ; so it is loaded in two parts
+    mov c2, 1431654400          ; 1431655765 doesn't fit in a 32-bit float constant,
+    add c2, 1365                ; so it is loaded in two parts
+    spawn bits::bitwise_and     | ordered:false delay:0 remap: {c3 = bitwise_and_4}
+    mov c1, 2000000000
+    mov c2, 1999998976          ; 1999999999 doesn't fit in a 32-bit float constant,
+    add c2, 1023                ; so it is loaded in two parts
+    spawn bits::bitwise_xor     | ordered:false delay:0 remap: {c3 = bitwise_xor_3}
     mov c1, 1000000000
     spawn bits::bitwise_not     | ordered:false delay:0 remap: {c3 = bitwise_not_1}
     mov c1, 5

@@ -1,10 +1,70 @@
 ; sha256 of the string starting at offset 100
 _init:
-    import ../stdlib/mem_14bit
     import ../stdlib/bits
 
-    alias strlen, 50
+    alias strlen, 50        ; maximum length: the string ends at its first 0 byte or after 50 bytes
     alias str_offset, 100
+
+    ; working variables a..h
+    alias sha_a,          c1200
+    alias sha_b,          c1201
+    alias sha_c,          c1202
+    alias sha_d,          c1203
+    alias sha_e,          c1204
+    alias sha_f,          c1205
+    alias sha_g,          c1206
+    alias sha_h,          c1207
+    alias sha_round,      c3000    ; rounds done
+    alias sha_tmp,        c3001    ; scratch
+    alias sha_den,        c3002    ; scratch
+    alias sha_s1,         c3003    ; S1(e)
+    alias sha_ch,         c3004    ; Ch(e, f, g)
+    alias sha_s0,         c3005    ; S0(a)
+    alias sha_maj,        c3006    ; Maj(a, b, c)
+    alias sha_t1,         c3007    ; T1
+    alias sha_x,          c3008    ; scratch word
+    alias sha_y,          c3009    ; scratch word
+    alias rot_n,          c3020    ; rotr: the rotation
+    alias rot_hi,         c3021    ; rotr: c1 >>> n
+    alias op_sa,          c3022    ; xor32/and32: -1 if c1 < 0
+    alias op_sb,          c3023    ; xor32/and32: -1 if c2 < 0
+    alias op_s,           c3024    ; xor32/and32: the sign bit of the result
+    alias add_q,          c3025    ; add32: floor((c1 + c2) / 2^31)
+    alias add_carry,      c3026    ; add32: 1, 0 or -1 times 2^32 to drop
+
+    ; the hash, one byte per counter (bottom display = first byte)
+    display c20         ; expected: 49
+    display c21         ; expected: 95
+    display c22         ; expected: 91
+    display c23         ; expected: 219
+    display c24         ; expected: 118
+    display c25         ; expected: 208
+    display c26         ; expected: 120
+    display c27         ; expected: 196
+    display c28         ; expected: 59
+    display c29         ; expected: 138
+    display c30         ; expected: 192
+    display c31         ; expected: 6
+    display c32         ; expected: 78
+    display c33         ; expected: 74
+    display c34         ; expected: 1
+    display c35         ; expected: 100
+    display c36         ; expected: 97
+    display c37         ; expected: 43
+    display c38         ; expected: 31
+    display c39         ; expected: 206
+    display c40         ; expected: 119
+    display c41         ; expected: 200
+    display c42         ; expected: 105
+    display c43         ; expected: 52
+    display c44         ; expected: 91
+    display c45         ; expected: 252
+    display c46         ; expected: 148
+    display c47         ; expected: 199
+    display c48         ; expected: 88
+    display c49         ; expected: 148
+    display c50         ; expected: 237
+    display c51         ; expected: 211
 
 _start:
     ; load string: "Hello, world!"
@@ -22,3 +82,1288 @@ _start:
     mov C110, 108       ; l
     mov C111, 100       ; d
     mov C112, 33        ; !
+    spawn sha256                | ordered:false delay:0
+
+; SHA-256 of the string at c100.. (one byte per counter). The string ends at its first 0 byte
+; or after 50 bytes, so it always fits in one 512-bit block. The 32 bytes of the hash end up
+; in c20 - c51, most significant byte first.
+;
+; Every 32-bit word is one counter, holding the word's bits as a 32-bit two's complement integer
+; (so words with the top bit set are negative). Item layout:
+;     c1 - c3: arguments and results of xor32, and32, add32, rotr and the bits:: routines
+;     c1200-c1207: the working variables a..h
+;     c1300-c1315: the message schedule, W[t] .. W[t + 15]
+;     c1400-c1463: the round constants that are still to come
+;     c2300-c2363: the padded block, c2400-c2449: end-of-string flags
+;     c3000-c3026: scratch
+; @0tick, but the rounds run afterwards, one per tick (64 ticks)
+sha256:
+    mov sha_round, 0
+    ; find the length: alive_i = 1 while bytes 0..i are all non-zero
+    mov sha_tmp, c100           | resmode:+             ; byte 0
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2400, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mov sha_tmp, c101           | resmode:+             ; byte 1
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2401, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2401, c2400
+    mov sha_tmp, c102           | resmode:+             ; byte 2
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2402, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2402, c2401
+    mov sha_tmp, c103           | resmode:+             ; byte 3
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2403, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2403, c2402
+    mov sha_tmp, c104           | resmode:+             ; byte 4
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2404, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2404, c2403
+    mov sha_tmp, c105           | resmode:+             ; byte 5
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2405, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2405, c2404
+    mov sha_tmp, c106           | resmode:+             ; byte 6
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2406, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2406, c2405
+    mov sha_tmp, c107           | resmode:+             ; byte 7
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2407, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2407, c2406
+    mov sha_tmp, c108           | resmode:+             ; byte 8
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2408, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2408, c2407
+    mov sha_tmp, c109           | resmode:+             ; byte 9
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2409, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2409, c2408
+    mov sha_tmp, c110           | resmode:+             ; byte 10
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2410, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2410, c2409
+    mov sha_tmp, c111           | resmode:+             ; byte 11
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2411, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2411, c2410
+    mov sha_tmp, c112           | resmode:+             ; byte 12
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2412, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2412, c2411
+    mov sha_tmp, c113           | resmode:+             ; byte 13
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2413, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2413, c2412
+    mov sha_tmp, c114           | resmode:+             ; byte 14
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2414, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2414, c2413
+    mov sha_tmp, c115           | resmode:+             ; byte 15
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2415, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2415, c2414
+    mov sha_tmp, c116           | resmode:+             ; byte 16
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2416, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2416, c2415
+    mov sha_tmp, c117           | resmode:+             ; byte 17
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2417, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2417, c2416
+    mov sha_tmp, c118           | resmode:+             ; byte 18
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2418, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2418, c2417
+    mov sha_tmp, c119           | resmode:+             ; byte 19
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2419, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2419, c2418
+    mov sha_tmp, c120           | resmode:+             ; byte 20
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2420, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2420, c2419
+    mov sha_tmp, c121           | resmode:+             ; byte 21
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2421, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2421, c2420
+    mov sha_tmp, c122           | resmode:+             ; byte 22
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2422, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2422, c2421
+    mov sha_tmp, c123           | resmode:+             ; byte 23
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2423, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2423, c2422
+    mov sha_tmp, c124           | resmode:+             ; byte 24
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2424, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2424, c2423
+    mov sha_tmp, c125           | resmode:+             ; byte 25
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2425, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2425, c2424
+    mov sha_tmp, c126           | resmode:+             ; byte 26
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2426, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2426, c2425
+    mov sha_tmp, c127           | resmode:+             ; byte 27
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2427, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2427, c2426
+    mov sha_tmp, c128           | resmode:+             ; byte 28
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2428, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2428, c2427
+    mov sha_tmp, c129           | resmode:+             ; byte 29
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2429, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2429, c2428
+    mov sha_tmp, c130           | resmode:+             ; byte 30
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2430, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2430, c2429
+    mov sha_tmp, c131           | resmode:+             ; byte 31
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2431, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2431, c2430
+    mov sha_tmp, c132           | resmode:+             ; byte 32
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2432, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2432, c2431
+    mov sha_tmp, c133           | resmode:+             ; byte 33
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2433, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2433, c2432
+    mov sha_tmp, c134           | resmode:+             ; byte 34
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2434, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2434, c2433
+    mov sha_tmp, c135           | resmode:+             ; byte 35
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2435, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2435, c2434
+    mov sha_tmp, c136           | resmode:+             ; byte 36
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2436, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2436, c2435
+    mov sha_tmp, c137           | resmode:+             ; byte 37
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2437, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2437, c2436
+    mov sha_tmp, c138           | resmode:+             ; byte 38
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2438, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2438, c2437
+    mov sha_tmp, c139           | resmode:+             ; byte 39
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2439, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2439, c2438
+    mov sha_tmp, c140           | resmode:+             ; byte 40
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2440, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2440, c2439
+    mov sha_tmp, c141           | resmode:+             ; byte 41
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2441, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2441, c2440
+    mov sha_tmp, c142           | resmode:+             ; byte 42
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2442, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2442, c2441
+    mov sha_tmp, c143           | resmode:+             ; byte 43
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2443, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2443, c2442
+    mov sha_tmp, c144           | resmode:+             ; byte 44
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2444, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2444, c2443
+    mov sha_tmp, c145           | resmode:+             ; byte 45
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2445, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2445, c2444
+    mov sha_tmp, c146           | resmode:+             ; byte 46
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2446, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2446, c2445
+    mov sha_tmp, c147           | resmode:+             ; byte 47
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2447, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2447, c2446
+    mov sha_tmp, c148           | resmode:+             ; byte 48
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2448, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2448, c2447
+    mov sha_tmp, c149           | resmode:+             ; byte 49
+    mov sha_den, sha_tmp
+    add sha_den, 1
+    div c2449, sha_tmp, sha_den | resmode:ceil          ; |x| / (|x| + 1) rounds up to 1 unless x is 0
+    mul c2449, c2448
+    ; the padded block: the string, then 0x80, then zeros, then the length in bits (bytes 62-63)
+    mul c2300, c100, c2400                              ; byte 0
+    mov sha_tmp, c2400          | itemmod:-1
+    add sha_tmp, 1
+    add c2300, sha_tmp          | itemmod:128
+    mul c2301, c101, c2401                              ; byte 1
+    sub sha_tmp, c2400, c2401
+    add c2301, sha_tmp          | itemmod:128
+    mul c2302, c102, c2402                              ; byte 2
+    sub sha_tmp, c2401, c2402
+    add c2302, sha_tmp          | itemmod:128
+    mul c2303, c103, c2403                              ; byte 3
+    sub sha_tmp, c2402, c2403
+    add c2303, sha_tmp          | itemmod:128
+    mul c2304, c104, c2404                              ; byte 4
+    sub sha_tmp, c2403, c2404
+    add c2304, sha_tmp          | itemmod:128
+    mul c2305, c105, c2405                              ; byte 5
+    sub sha_tmp, c2404, c2405
+    add c2305, sha_tmp          | itemmod:128
+    mul c2306, c106, c2406                              ; byte 6
+    sub sha_tmp, c2405, c2406
+    add c2306, sha_tmp          | itemmod:128
+    mul c2307, c107, c2407                              ; byte 7
+    sub sha_tmp, c2406, c2407
+    add c2307, sha_tmp          | itemmod:128
+    mul c2308, c108, c2408                              ; byte 8
+    sub sha_tmp, c2407, c2408
+    add c2308, sha_tmp          | itemmod:128
+    mul c2309, c109, c2409                              ; byte 9
+    sub sha_tmp, c2408, c2409
+    add c2309, sha_tmp          | itemmod:128
+    mul c2310, c110, c2410                              ; byte 10
+    sub sha_tmp, c2409, c2410
+    add c2310, sha_tmp          | itemmod:128
+    mul c2311, c111, c2411                              ; byte 11
+    sub sha_tmp, c2410, c2411
+    add c2311, sha_tmp          | itemmod:128
+    mul c2312, c112, c2412                              ; byte 12
+    sub sha_tmp, c2411, c2412
+    add c2312, sha_tmp          | itemmod:128
+    mul c2313, c113, c2413                              ; byte 13
+    sub sha_tmp, c2412, c2413
+    add c2313, sha_tmp          | itemmod:128
+    mul c2314, c114, c2414                              ; byte 14
+    sub sha_tmp, c2413, c2414
+    add c2314, sha_tmp          | itemmod:128
+    mul c2315, c115, c2415                              ; byte 15
+    sub sha_tmp, c2414, c2415
+    add c2315, sha_tmp          | itemmod:128
+    mul c2316, c116, c2416                              ; byte 16
+    sub sha_tmp, c2415, c2416
+    add c2316, sha_tmp          | itemmod:128
+    mul c2317, c117, c2417                              ; byte 17
+    sub sha_tmp, c2416, c2417
+    add c2317, sha_tmp          | itemmod:128
+    mul c2318, c118, c2418                              ; byte 18
+    sub sha_tmp, c2417, c2418
+    add c2318, sha_tmp          | itemmod:128
+    mul c2319, c119, c2419                              ; byte 19
+    sub sha_tmp, c2418, c2419
+    add c2319, sha_tmp          | itemmod:128
+    mul c2320, c120, c2420                              ; byte 20
+    sub sha_tmp, c2419, c2420
+    add c2320, sha_tmp          | itemmod:128
+    mul c2321, c121, c2421                              ; byte 21
+    sub sha_tmp, c2420, c2421
+    add c2321, sha_tmp          | itemmod:128
+    mul c2322, c122, c2422                              ; byte 22
+    sub sha_tmp, c2421, c2422
+    add c2322, sha_tmp          | itemmod:128
+    mul c2323, c123, c2423                              ; byte 23
+    sub sha_tmp, c2422, c2423
+    add c2323, sha_tmp          | itemmod:128
+    mul c2324, c124, c2424                              ; byte 24
+    sub sha_tmp, c2423, c2424
+    add c2324, sha_tmp          | itemmod:128
+    mul c2325, c125, c2425                              ; byte 25
+    sub sha_tmp, c2424, c2425
+    add c2325, sha_tmp          | itemmod:128
+    mul c2326, c126, c2426                              ; byte 26
+    sub sha_tmp, c2425, c2426
+    add c2326, sha_tmp          | itemmod:128
+    mul c2327, c127, c2427                              ; byte 27
+    sub sha_tmp, c2426, c2427
+    add c2327, sha_tmp          | itemmod:128
+    mul c2328, c128, c2428                              ; byte 28
+    sub sha_tmp, c2427, c2428
+    add c2328, sha_tmp          | itemmod:128
+    mul c2329, c129, c2429                              ; byte 29
+    sub sha_tmp, c2428, c2429
+    add c2329, sha_tmp          | itemmod:128
+    mul c2330, c130, c2430                              ; byte 30
+    sub sha_tmp, c2429, c2430
+    add c2330, sha_tmp          | itemmod:128
+    mul c2331, c131, c2431                              ; byte 31
+    sub sha_tmp, c2430, c2431
+    add c2331, sha_tmp          | itemmod:128
+    mul c2332, c132, c2432                              ; byte 32
+    sub sha_tmp, c2431, c2432
+    add c2332, sha_tmp          | itemmod:128
+    mul c2333, c133, c2433                              ; byte 33
+    sub sha_tmp, c2432, c2433
+    add c2333, sha_tmp          | itemmod:128
+    mul c2334, c134, c2434                              ; byte 34
+    sub sha_tmp, c2433, c2434
+    add c2334, sha_tmp          | itemmod:128
+    mul c2335, c135, c2435                              ; byte 35
+    sub sha_tmp, c2434, c2435
+    add c2335, sha_tmp          | itemmod:128
+    mul c2336, c136, c2436                              ; byte 36
+    sub sha_tmp, c2435, c2436
+    add c2336, sha_tmp          | itemmod:128
+    mul c2337, c137, c2437                              ; byte 37
+    sub sha_tmp, c2436, c2437
+    add c2337, sha_tmp          | itemmod:128
+    mul c2338, c138, c2438                              ; byte 38
+    sub sha_tmp, c2437, c2438
+    add c2338, sha_tmp          | itemmod:128
+    mul c2339, c139, c2439                              ; byte 39
+    sub sha_tmp, c2438, c2439
+    add c2339, sha_tmp          | itemmod:128
+    mul c2340, c140, c2440                              ; byte 40
+    sub sha_tmp, c2439, c2440
+    add c2340, sha_tmp          | itemmod:128
+    mul c2341, c141, c2441                              ; byte 41
+    sub sha_tmp, c2440, c2441
+    add c2341, sha_tmp          | itemmod:128
+    mul c2342, c142, c2442                              ; byte 42
+    sub sha_tmp, c2441, c2442
+    add c2342, sha_tmp          | itemmod:128
+    mul c2343, c143, c2443                              ; byte 43
+    sub sha_tmp, c2442, c2443
+    add c2343, sha_tmp          | itemmod:128
+    mul c2344, c144, c2444                              ; byte 44
+    sub sha_tmp, c2443, c2444
+    add c2344, sha_tmp          | itemmod:128
+    mul c2345, c145, c2445                              ; byte 45
+    sub sha_tmp, c2444, c2445
+    add c2345, sha_tmp          | itemmod:128
+    mul c2346, c146, c2446                              ; byte 46
+    sub sha_tmp, c2445, c2446
+    add c2346, sha_tmp          | itemmod:128
+    mul c2347, c147, c2447                              ; byte 47
+    sub sha_tmp, c2446, c2447
+    add c2347, sha_tmp          | itemmod:128
+    mul c2348, c148, c2448                              ; byte 48
+    sub sha_tmp, c2447, c2448
+    add c2348, sha_tmp          | itemmod:128
+    mul c2349, c149, c2449                              ; byte 49
+    sub sha_tmp, c2448, c2449
+    add c2349, sha_tmp          | itemmod:128
+    mov c2350, 0                                        ; byte 50
+    add c2350, c2449            | itemmod:128
+    mov c2351, 0                                        ; byte 51
+    mov c2352, 0                                        ; byte 52
+    mov c2353, 0                                        ; byte 53
+    mov c2354, 0                                        ; byte 54
+    mov c2355, 0                                        ; byte 55
+    mov c2356, 0                                        ; byte 56
+    mov c2357, 0                                        ; byte 57
+    mov c2358, 0                                        ; byte 58
+    mov c2359, 0                                        ; byte 59
+    mov c2360, 0                                        ; byte 60
+    mov c2361, 0                                        ; byte 61
+    mov c2362, 0                                        ; byte 62
+    mov c2363, 0                                        ; byte 63
+    mov sha_tmp, 0
+    add sha_tmp, c2400          | itemmod:8             ; length in bits
+    add sha_tmp, c2401          | itemmod:8
+    add sha_tmp, c2402          | itemmod:8
+    add sha_tmp, c2403          | itemmod:8
+    add sha_tmp, c2404          | itemmod:8
+    add sha_tmp, c2405          | itemmod:8
+    add sha_tmp, c2406          | itemmod:8
+    add sha_tmp, c2407          | itemmod:8
+    add sha_tmp, c2408          | itemmod:8
+    add sha_tmp, c2409          | itemmod:8
+    add sha_tmp, c2410          | itemmod:8
+    add sha_tmp, c2411          | itemmod:8
+    add sha_tmp, c2412          | itemmod:8
+    add sha_tmp, c2413          | itemmod:8
+    add sha_tmp, c2414          | itemmod:8
+    add sha_tmp, c2415          | itemmod:8
+    add sha_tmp, c2416          | itemmod:8
+    add sha_tmp, c2417          | itemmod:8
+    add sha_tmp, c2418          | itemmod:8
+    add sha_tmp, c2419          | itemmod:8
+    add sha_tmp, c2420          | itemmod:8
+    add sha_tmp, c2421          | itemmod:8
+    add sha_tmp, c2422          | itemmod:8
+    add sha_tmp, c2423          | itemmod:8
+    add sha_tmp, c2424          | itemmod:8
+    add sha_tmp, c2425          | itemmod:8
+    add sha_tmp, c2426          | itemmod:8
+    add sha_tmp, c2427          | itemmod:8
+    add sha_tmp, c2428          | itemmod:8
+    add sha_tmp, c2429          | itemmod:8
+    add sha_tmp, c2430          | itemmod:8
+    add sha_tmp, c2431          | itemmod:8
+    add sha_tmp, c2432          | itemmod:8
+    add sha_tmp, c2433          | itemmod:8
+    add sha_tmp, c2434          | itemmod:8
+    add sha_tmp, c2435          | itemmod:8
+    add sha_tmp, c2436          | itemmod:8
+    add sha_tmp, c2437          | itemmod:8
+    add sha_tmp, c2438          | itemmod:8
+    add sha_tmp, c2439          | itemmod:8
+    add sha_tmp, c2440          | itemmod:8
+    add sha_tmp, c2441          | itemmod:8
+    add sha_tmp, c2442          | itemmod:8
+    add sha_tmp, c2443          | itemmod:8
+    add sha_tmp, c2444          | itemmod:8
+    add sha_tmp, c2445          | itemmod:8
+    add sha_tmp, c2446          | itemmod:8
+    add sha_tmp, c2447          | itemmod:8
+    add sha_tmp, c2448          | itemmod:8
+    add sha_tmp, c2449          | itemmod:8
+    mov c2362, sha_tmp
+    fldiv c2362, 256
+    sub sha_tmp, c2362          | itemmod:256
+    mov c2363, sha_tmp
+    ; pack the block into the 16 schedule words, most significant byte first. The top byte
+    ; counts as negative when it is 128 or more, so that the word fits in a counter
+    mov sha_tmp, c2300                                  ; W[0]
+    fldiv sha_tmp, 128
+    mov c1300, c2300
+    sub c1300, sha_tmp          | itemmod:256
+    mul c1300, 256
+    add c1300, c2301
+    mul c1300, 256
+    add c1300, c2302
+    mul c1300, 256
+    add c1300, c2303
+    mov sha_tmp, c2304                                  ; W[1]
+    fldiv sha_tmp, 128
+    mov c1301, c2304
+    sub c1301, sha_tmp          | itemmod:256
+    mul c1301, 256
+    add c1301, c2305
+    mul c1301, 256
+    add c1301, c2306
+    mul c1301, 256
+    add c1301, c2307
+    mov sha_tmp, c2308                                  ; W[2]
+    fldiv sha_tmp, 128
+    mov c1302, c2308
+    sub c1302, sha_tmp          | itemmod:256
+    mul c1302, 256
+    add c1302, c2309
+    mul c1302, 256
+    add c1302, c2310
+    mul c1302, 256
+    add c1302, c2311
+    mov sha_tmp, c2312                                  ; W[3]
+    fldiv sha_tmp, 128
+    mov c1303, c2312
+    sub c1303, sha_tmp          | itemmod:256
+    mul c1303, 256
+    add c1303, c2313
+    mul c1303, 256
+    add c1303, c2314
+    mul c1303, 256
+    add c1303, c2315
+    mov sha_tmp, c2316                                  ; W[4]
+    fldiv sha_tmp, 128
+    mov c1304, c2316
+    sub c1304, sha_tmp          | itemmod:256
+    mul c1304, 256
+    add c1304, c2317
+    mul c1304, 256
+    add c1304, c2318
+    mul c1304, 256
+    add c1304, c2319
+    mov sha_tmp, c2320                                  ; W[5]
+    fldiv sha_tmp, 128
+    mov c1305, c2320
+    sub c1305, sha_tmp          | itemmod:256
+    mul c1305, 256
+    add c1305, c2321
+    mul c1305, 256
+    add c1305, c2322
+    mul c1305, 256
+    add c1305, c2323
+    mov sha_tmp, c2324                                  ; W[6]
+    fldiv sha_tmp, 128
+    mov c1306, c2324
+    sub c1306, sha_tmp          | itemmod:256
+    mul c1306, 256
+    add c1306, c2325
+    mul c1306, 256
+    add c1306, c2326
+    mul c1306, 256
+    add c1306, c2327
+    mov sha_tmp, c2328                                  ; W[7]
+    fldiv sha_tmp, 128
+    mov c1307, c2328
+    sub c1307, sha_tmp          | itemmod:256
+    mul c1307, 256
+    add c1307, c2329
+    mul c1307, 256
+    add c1307, c2330
+    mul c1307, 256
+    add c1307, c2331
+    mov sha_tmp, c2332                                  ; W[8]
+    fldiv sha_tmp, 128
+    mov c1308, c2332
+    sub c1308, sha_tmp          | itemmod:256
+    mul c1308, 256
+    add c1308, c2333
+    mul c1308, 256
+    add c1308, c2334
+    mul c1308, 256
+    add c1308, c2335
+    mov sha_tmp, c2336                                  ; W[9]
+    fldiv sha_tmp, 128
+    mov c1309, c2336
+    sub c1309, sha_tmp          | itemmod:256
+    mul c1309, 256
+    add c1309, c2337
+    mul c1309, 256
+    add c1309, c2338
+    mul c1309, 256
+    add c1309, c2339
+    mov sha_tmp, c2340                                  ; W[10]
+    fldiv sha_tmp, 128
+    mov c1310, c2340
+    sub c1310, sha_tmp          | itemmod:256
+    mul c1310, 256
+    add c1310, c2341
+    mul c1310, 256
+    add c1310, c2342
+    mul c1310, 256
+    add c1310, c2343
+    mov sha_tmp, c2344                                  ; W[11]
+    fldiv sha_tmp, 128
+    mov c1311, c2344
+    sub c1311, sha_tmp          | itemmod:256
+    mul c1311, 256
+    add c1311, c2345
+    mul c1311, 256
+    add c1311, c2346
+    mul c1311, 256
+    add c1311, c2347
+    mov sha_tmp, c2348                                  ; W[12]
+    fldiv sha_tmp, 128
+    mov c1312, c2348
+    sub c1312, sha_tmp          | itemmod:256
+    mul c1312, 256
+    add c1312, c2349
+    mul c1312, 256
+    add c1312, c2350
+    mul c1312, 256
+    add c1312, c2351
+    mov sha_tmp, c2352                                  ; W[13]
+    fldiv sha_tmp, 128
+    mov c1313, c2352
+    sub c1313, sha_tmp          | itemmod:256
+    mul c1313, 256
+    add c1313, c2353
+    mul c1313, 256
+    add c1313, c2354
+    mul c1313, 256
+    add c1313, c2355
+    mov sha_tmp, c2356                                  ; W[14]
+    fldiv sha_tmp, 128
+    mov c1314, c2356
+    sub c1314, sha_tmp          | itemmod:256
+    mul c1314, 256
+    add c1314, c2357
+    mul c1314, 256
+    add c1314, c2358
+    mul c1314, 256
+    add c1314, c2359
+    mov sha_tmp, c2360                                  ; W[15]
+    fldiv sha_tmp, 128
+    mov c1315, c2360
+    sub c1315, sha_tmp          | itemmod:256
+    mul c1315, 256
+    add c1315, c2361
+    mul c1315, 256
+    add c1315, c2362
+    mul c1315, 256
+    add c1315, c2363
+    ; a..h = the initial hash values
+    mov sha_a, 1779032064                               ; a = 0x6a09e667
+    add sha_a, 1639
+    mov sha_b, -1150832640                              ; b = 0xbb67ae85
+    add sha_b, -379
+    mov sha_c, 1013903360                               ; c = 0x3c6ef372
+    add sha_c, 882
+    mov sha_d, -1521483776                              ; d = 0xa54ff53a
+    add sha_d, -2758
+    mov sha_e, 1359892480                               ; e = 0x510e527f
+    add sha_e, 639
+    mov sha_f, -1694142464                              ; f = 0x9b05688c
+    add sha_f, -1908
+    mov sha_g, 528732160                                ; g = 0x1f83d9ab
+    add sha_g, 2475
+    mov sha_h, 1541455872                               ; h = 0x5be0cd19
+    add sha_h, 3353
+    ; the round constants
+    mov c1400, 1116348416                               ; K[0] = 0x428a2f98
+    add c1400, 3992
+    mov c1401, 1899446272                               ; K[1] = 0x71374491
+    add c1401, 1169
+    mov c1402, -1245642752                              ; K[2] = 0xb5c0fbcf
+    add c1402, -1073
+    mov c1403, -373956608                               ; K[3] = 0xe9b5dba5
+    add c1403, -1115
+    mov c1404, 961986560                                ; K[4] = 0x3956c25b
+    add c1404, 603
+    mov c1405, 1508970496                               ; K[5] = 0x59f111f1
+    add c1405, 497
+    mov c1406, -1841328128                              ; K[6] = 0x923f82a4
+    add c1406, -3420
+    mov c1407, -1424203776                              ; K[7] = 0xab1c5ed5
+    add c1407, -299
+    mov c1408, -670584832                               ; K[8] = 0xd807aa98
+    add c1408, -1384
+    mov c1409, 310595584                                ; K[9] = 0x12835b01
+    add c1409, 2817
+    mov c1410, 607223808                                ; K[10] = 0x243185be
+    add c1410, 1470
+    mov c1411, 1426878464                               ; K[11] = 0x550c7dc3
+    add c1411, 3523
+    mov c1412, 1925074944                               ; K[12] = 0x72be5d74
+    add c1412, 3444
+    mov c1413, -2132885504                              ; K[13] = 0x80deb1fe
+    add c1413, -3586
+    mov c1414, -1680076800                              ; K[14] = 0x9bdc06a7
+    add c1414, -2393
+    mov c1415, -1046740992                              ; K[15] = 0xc19bf174
+    add c1415, -3724
+    mov c1416, -459575296                               ; K[16] = 0xe49b69c1
+    add c1416, -1599
+    mov c1417, -272740352                               ; K[17] = 0xefbe4786
+    add c1417, -2170
+    mov c1418, 264343552                                ; K[18] = 0x0fc19dc6
+    add c1418, 3526
+    mov c1419, 604807168                                ; K[19] = 0x240ca1cc
+    add c1419, 460
+    mov c1420, 770252800                                ; K[20] = 0x2de92c6f
+    add c1420, 3183
+    mov c1421, 1249148928                               ; K[21] = 0x4a7484aa
+    add c1421, 1194
+    mov c1422, 1555079168                               ; K[22] = 0x5cb0a9dc
+    add c1422, 2524
+    mov c1423, 1996062720                               ; K[23] = 0x76f988da
+    add c1423, 2266
+    mov c1424, -1740742656                              ; K[24] = 0x983e5152
+    add c1424, -3758
+    mov c1425, -1473130496                              ; K[25] = 0xa831c66d
+    add c1425, -2451
+    mov c1426, -1341968384                              ; K[26] = 0xb00327c8
+    add c1426, -2104
+    mov c1427, -1084653568                              ; K[27] = 0xbf597fc7
+    add c1427, -57
+    mov c1428, -958394368                               ; K[28] = 0xc6e00bf3
+    add c1428, -1037
+    mov c1429, -710434816                               ; K[29] = 0xd5a79147
+    add c1429, -3769
+    mov c1430, 113926144                                ; K[30] = 0x06ca6351
+    add c1430, 849
+    mov c1431, 338239488                                ; K[31] = 0x14292967
+    add c1431, 2407
+    mov c1432, 666304512                                ; K[32] = 0x27b70a85
+    add c1432, 2693
+    mov c1433, 773529600                                ; K[33] = 0x2e1b2138
+    add c1433, 312
+    mov c1434, 1294753792                               ; K[34] = 0x4d2c6dfc
+    add c1434, 3580
+    mov c1435, 1396178944                               ; K[35] = 0x53380d13
+    add c1435, 3347
+    mov c1436, 1695182848                               ; K[36] = 0x650a7354
+    add c1436, 852
+    mov c1437, 1986658304                               ; K[37] = 0x766a0abb
+    add c1437, 2747
+    mov c1438, -2117939200                              ; K[38] = 0x81c2c92e
+    add c1438, -1746
+    mov c1439, -1838010368                              ; K[39] = 0x92722c85
+    add c1439, -891
+    mov c1440, -1564479488                              ; K[40] = 0xa2bfe8a1
+    add c1440, -1887
+    mov c1441, -1474662400                              ; K[41] = 0xa81a664b
+    add c1441, -2485
+    mov c1442, -1035235328                              ; K[42] = 0xc24b8b70
+    add c1442, -1168
+    mov c1443, -949198848                               ; K[43] = 0xc76c51a3
+    add c1443, -3677
+    mov c1444, -778899456                               ; K[44] = 0xd192e819
+    add c1444, -2023
+    mov c1445, -694611968                               ; K[45] = 0xd6990624
+    add c1445, -2524
+    mov c1446, -200392704                               ; K[46] = 0xf40e3585
+    add c1446, -2683
+    mov c1447, 275423232                                ; K[47] = 0x106aa070
+    add c1447, 112
+    mov c1448, 430227456                                ; K[48] = 0x19a4c116
+    add c1448, 278
+    mov c1449, 506945536                                ; K[49] = 0x1e376c08
+    add c1449, 3080
+    mov c1450, 659058688                                ; K[50] = 0x2748774c
+    add c1450, 1868
+    mov c1451, 883994624                                ; K[51] = 0x34b0bcb5
+    add c1451, 3253
+    mov c1452, 958136320                                ; K[52] = 0x391c0cb3
+    add c1452, 3251
+    mov c1453, 1322819584                               ; K[53] = 0x4ed8aa4a
+    add c1453, 2634
+    mov c1454, 1536999424                               ; K[54] = 0x5b9cca4f
+    add c1454, 2639
+    mov c1455, 1747869696                               ; K[55] = 0x682e6ff3
+    add c1455, 4083
+    mov c1456, 1955561472                               ; K[56] = 0x748f82ee
+    add c1456, 750
+    mov c1457, 2024103936                               ; K[57] = 0x78a5636f
+    add c1457, 879
+    mov c1458, -2067234816                              ; K[58] = 0x84c87814
+    add c1458, -2028
+    mov c1459, -1933111296                              ; K[59] = 0x8cc70208
+    add c1459, -3576
+    mov c1460, -1866530816                              ; K[60] = 0x90befffa
+    add c1460, -6
+    mov c1461, -1538232320                              ; K[61] = 0xa4506ceb
+    add c1461, -789
+    mov c1462, -1090932736                              ; K[62] = 0xbef9a3f7
+    add c1462, -3081
+    mov c1463, -965640192                               ; K[63] = 0xc67178f2
+    add c1463, -1806
+    spawn sha256_round          | ordered:false         ; the next tick
+
+; One round of the compression function, and the next word of the message schedule.
+; not 0-tickable: loops by spawning itself (64 times, one tick each)
+sha256_round:
+    ; S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
+    mov c1, sha_e
+    mov c2, 6
+    spawn rotr                  | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, sha_e
+    mov c2, 11
+    spawn rotr                  | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, sha_e
+    mov c2, 25
+    spawn rotr                  | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_s1, c3
+    ; Ch = (e & f) ^ (~e & g) = g ^ (e & (f ^ g))
+    mov c1, sha_f
+    mov c2, sha_g
+    spawn xor32                 | ordered:false delay:0
+    mov c1, sha_e
+    mov c2, c3
+    spawn and32                 | ordered:false delay:0
+    mov c1, sha_g
+    mov c2, c3
+    spawn xor32                 | ordered:false delay:0
+    mov sha_ch, c3
+    ; S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
+    mov c1, sha_a
+    mov c2, 2
+    spawn rotr                  | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, sha_a
+    mov c2, 13
+    spawn rotr                  | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, sha_a
+    mov c2, 22
+    spawn rotr                  | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_s0, c3
+    ; Maj = (a & b) ^ (a & c) ^ (b & c) = (a & b) + (c & (a ^ b)): the two parts have no bits
+    ; in common, so adding them is the same as or-ing them, and can't leave the counter range
+    mov c1, sha_a
+    mov c2, sha_b
+    spawn and32                 | ordered:false delay:0
+    mov sha_maj, c3
+    mov c1, sha_a
+    mov c2, sha_b
+    spawn xor32                 | ordered:false delay:0
+    mov c1, sha_c
+    mov c2, c3
+    spawn and32                 | ordered:false delay:0
+    add sha_maj, c3
+    ; T1 = h + S1 + Ch + K[t] + W[t]
+    mov c1, sha_h
+    mov c2, sha_s1
+    spawn add32                 | ordered:false delay:0
+    mov c1, c3
+    mov c2, sha_ch
+    spawn add32                 | ordered:false delay:0
+    mov c1, c3
+    mov c2, c1400
+    spawn add32                 | ordered:false delay:0
+    mov c1, c3
+    mov c2, c1300
+    spawn add32                 | ordered:false delay:0
+    mov sha_t1, c3
+    ; h = g, g = f, f = e, e = d + T1, d = c, c = b, b = a, a = T1 + S0 + Maj
+    mov sha_h, sha_g
+    mov sha_g, sha_f
+    mov sha_f, sha_e
+    mov c1, sha_d
+    mov c2, sha_t1
+    spawn add32                 | ordered:false delay:0
+    mov sha_e, c3
+    mov sha_d, sha_c
+    mov sha_c, sha_b
+    mov sha_b, sha_a
+    mov c1, sha_t1
+    mov c2, sha_s0
+    spawn add32                 | ordered:false delay:0
+    mov c1, c3
+    mov c2, sha_maj
+    spawn add32                 | ordered:false delay:0
+    mov sha_a, c3
+    ; W[t + 16] = s1(W[t + 14]) + W[t + 9] + s0(W[t + 1]) + W[t], with
+    ; s0(x) = rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3) and s1(x) = rotr(x, 17) ^ rotr(x, 19) ^ (x >>> 10)
+    mov c1, c1301
+    mov c2, 7
+    spawn rotr                  | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, c1301
+    mov c2, 18
+    spawn rotr                  | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, c1301
+    mov c2, 3
+    spawn bits::raw_shift_right | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_s0, c3
+    mov c1, c1314
+    mov c2, 17
+    spawn rotr                  | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, c1314
+    mov c2, 19
+    spawn rotr                  | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_x, c3
+    mov c1, c1314
+    mov c2, 10
+    spawn bits::raw_shift_right | ordered:false delay:0
+    mov sha_y, c3
+    mov c1, sha_x
+    mov c2, sha_y
+    spawn xor32                 | ordered:false delay:0
+    mov sha_s1, c3
+    mov c1, sha_s1
+    mov c2, c1309
+    spawn add32                 | ordered:false delay:0
+    mov c1, c3
+    mov c2, sha_s0
+    spawn add32                 | ordered:false delay:0
+    mov c1, c3
+    mov c2, c1300
+    spawn add32                 | ordered:false delay:0
+    mov sha_x, c3
+    ; move the schedule window and the constants along by one
+    mov c1300, c1301
+    mov c1301, c1302
+    mov c1302, c1303
+    mov c1303, c1304
+    mov c1304, c1305
+    mov c1305, c1306
+    mov c1306, c1307
+    mov c1307, c1308
+    mov c1308, c1309
+    mov c1309, c1310
+    mov c1310, c1311
+    mov c1311, c1312
+    mov c1312, c1313
+    mov c1313, c1314
+    mov c1314, c1315
+    mov c1315, sha_x
+    mov c1400, c1401
+    mov c1401, c1402
+    mov c1402, c1403
+    mov c1403, c1404
+    mov c1404, c1405
+    mov c1405, c1406
+    mov c1406, c1407
+    mov c1407, c1408
+    mov c1408, c1409
+    mov c1409, c1410
+    mov c1410, c1411
+    mov c1411, c1412
+    mov c1412, c1413
+    mov c1413, c1414
+    mov c1414, c1415
+    mov c1415, c1416
+    mov c1416, c1417
+    mov c1417, c1418
+    mov c1418, c1419
+    mov c1419, c1420
+    mov c1420, c1421
+    mov c1421, c1422
+    mov c1422, c1423
+    mov c1423, c1424
+    mov c1424, c1425
+    mov c1425, c1426
+    mov c1426, c1427
+    mov c1427, c1428
+    mov c1428, c1429
+    mov c1429, c1430
+    mov c1430, c1431
+    mov c1431, c1432
+    mov c1432, c1433
+    mov c1433, c1434
+    mov c1434, c1435
+    mov c1435, c1436
+    mov c1436, c1437
+    mov c1437, c1438
+    mov c1438, c1439
+    mov c1439, c1440
+    mov c1440, c1441
+    mov c1441, c1442
+    mov c1442, c1443
+    mov c1443, c1444
+    mov c1444, c1445
+    mov c1445, c1446
+    mov c1446, c1447
+    mov c1447, c1448
+    mov c1448, c1449
+    mov c1449, c1450
+    mov c1450, c1451
+    mov c1451, c1452
+    mov c1452, c1453
+    mov c1453, c1454
+    mov c1454, c1455
+    mov c1455, c1456
+    mov c1456, c1457
+    mov c1457, c1458
+    mov c1458, c1459
+    mov c1459, c1460
+    mov c1460, c1461
+    mov c1461, c1462
+    mov c1462, c1463
+    add sha_round, 1
+    fl sha256_round, sha256_finish, sha_round, 64 | ordered:false
+
+; hash = initial hash values + a..h, written as bytes to c20 - c51.
+; @0tick
+sha256_finish:
+    mov c1, 1779032064                                  ; H0 = 0x6a09e667 + a
+    add c1, 1639
+    mov c2, sha_a
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3                                     ; byte 0: floor(H / 2^24) mod 256
+    fldiv sha_tmp, 16777216
+    mov c20, sha_tmp
+    fldiv sha_tmp, 256
+    sub c20, sha_tmp            | itemmod:256
+    mov sha_tmp, c3                                     ; byte 1: floor(H / 2^16) mod 256
+    fldiv sha_tmp, 65536
+    mov c21, sha_tmp
+    fldiv sha_tmp, 256
+    sub c21, sha_tmp            | itemmod:256
+    mov sha_tmp, c3                                     ; byte 2: floor(H / 2^8) mod 256
+    fldiv sha_tmp, 256
+    mov c22, sha_tmp
+    fldiv sha_tmp, 256
+    sub c22, sha_tmp            | itemmod:256
+    mov sha_tmp, c3                                     ; byte 3: floor(H / 2^0) mod 256
+    mov c23, sha_tmp
+    fldiv sha_tmp, 256
+    sub c23, sha_tmp            | itemmod:256
+    mov c1, -1150832640                                 ; H1 = 0xbb67ae85 + b
+    add c1, -379
+    mov c2, sha_b
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c24, sha_tmp
+    fldiv sha_tmp, 256
+    sub c24, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c25, sha_tmp
+    fldiv sha_tmp, 256
+    sub c25, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c26, sha_tmp
+    fldiv sha_tmp, 256
+    sub c26, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c27, sha_tmp
+    fldiv sha_tmp, 256
+    sub c27, sha_tmp            | itemmod:256
+    mov c1, 1013903360                                  ; H2 = 0x3c6ef372 + c
+    add c1, 882
+    mov c2, sha_c
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c28, sha_tmp
+    fldiv sha_tmp, 256
+    sub c28, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c29, sha_tmp
+    fldiv sha_tmp, 256
+    sub c29, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c30, sha_tmp
+    fldiv sha_tmp, 256
+    sub c30, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c31, sha_tmp
+    fldiv sha_tmp, 256
+    sub c31, sha_tmp            | itemmod:256
+    mov c1, -1521483776                                 ; H3 = 0xa54ff53a + d
+    add c1, -2758
+    mov c2, sha_d
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c32, sha_tmp
+    fldiv sha_tmp, 256
+    sub c32, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c33, sha_tmp
+    fldiv sha_tmp, 256
+    sub c33, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c34, sha_tmp
+    fldiv sha_tmp, 256
+    sub c34, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c35, sha_tmp
+    fldiv sha_tmp, 256
+    sub c35, sha_tmp            | itemmod:256
+    mov c1, 1359892480                                  ; H4 = 0x510e527f + e
+    add c1, 639
+    mov c2, sha_e
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c36, sha_tmp
+    fldiv sha_tmp, 256
+    sub c36, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c37, sha_tmp
+    fldiv sha_tmp, 256
+    sub c37, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c38, sha_tmp
+    fldiv sha_tmp, 256
+    sub c38, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c39, sha_tmp
+    fldiv sha_tmp, 256
+    sub c39, sha_tmp            | itemmod:256
+    mov c1, -1694142464                                 ; H5 = 0x9b05688c + f
+    add c1, -1908
+    mov c2, sha_f
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c40, sha_tmp
+    fldiv sha_tmp, 256
+    sub c40, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c41, sha_tmp
+    fldiv sha_tmp, 256
+    sub c41, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c42, sha_tmp
+    fldiv sha_tmp, 256
+    sub c42, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c43, sha_tmp
+    fldiv sha_tmp, 256
+    sub c43, sha_tmp            | itemmod:256
+    mov c1, 528732160                                   ; H6 = 0x1f83d9ab + g
+    add c1, 2475
+    mov c2, sha_g
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c44, sha_tmp
+    fldiv sha_tmp, 256
+    sub c44, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c45, sha_tmp
+    fldiv sha_tmp, 256
+    sub c45, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c46, sha_tmp
+    fldiv sha_tmp, 256
+    sub c46, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c47, sha_tmp
+    fldiv sha_tmp, 256
+    sub c47, sha_tmp            | itemmod:256
+    mov c1, 1541455872                                  ; H7 = 0x5be0cd19 + h
+    add c1, 3353
+    mov c2, sha_h
+    spawn add32                 | ordered:false delay:0
+    mov sha_tmp, c3
+    fldiv sha_tmp, 16777216
+    mov c48, sha_tmp
+    fldiv sha_tmp, 256
+    sub c48, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 65536
+    mov c49, sha_tmp
+    fldiv sha_tmp, 256
+    sub c49, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    fldiv sha_tmp, 256
+    mov c50, sha_tmp
+    fldiv sha_tmp, 256
+    sub c50, sha_tmp            | itemmod:256
+    mov sha_tmp, c3
+    mov c51, sha_tmp
+    fldiv sha_tmp, 256
+    sub c51, sha_tmp            | itemmod:256
+
+; Returns `c1` ^ `c2` over all 32 bits, including the sign bit. bits::bitwise_xor ignores the
+; sign bit, so the sign bits are taken off first, handled separately and put back afterwards.
+; @param c1 the first word (changed)
+; @param c2 the second word (changed)
+; @returns c3 c1 ^ c2
+; @0tick
+xor32:
+    mov op_sa, 0
+    add op_sa, c1               | itemmod:2147483648 divmod:true finmode:floor ; -1 if c1 < 0, else 0
+    mov op_sb, 0
+    add op_sb, c2               | itemmod:2147483648 divmod:true finmode:floor
+    sub c1, op_sa               | itemmod:2147483648    ; c1 without its sign bit: c1 + 2^31 if negative
+    sub c2, op_sb               | itemmod:2147483648
+    sub op_s, op_sa, op_sb      | resmode:+             ; sign bit: |sa - sb|
+    spawn bits::bitwise_xor     | ordered:false delay:0
+    sub c3, op_s                | itemmod:2147483648    ; put the sign bit back
+
+; Returns `c1` & `c2` over all 32 bits, including the sign bit (see xor32).
+; @param c1 the first word (changed)
+; @param c2 the second word (changed)
+; @returns c3 c1 & c2
+; @0tick
+and32:
+    mov op_sa, 0
+    add op_sa, c1               | itemmod:2147483648 divmod:true finmode:floor ; -1 if c1 < 0, else 0
+    mov op_sb, 0
+    add op_sb, c2               | itemmod:2147483648 divmod:true finmode:floor
+    sub c1, op_sa               | itemmod:2147483648    ; c1 without its sign bit: c1 + 2^31 if negative
+    sub c2, op_sb               | itemmod:2147483648
+    mul op_s, op_sa, op_sb                              ; sign bit: sa * sb
+    spawn bits::bitwise_and     | ordered:false delay:0
+    sub c3, op_s                | itemmod:2147483648    ; put the sign bit back
+
+; Returns `c1` rotated right by `c2` bits: (c1 >>> n) | (c1 << (32 - n)).
+; @param c1 the word
+; @param c2 the rotation, from 1 to 31 (changed)
+; @returns c3 c1 rotated right by c2
+; @0tick
+rotr:
+    spawn bits::raw_shift_right | ordered:false delay:0
+    mov rot_hi, c3
+    mov rot_n, c2
+    mov c2, 32
+    sub c2, rot_n
+    spawn bits::raw_shift_left  | ordered:false delay:0
+    add c3, rot_hi                                      ; no bits in common, so | is +, and the sum stays in range
+
+; Returns `c1` + `c2` modulo 2^32, as a 32-bit two's complement integer (the carry out of the
+; top bit is dropped). c1 + c2 itself may not fit in a counter, so it is never stored.
+; @param c1 the first word
+; @param c2 the second word
+; @returns c3 c1 + c2, wrapped around
+; @0tick
+add32:
+    mov add_q, 0
+    add add_q, c1, c2           | iter:+ itemmod:2147483648 divmod:true finmode:floor ; -2 to 1
+    mov add_carry, 0
+    add add_carry, add_q        | itemmod:2 divmod:true finmode:ceil ; 1 if c1 + c2 >= 2^31, -1 if below -2^31, else 0
+    mov c3, c2
+    sub c3, add_carry           | itemmod:2147483648    ; c2 - carry * 2^31 fits in a counter,
+    add c3, c1                                          ; and so does c1 + c2 - carry * 2^31,
+    sub c3, add_carry           | itemmod:2147483648    ; and c1 + c2 - carry * 2^32

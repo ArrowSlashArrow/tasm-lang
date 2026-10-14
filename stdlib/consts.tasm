@@ -1,4 +1,9 @@
 ; useful numbers
+;
+; The aliases below are for use as modifiers, e.g. `mul t2, consts::PI`. GD keeps only 3 decimals of
+; a modifier, so `consts::PI` acts as 3.141 there. For the precise value, spawn the matching
+; load_const_* routine (0-tickable), which writes the constant into t1 as precisely as a timer can
+; hold it. These routines use t9950 internally.
 
 _init:
     ; tasm-specific numbers
@@ -10,7 +15,7 @@ _init:
     alias MAX_TIMER_VALUE,  9999999.0    ; maximum value a timer will accept from an item edit trigger
 
     ; math numbers. source: https://doc.rust-lang.org/src/core/num/f32.rs.html
-    ; see docs section 3.1.2.1.1 about loading constants
+    ; see docs section 3.1.2.1.1 about loading constants, and the load_const_* routines below
     alias PI,               3.14159265358979323846264338327950288
     alias TAU,              6.28318530717958647692528676655900577
     alias E,                2.71828182845904523536028747135266250
@@ -32,139 +37,270 @@ _init:
     alias LN_10,            2.30258509299404568401799145468436421
 
     ; internal alias
-    alias __CONST_SCALE_FACTOR, 1000000
+    alias __consts_k,       t9950         ; scratch: the part being added
 
-    ; consts with precision
-; Loads `PI` into t1 with full precision.
+; Loads `PI` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 3.141592653589793238...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6588397 / 2^21 + 2656346 / 2^44 + 1590937 / 2^67.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_PI:
-    mov t1, 265358
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 3.14159
-; Loads `TAU` into t1 with full precision.
+    mov t1, 6588397
+    div t1, 2097152                   ; t1 = 6588397 / 2^21
+    mov __consts_k, 2656346
+    add t1, __consts_k          | itemmod:17592186044416 divmod:true
+    mov __consts_k, 1590937
+    add t1, __consts_k          | itemmod:147573952589676412928 divmod:true
+
+; Loads `TAU` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 6.283185307179586476...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6588397 / 2^20 + 2656346 / 2^43 + 1590937 / 2^66.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_TAU:
-    mov t1, 530717
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 6.28318
-; Loads `E` into t1 with full precision.
+    mov t1, 6588397
+    div t1, 1048576                   ; t1 = 6588397 / 2^20
+    mov __consts_k, 2656346
+    add t1, __consts_k          | itemmod:8796093022208 divmod:true
+    mov __consts_k, 1590937
+    add t1, __consts_k          | itemmod:73786976294838206464 divmod:true
+
+; Loads `E` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 2.718281828459045235...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 5700650 / 2^21 + 1452207 / 2^44 + -1485994 / 2^67.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_E:
-    mov t1, 182845
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 2.71828
-; Loads `GOLDEN_RATIO` into t1 with full precision.
+    mov t1, 5700650
+    div t1, 2097152                   ; t1 = 5700650 / 2^21
+    mov __consts_k, 1452207
+    add t1, __consts_k          | itemmod:17592186044416 divmod:true
+    mov __consts_k, -1485994
+    add t1, __consts_k          | itemmod:147573952589676412928 divmod:true
+
+; Loads `GOLDEN_RATIO` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 1.618033988749894848...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6786526 / 2^22 + 3616745 / 2^45 + 2605407 / 2^68.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_GOLDEN_RATIO:
-    mov t1, 398874
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 1.61803
-; Loads `EULER_GAMMA` into t1 with full precision.
+    mov t1, 6786526
+    div t1, 4194304                   ; t1 = 6786526 / 2^22
+    mov __consts_k, 3616745
+    add t1, __consts_k          | itemmod:35184372088832 divmod:true
+    mov __consts_k, 2605407
+    add t1, __consts_k          | itemmod:295147905179352825856 divmod:true
+
+; Loads `EULER_GAMMA` (The Euler-Mascheroni constant (γ)) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.577215664901532860...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 4842036 / 2^23 + -467092 / 2^46 + 1635482 / 2^69.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_EULER_GAMMA:
-    mov t1, 566490      ; The Euler-Mascheroni constant (γ)
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.57721
-; Loads `HALF_PI` into t1 with full precision.
+    mov t1, 4842036
+    div t1, 8388608                   ; t1 = 4842036 / 2^23
+    mov __consts_k, -467092
+    add t1, __consts_k          | itemmod:70368744177664 divmod:true
+    mov __consts_k, 1635482
+    add t1, __consts_k          | itemmod:590295810358705651712 divmod:true
+
+; Loads `HALF_PI` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 1.570796326794896619...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6588397 / 2^22 + 2656346 / 2^45 + 1590937 / 2^68.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_HALF_PI:
-    mov t1, 632679
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 1.57079
-; Loads `FRAC_PI_3` into t1 with full precision.
+    mov t1, 6588397
+    div t1, 4194304                   ; t1 = 6588397 / 2^22
+    mov __consts_k, 2656346
+    add t1, __consts_k          | itemmod:35184372088832 divmod:true
+    mov __consts_k, 1590937
+    add t1, __consts_k          | itemmod:295147905179352825856 divmod:true
+
+; Loads `FRAC_PI_3` (pi/3) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 1.047197551196597746...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 4392265 / 2^22 + -1025305 / 2^45 + -1735578 / 2^68.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_3:
-    mov t1, 755119      ; pi/3
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 1.04719
-; Loads `FRAC_PI_4` into t1 with full precision.
+    mov t1, 4392265
+    div t1, 4194304                   ; t1 = 4392265 / 2^22
+    mov __consts_k, -1025305
+    add t1, __consts_k          | itemmod:35184372088832 divmod:true
+    mov __consts_k, -1735578
+    add t1, __consts_k          | itemmod:295147905179352825856 divmod:true
+
+; Loads `FRAC_PI_4` (pi/4) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.785398163397448309...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6588397 / 2^23 + 2656346 / 2^46 + 1590937 / 2^69.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_4:
-    mov t1, 816339      ; pi/4
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.78539
-; Loads `FRAC_PI_6` into t1 with full precision.
+    mov t1, 6588397
+    div t1, 8388608                   ; t1 = 6588397 / 2^23
+    mov __consts_k, 2656346
+    add t1, __consts_k          | itemmod:70368744177664 divmod:true
+    mov __consts_k, 1590937
+    add t1, __consts_k          | itemmod:590295810358705651712 divmod:true
+
+; Loads `FRAC_PI_6` (pi/6) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.523598775598298873...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 4392265 / 2^23 + -1025305 / 2^46 + -1735578 / 2^69.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_6:
-    mov t1, 877559      ; pi/6
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.52359
-; Loads `FRAC_PI_8` into t1 with full precision.
+    mov t1, 4392265
+    div t1, 8388608                   ; t1 = 4392265 / 2^23
+    mov __consts_k, -1025305
+    add t1, __consts_k          | itemmod:70368744177664 divmod:true
+    mov __consts_k, -1735578
+    add t1, __consts_k          | itemmod:590295810358705651712 divmod:true
+
+; Loads `FRAC_PI_8` (pi/8) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.392699081698724154...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6588397 / 2^24 + 2656346 / 2^47 + 1590937 / 2^70.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_8:
-    mov t1, 908169      ; pi/8
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.39269
-; Loads `FRAC_1_PI` into t1 with full precision.
+    mov t1, 6588397
+    div t1, 16777216                  ; t1 = 6588397 / 2^24
+    mov __consts_k, 2656346
+    add t1, __consts_k          | itemmod:140737488355328 divmod:true
+    mov __consts_k, 1590937
+    add t1, __consts_k          | itemmod:1180591620717411303424 divmod:true
+
+; Loads `FRAC_1_PI` (1/pi) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.318309886183790671...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 5340354 / 2^24 + -2387055 / 2^47 + 173376 / 2^70.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_1_PI:
-    mov t1, 988618      ; 1/pi
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.31830
-; Loads `SQRT_2` into t1 with full precision.
+    mov t1, 5340354
+    div t1, 16777216                  ; t1 = 5340354 / 2^24
+    mov __consts_k, -2387055
+    add t1, __consts_k          | itemmod:140737488355328 divmod:true
+    mov __consts_k, 173376
+    add t1, __consts_k          | itemmod:1180591620717411303424 divmod:true
+
+; Loads `SQRT_2` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 1.414213562373095048...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 5931642 / 2^22 + -3342728 / 2^45 + -3370869 / 2^68.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_SQRT_2:
-    mov t1, 356237
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 1.41421
-; Loads `FRAC_1_SQRT_2` into t1 with full precision.
+    mov t1, 5931642
+    div t1, 4194304                   ; t1 = 5931642 / 2^22
+    mov __consts_k, -3342728
+    add t1, __consts_k          | itemmod:35184372088832 divmod:true
+    mov __consts_k, -3370869
+    add t1, __consts_k          | itemmod:295147905179352825856 divmod:true
+
+; Loads `FRAC_1_SQRT_2` (1 / sqrt2) into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.707106781186547524...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 5931642 / 2^23 + -3342728 / 2^46 + -3370869 / 2^69.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_1_SQRT_2:
-    mov t1, 678118      ; 1 / sqrt2
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.70710
-; Loads `LOG2_E` into t1 with full precision.
+    mov t1, 5931642
+    div t1, 8388608                   ; t1 = 5931642 / 2^23
+    mov __consts_k, -3342728
+    add t1, __consts_k          | itemmod:70368744177664 divmod:true
+    mov __consts_k, -3370869
+    add t1, __consts_k          | itemmod:590295810358705651712 divmod:true
+
+; Loads `LOG2_E` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 1.442695040888963407...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6051102 / 2^22 + -3516666 / 2^45 + -125064 / 2^68.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG2_E:
-    mov t1, 504088
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 1.44269
-; Loads `LOG2_10` into t1 with full precision.
+    mov t1, 6051102
+    div t1, 4194304                   ; t1 = 6051102 / 2^22
+    mov __consts_k, -3516666
+    add t1, __consts_k          | itemmod:35184372088832 divmod:true
+    mov __consts_k, -125064
+    add t1, __consts_k          | itemmod:295147905179352825856 divmod:true
+
+; Loads `LOG2_10` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 3.321928094887362347...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 6966588 / 2^21 + 1241927 / 2^44 + -958519 / 2^67.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG2_10:
-    mov t1, 809488
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 3.32192
-; Loads `LOG10_E` into t1 with full precision.
+    mov t1, 6966588
+    div t1, 2097152                   ; t1 = 6966588 / 2^21
+    mov __consts_k, 1241927
+    add t1, __consts_k          | itemmod:17592186044416 divmod:true
+    mov __consts_k, -958519
+    add t1, __consts_k          | itemmod:147573952589676412928 divmod:true
+
+; Loads `LOG10_E` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.434294481903251827...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 7286252 / 2^24 + 2772426 / 2^47 + 930471 / 2^70.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG10_E:
-    mov t1, 448190
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.43429
-; Loads `LOG10_2` into t1 with full precision.
+    mov t1, 7286252
+    div t1, 16777216                  ; t1 = 7286252 / 2^24
+    mov __consts_k, 2772426
+    add t1, __consts_k          | itemmod:140737488355328 divmod:true
+    mov __consts_k, 930471
+    add t1, __consts_k          | itemmod:1180591620717411303424 divmod:true
+
+; Loads `LOG10_2` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.301029995663981195...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 5050445 / 2^24 + 2178804 / 2^47 + -68846 / 2^70.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG10_2:
-    mov t1, 999566
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.30102
-; Loads `LN_2` into t1 with full precision.
+    mov t1, 5050445
+    div t1, 16777216                  ; t1 = 5050445 / 2^24
+    mov __consts_k, 2178804
+    add t1, __consts_k          | itemmod:140737488355328 divmod:true
+    mov __consts_k, -68846
+    add t1, __consts_k          | itemmod:1180591620717411303424 divmod:true
+
+; Loads `LN_2` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 0.693147180559945309...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 5814540 / 2^23 + -134028 / 2^46 + -1100423 / 2^69.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LN_2:
-    mov t1, 718055
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 0.69314
-; Loads `LN_10` into t1 with full precision.
+    mov t1, 5814540
+    div t1, 8388608                   ; t1 = 5814540 / 2^23
+    mov __consts_k, -134028
+    add t1, __consts_k          | itemmod:70368744177664 divmod:true
+    mov __consts_k, -1100423
+    add t1, __consts_k          | itemmod:590295810358705651712 divmod:true
+
+; Loads `LN_10` into t1, to the full precision of a timer: the closest value
+; a timer can hold to 2.302585092994045684...
+; The constant is built from three integers below 2^23, each divided by a power of two:
+; 4828871 / 2^21 + -562518 / 2^44 + 1409757 / 2^67.
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LN_10:
-    mov t1, 509299
-    div t1, __CONST_SCALE_FACTOR
-    add t1, 2.30258
+    mov t1, 4828871
+    div t1, 2097152                   ; t1 = 4828871 / 2^21
+    mov __consts_k, -562518
+    add t1, __consts_k          | itemmod:17592186044416 divmod:true
+    mov __consts_k, 1409757
+    add t1, __consts_k          | itemmod:147573952589676412928 divmod:true

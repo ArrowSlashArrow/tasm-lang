@@ -1,4 +1,4 @@
-; Bit operations. The bitwise_* routines use c9850-c9874 internally.
+; Bit operations. The bitwise_* routines use c9850-c9877 internally.
 
 _init:
     import core
@@ -28,6 +28,9 @@ _init:
     alias __shift_sign, c9872
     alias __shift_bit,  c9873
     alias __shift_fac,  c9874
+    alias __shift_x,    c9875               ; the shifted-out part, floor(c1 / 2^k)
+    alias __shift_h,    c9876
+    alias __shift_neg,  c9877               ; -1 if c1 < 0, else 0
 
 ; bitwise ops provided by @xtreme420 on discord.
 ; thread: https://discord.com/channels/1271838464702283796/1486082799546138834
@@ -62,29 +65,7 @@ xnor:
     spawn xor       | ordered:false
     spawn not       | ordered:false remap: {1 = 3}
 
-; todo: shift right, shift left
-
-; shifts c1 right by c2 bits.
-slow_shift_right:
-    ; copy c2
-    mov core::c3_temp, c2
-    ifge __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0   | ordered:false
-__slow_shift_right_loop:
-    div c1, 2   | resmode:f
-    sub core::c3_temp, 1
-    fge __slow_shift_right_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
-
-; shifts c1 right by c2 bits.
-slow_shift_left:
-    ; copy c2
-    mov core::c3_temp, c2
-    ifge __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0    | ordered:false
-__slow_shift_left_loop:
-    mul c1, 2
-    sub core::c3_temp, 1
-    fge __slow_shift_left_loop, core::return_with_signal, core::c3_temp, 0     | ordered:false
-
-; Returns `c1` & `c2`, computed bit by bit. The sign bit is ignored: the operation works on |c1| and |c2|. GD's arithmetic is only exact up to 16,777,216, so larger values may lose their lowest bits.
+; Returns `c1` & `c2`, computed bit by bit. The sign bit is ignored: the operation works on |c1| and |c2|.
 ; @param c1 the first integer
 ; @param c2 the second integer
 ; @returns c3 `c1` & `c2`
@@ -95,7 +76,7 @@ bitwise_and:
     spawn __and                 | ordered:false delay:0
     mov c3, __and_y
 
-; Returns `c1` | `c2`, computed bit by bit. The sign bit is ignored: the operation works on |c1| and |c2|. GD's arithmetic is only exact up to 16,777,216, so larger values may lose their lowest bits.
+; Returns `c1` | `c2`, computed bit by bit. The sign bit is ignored: the operation works on |c1| and |c2|.
 ; @param c1 the first integer
 ; @param c2 the second integer
 ; @returns c3 `c1` | `c2`
@@ -109,7 +90,7 @@ bitwise_or:
     mov c3, c1                  | resmode:+
     add c3, __t                             ; a | b = a + (b - (a & b)), without overflowing
 
-; Returns `c1` ^ `c2`, computed bit by bit. The sign bit is ignored: the operation works on |c1| and |c2|. GD's arithmetic is only exact up to 16,777,216, so larger values may lose their lowest bits.
+; Returns `c1` ^ `c2`, computed bit by bit. The sign bit is ignored: the operation works on |c1| and |c2|.
 ; @param c1 the first integer
 ; @param c2 the second integer
 ; @returns c3 `c1` ^ `c2`
@@ -125,8 +106,8 @@ bitwise_xor:
     add c3, __t                             ; a ^ b = (a - (a & b)) + (b - (a & b))
 
 ; Returns `c1` shifted left by `c2` bits: |`c1`| * 2^`c2`, keeping only the 31 bits below the sign bit
-; (bits shifted past bit 30 are dropped instead of overflowing). Branchless version of `slow_shift_left`.
-; Only the 31 bits below the sign bit are shifted: the shift works on |`c1`| and the result gets the sign of `c1`. GD's arithmetic is only exact up to 16,777,216, so larger values may lose their lowest bits.
+; (bits shifted past bit 30 are dropped instead of overflowing).
+; Only the 31 bits below the sign bit are shifted: the shift works on |`c1`| and the result gets the sign of `c1`. For shifts that include the sign bit, see the raw_shift_* routines.
 ; @param c1 the integer
 ; @param c2 the number of bits (negative counts as 0; 31 or more gives 0)
 ; @returns c3 c1 << c2
@@ -134,27 +115,19 @@ bitwise_xor:
 fast_shift_left:
     mov __shift_a, c1           | resmode:+
     div __shift_sign, c1, __shift_a         ; sign of c1 (0 for 0)
-    mov __cs1, c2               | resmode:+                 ; c2 > 0
-    add __cs2, c2, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __shift_n, __cs2, __cs3 | resmode:ceil
+    mov __shift_n, 0                        ; c2 > 0
+    add __shift_n, c2           | itemmod:4294967296 divmod:true finmode:ceil
     mul __shift_n, c2                       ; n = max(c2, 0)
     mov __t, __shift_n
     sub __t, 30
-    mov __cs1, __t              | resmode:+                 ; n > 30: every bit is shifted out
-    add __cs2, __t, __cs1       | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __shift_zero, __cs2, __cs3 | resmode:ceil
+    mov __shift_zero, 0                     ; n > 30: every bit is shifted out
+    add __shift_zero, __t       | itemmod:4294967296 divmod:true finmode:ceil
     mul __t, __shift_zero
     sub __shift_n, __t                      ; n = min(n, 30)
     ; drop the bits that would pass bit 30: keep |c1| mod 2^(31 - n). For n = 0, 2^31 doesn't
     ; fit in a counter, so 2^30 is used and the unshifted value is chosen at the end instead
-    mov __cs1, __shift_n        | resmode:+                 ; __shift_k = __shift_n != 0
-    mov __cs2, __cs1
-    add __cs2, 1
-    div __shift_k, __cs1, __cs2 | resmode:ceil
+    mov __shift_k, 0                        ; __shift_k = __shift_n != 0
+    add __shift_k, __shift_n    | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
     mov __shift_k, __shift_k    | itemmod:-1                ; __shift_k = 1 - __shift_k
     add __shift_k, 1
     mov __shift_m, __shift_n    | itemmod:-1
@@ -237,8 +210,7 @@ fast_shift_left:
     mul c3, __shift_r, __shift_sign         ; put the sign back
 
 ; Returns `c1` shifted right by `c2` bits: floor(|`c1`| / 2^`c2`) with the sign of `c1`, so -5 >> 1 is -2.
-; Branchless version of `slow_shift_right`.
-; Only the 31 bits below the sign bit are shifted: the shift works on |`c1`| and the result gets the sign of `c1`. GD's arithmetic is only exact up to 16,777,216, so larger values may lose their lowest bits.
+; Only the 31 bits below the sign bit are shifted: the shift works on |`c1`| and the result gets the sign of `c1`. For shifts that include the sign bit, see the raw_shift_* routines.
 ; @param c1 the integer
 ; @param c2 the number of bits (negative counts as 0; 31 or more gives 0)
 ; @returns c3 c1 >> c2
@@ -246,19 +218,13 @@ fast_shift_left:
 fast_shift_right:
     mov __shift_a, c1           | resmode:+
     div __shift_sign, c1, __shift_a         ; sign of c1 (0 for 0)
-    mov __cs1, c2               | resmode:+                 ; c2 > 0
-    add __cs2, c2, __cs1        | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __shift_n, __cs2, __cs3 | resmode:ceil
+    mov __shift_n, 0                        ; c2 > 0
+    add __shift_n, c2           | itemmod:4294967296 divmod:true finmode:ceil
     mul __shift_n, c2                       ; n = max(c2, 0)
     mov __t, __shift_n
     sub __t, 30
-    mov __cs1, __t              | resmode:+                 ; n > 30: every bit is shifted out
-    add __cs2, __t, __cs1       | itemmod:2 divmod:true     ; max(d, 0)
-    mov __cs3, __cs2
-    add __cs3, 1
-    div __shift_zero, __cs2, __cs3 | resmode:ceil
+    mov __shift_zero, 0                     ; n > 30: every bit is shifted out
+    add __shift_zero, __t       | itemmod:4294967296 divmod:true finmode:ceil
     mul __t, __shift_zero
     sub __shift_n, __t                      ; n = min(n, 30)
     mov __shift_m, __shift_n
@@ -299,8 +265,287 @@ fast_shift_right:
     mul __shift_r, __t
     mul c3, __shift_r, __shift_sign         ; put the sign back
 
+; Returns `c1` shifted left by `c2` bits, including the sign bit: bits shifted past bit 31 are
+; dropped and the result wraps around like a 32-bit integer (1 << 31 is -2147483648, 3 << 31 too).
+; `c1` is treated as a 32-bit two's complement bit pattern, so the sign bit is shifted like every other bit.
+; @param c1 the integer
+; @param c2 the number of bits (negative counts as 0; 32 or more gives 0)
+; @returns c3 c1 << c2
+; @0tick
+raw_shift_left:
+    mov __shift_n, 0                        ; c2 > 0
+    add __shift_n, c2           | itemmod:4294967296 divmod:true finmode:ceil
+    mul __shift_n, c2                       ; n = max(c2, 0)
+    mov __t, __shift_n
+    sub __t, 31
+    mov __shift_zero, 0                     ; n > 31: every bit is shifted out
+    add __shift_zero, __t       | itemmod:4294967296 divmod:true finmode:ceil
+    mul __t, __shift_zero
+    sub __shift_n, __t                      ; n = min(n, 31)
+    mov __shift_k, 0                        ; __shift_k = __shift_n != 0
+    add __shift_k, __shift_n    | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mov __shift_k, __shift_k    | itemmod:-1                ; __shift_k = 1 - __shift_k
+    add __shift_k, 1
+    ; with k = 31 - n: the low k bits of c1 end up below the sign bit, bit k becomes the sign bit,
+    ; so the result is (c1 mod 2^k) * 2^n - (bit k of c1) * 2^31. For n = 0 that would need 2^31,
+    ; so k = 30 is used and c1 itself is chosen at the end
+    mov __shift_m, __shift_n    | itemmod:-1
+    add __shift_m, 31
+    sub __shift_m, __shift_k                ; k = 31 - n, or 30 for n = 0
+    mov __shift_q, 1
+    mov __shift_bit, __shift_m              ; bit 16 of the exponent
+    fldiv __shift_bit, 16
+    sub __shift_m, __shift_bit  | itemmod:16
+    mov __shift_fac, __shift_bit | itemmod:65535
+    add __shift_fac, 1                      ; 2^16 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 8 of the exponent
+    fldiv __shift_bit, 8
+    sub __shift_m, __shift_bit  | itemmod:8
+    mov __shift_fac, __shift_bit | itemmod:255
+    add __shift_fac, 1                      ; 2^8 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 4 of the exponent
+    fldiv __shift_bit, 4
+    sub __shift_m, __shift_bit  | itemmod:4
+    mov __shift_fac, __shift_bit | itemmod:15
+    add __shift_fac, 1                      ; 2^4 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 2 of the exponent
+    fldiv __shift_bit, 2
+    sub __shift_m, __shift_bit  | itemmod:2
+    mov __shift_fac, __shift_bit | itemmod:3
+    add __shift_fac, 1                      ; 2^2 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 1 of the exponent
+    fldiv __shift_bit, 1
+    sub __shift_m, __shift_bit  | itemmod:1
+    mov __shift_fac, __shift_bit | itemmod:1
+    add __shift_fac, 1                      ; 2^1 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    fldiv __shift_x, c1, __shift_q          ; floor(c1 / 2^k), also for negative c1
+    mul __t, __shift_x, __shift_q
+    sub __shift_r, c1, __t                  ; c1 mod 2^k, in [0, 2^k)
+    mov __shift_h, __shift_x
+    fldiv __shift_h, 2
+    sub __shift_x, __shift_h    | itemmod:2                 ; bit k of c1
+    add __shift_m, __shift_n, __shift_k
+    sub __shift_m, 1                        ; n - 1, or 0 for n = 0
+    mov __shift_p, 1
+    mov __shift_bit, __shift_m              ; bit 16 of the exponent
+    fldiv __shift_bit, 16
+    sub __shift_m, __shift_bit  | itemmod:16
+    mov __shift_fac, __shift_bit | itemmod:65535
+    add __shift_fac, 1                      ; 2^16 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 8 of the exponent
+    fldiv __shift_bit, 8
+    sub __shift_m, __shift_bit  | itemmod:8
+    mov __shift_fac, __shift_bit | itemmod:255
+    add __shift_fac, 1                      ; 2^8 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 4 of the exponent
+    fldiv __shift_bit, 4
+    sub __shift_m, __shift_bit  | itemmod:4
+    mov __shift_fac, __shift_bit | itemmod:15
+    add __shift_fac, 1                      ; 2^4 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 2 of the exponent
+    fldiv __shift_bit, 2
+    sub __shift_m, __shift_bit  | itemmod:2
+    mov __shift_fac, __shift_bit | itemmod:3
+    add __shift_fac, 1                      ; 2^2 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 1 of the exponent
+    fldiv __shift_bit, 1
+    sub __shift_m, __shift_bit  | itemmod:1
+    mov __shift_fac, __shift_bit | itemmod:1
+    add __shift_fac, 1                      ; 2^1 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mul __shift_r, __shift_p    | itemmod:2                 ; (c1 mod 2^k) * 2^n, below 2^31
+    sub __shift_r, __shift_x    | itemmod:2147483648        ; - 2^31 if bit k was set
+    mul __cs4, __shift_k, c1                ; n = 0: c1 unchanged
+    mul __cs5, __shift_k, __shift_r
+    sub __cs5, __shift_r, __cs5
+    add __shift_r, __cs4, __cs5
+    mov __t, __shift_zero       | itemmod:-1                ; __t = 1 - __shift_zero
+    add __t, 1
+    mul c3, __shift_r, __t                  ; shifted out completely: 0
+
+; Returns `c1` shifted right by `c2` bits, including the sign bit, and filling in zeros (the
+; logical shift, >>> in Java and JavaScript): -1 >>> 1 is 2147483647. For n >= 1 the result is
+; never negative.
+; `c1` is treated as a 32-bit two's complement bit pattern, so the sign bit is shifted like every other bit.
+; @param c1 the integer
+; @param c2 the number of bits (negative counts as 0; 32 or more gives 0)
+; @returns c3 c1 >>> c2
+; @0tick
+raw_shift_right:
+    mov __shift_n, 0                        ; c2 > 0
+    add __shift_n, c2           | itemmod:4294967296 divmod:true finmode:ceil
+    mul __shift_n, c2                       ; n = max(c2, 0)
+    mov __t, __shift_n
+    sub __t, 31
+    mov __shift_zero, 0                     ; n > 31: every bit is shifted out
+    add __shift_zero, __t       | itemmod:4294967296 divmod:true finmode:ceil
+    mul __t, __shift_zero
+    sub __shift_n, __t                      ; n = min(n, 31)
+    mov __shift_k, 0                        ; __shift_k = __shift_n != 0
+    add __shift_k, __shift_n    | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mov __shift_k, __shift_k    | itemmod:-1                ; __shift_k = 1 - __shift_k
+    add __shift_k, 1
+    mov __t, __shift_n
+    sub __t, 30
+    mov __shift_h, 0                        ; n == 31
+    add __shift_h, __t          | itemmod:4294967296 divmod:true finmode:ceil
+    sub __shift_m, __shift_n, __shift_h
+    mov __shift_p, 1
+    mov __shift_bit, __shift_m              ; bit 16 of the exponent
+    fldiv __shift_bit, 16
+    sub __shift_m, __shift_bit  | itemmod:16
+    mov __shift_fac, __shift_bit | itemmod:65535
+    add __shift_fac, 1                      ; 2^16 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 8 of the exponent
+    fldiv __shift_bit, 8
+    sub __shift_m, __shift_bit  | itemmod:8
+    mov __shift_fac, __shift_bit | itemmod:255
+    add __shift_fac, 1                      ; 2^8 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 4 of the exponent
+    fldiv __shift_bit, 4
+    sub __shift_m, __shift_bit  | itemmod:4
+    mov __shift_fac, __shift_bit | itemmod:15
+    add __shift_fac, 1                      ; 2^4 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 2 of the exponent
+    fldiv __shift_bit, 2
+    sub __shift_m, __shift_bit  | itemmod:2
+    mov __shift_fac, __shift_bit | itemmod:3
+    add __shift_fac, 1                      ; 2^2 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 1 of the exponent
+    fldiv __shift_bit, 1
+    sub __shift_m, __shift_bit  | itemmod:1
+    mov __shift_fac, __shift_bit | itemmod:1
+    add __shift_fac, 1                      ; 2^1 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    fldiv __shift_r, c1, __shift_p
+    add __shift_h, 1
+    fldiv __shift_r, __shift_h              ; and by 2 more for n == 31
+    ; as a 32-bit pattern, negative c1 is c1 + 2^32, so the result is floor(c1 / 2^n) + 2^(32 - n)
+    mov __shift_neg, 0
+    add __shift_neg, c1         | itemmod:2147483648 divmod:true finmode:floor ; -1 if c1 < 0, else 0
+    mov __shift_m, __shift_n    | itemmod:-1
+    add __shift_m, 31
+    sub __shift_m, __shift_k                ; 31 - n, or 30 for n = 0 (not used then)
+    mov __shift_q, 1
+    mov __shift_bit, __shift_m              ; bit 16 of the exponent
+    fldiv __shift_bit, 16
+    sub __shift_m, __shift_bit  | itemmod:16
+    mov __shift_fac, __shift_bit | itemmod:65535
+    add __shift_fac, 1                      ; 2^16 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 8 of the exponent
+    fldiv __shift_bit, 8
+    sub __shift_m, __shift_bit  | itemmod:8
+    mov __shift_fac, __shift_bit | itemmod:255
+    add __shift_fac, 1                      ; 2^8 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 4 of the exponent
+    fldiv __shift_bit, 4
+    sub __shift_m, __shift_bit  | itemmod:4
+    mov __shift_fac, __shift_bit | itemmod:15
+    add __shift_fac, 1                      ; 2^4 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 2 of the exponent
+    fldiv __shift_bit, 2
+    sub __shift_m, __shift_bit  | itemmod:2
+    mov __shift_fac, __shift_bit | itemmod:3
+    add __shift_fac, 1                      ; 2^2 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 1 of the exponent
+    fldiv __shift_bit, 1
+    sub __shift_m, __shift_bit  | itemmod:1
+    mov __shift_fac, __shift_bit | itemmod:1
+    add __shift_fac, 1                      ; 2^1 if the bit is set, else 1
+    mul __shift_q, __shift_fac
+    mov __t, __shift_k          | itemmod:-1                ; __t = 1 - __shift_k
+    add __t, 1
+    mul __shift_neg, __t
+    mul __t, __shift_q, __shift_neg | itemmod:2             ; -2^(32 - n) if c1 < 0
+    sub __shift_r, __t
+    mul __cs4, __shift_k, c1                ; n = 0: c1 unchanged
+    mul __cs5, __shift_k, __shift_r
+    sub __cs5, __shift_r, __cs5
+    add __shift_r, __cs4, __cs5
+    mov __t, __shift_zero       | itemmod:-1                ; __t = 1 - __shift_zero
+    add __t, 1
+    mul c3, __shift_r, __t                  ; shifted out completely: 0
+
+; Returns `c1` shifted right by `c2` bits, copying the sign bit into the new bits (the
+; >> of C, Java and JavaScript on 32-bit integers): floor(`c1` / 2^`c2`), so -5 >> 1 is -3.
+; `c1` is treated as a 32-bit two's complement bit pattern, so the sign bit is shifted like every other bit.
+; @param c1 the integer
+; @param c2 the number of bits (negative counts as 0; 31 or more gives 0, or -1 for negative c1)
+; @returns c3 c1 >> c2
+; @0tick
+raw_shift_right_signed:
+    mov __shift_n, 0                        ; c2 > 0
+    add __shift_n, c2           | itemmod:4294967296 divmod:true finmode:ceil
+    mul __shift_n, c2                       ; n = max(c2, 0)
+    mov __t, __shift_n
+    sub __t, 31
+    mov __shift_zero, 0                     ; n > 31: every bit is shifted out
+    add __shift_zero, __t       | itemmod:4294967296 divmod:true finmode:ceil
+    mul __t, __shift_zero
+    sub __shift_n, __t                      ; n = min(n, 31)
+    mov __shift_k, 0                        ; __shift_k = __shift_n != 0
+    add __shift_k, __shift_n    | resmode:+ itemmod:4294967296 divmod:true finmode:ceil
+    mov __shift_k, __shift_k    | itemmod:-1                ; __shift_k = 1 - __shift_k
+    add __shift_k, 1
+    ; n is at most 31 here, and floor(c1 / 2^31) is already 0 or -1, like any larger shift
+    mov __t, __shift_n
+    sub __t, 30
+    mov __shift_h, 0                        ; n == 31
+    add __shift_h, __t          | itemmod:4294967296 divmod:true finmode:ceil
+    sub __shift_m, __shift_n, __shift_h
+    mov __shift_p, 1
+    mov __shift_bit, __shift_m              ; bit 16 of the exponent
+    fldiv __shift_bit, 16
+    sub __shift_m, __shift_bit  | itemmod:16
+    mov __shift_fac, __shift_bit | itemmod:65535
+    add __shift_fac, 1                      ; 2^16 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 8 of the exponent
+    fldiv __shift_bit, 8
+    sub __shift_m, __shift_bit  | itemmod:8
+    mov __shift_fac, __shift_bit | itemmod:255
+    add __shift_fac, 1                      ; 2^8 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 4 of the exponent
+    fldiv __shift_bit, 4
+    sub __shift_m, __shift_bit  | itemmod:4
+    mov __shift_fac, __shift_bit | itemmod:15
+    add __shift_fac, 1                      ; 2^4 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 2 of the exponent
+    fldiv __shift_bit, 2
+    sub __shift_m, __shift_bit  | itemmod:2
+    mov __shift_fac, __shift_bit | itemmod:3
+    add __shift_fac, 1                      ; 2^2 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    mov __shift_bit, __shift_m              ; bit 1 of the exponent
+    fldiv __shift_bit, 1
+    sub __shift_m, __shift_bit  | itemmod:1
+    mov __shift_fac, __shift_bit | itemmod:1
+    add __shift_fac, 1                      ; 2^1 if the bit is set, else 1
+    mul __shift_p, __shift_fac
+    fldiv c3, c1, __shift_p
+    add __shift_h, 1
+    fldiv c3, __shift_h                     ; and by 2 more for n == 31
+
 ; Returns ~`c1` over the 31 bits below the sign bit: 2147483647 - |`c1`|.
-; The result is above 16,777,216 for small inputs, where GD's arithmetic may round its lowest bits.
 ; @param c1 the integer
 ; @returns c3 ~c1
 ; @0tick

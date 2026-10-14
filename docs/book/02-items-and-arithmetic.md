@@ -12,7 +12,7 @@ An item holds a single number. There are two kinds you can use freely:
 | Kind | Written | Holds |
 | ---- | ------- | ----- |
 | Counter | `c1` to `c9999` | Whole numbers (32-bit, from about -2.1 billion to 2.1 billion) |
-| Timer | `t1` to `t9999` | Decimal numbers (32-bit floats, about 7 significant digits) |
+| Timer | `t1` to `t9999` | Decimal numbers (item edits can't set them above 9,999,999) |
 
 Counter 1 and timer 1 are different items. The letter can be upper- or lowercase: `C5` and `c5` are the same counter.
 
@@ -24,7 +24,7 @@ GD also has three built-in items, written in uppercase:
 Writing to `ATTEMPTS` or `MAINTIME` is a compile error (E0004).
 
 > [!NOTE]
-> All arithmetic in GD is done with 32-bit floats. Whole numbers are only exact up to 16,777,216 (2<sup>24</sup>). Above that, results may be rounded, even when they are stored in a counter.
+> Arithmetic on items is exact. Only the constant in an instruction (the `5` in `add c1, 5`) is stored as a 32-bit float, so constants above 16,777,216 (2<sup>24</sup>) may be rounded: `mov c1, 16777217` sets `c1` to 16777216. Build bigger values from smaller constants instead, e.g. `mov c1, 16777216` then `add c1, 1`.
 
 ## 2.2. Arithmetic instructions
 | Instruction | Does |

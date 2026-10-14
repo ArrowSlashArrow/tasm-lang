@@ -198,6 +198,8 @@ tasm_test!("mem_14bit", stdlib);
 tasm_test!("math", stdlib);
 tasm_test!("compare", stdlib);
 tasm_test!("bits", stdlib);
+// sha256 of a string, implemented with one counter per bit
+tasm_test!("sha256", true);
 
 impl Args {
     pub fn test_args(infile: String, has_entry: bool) -> Self {

@@ -1,26 +1,44 @@
-; Tests for bits::fast_shift_left and fast_shift_right.
+; Tests for bits::fast_shift_left, fast_shift_right, raw_shift_left, raw_shift_right and raw_shift_right_signed.
 ; Each display shows one result; the expected value is in the comment next to it.
 _init:
     import ../../../stdlib/bits
-    alias fast_shift_left_1,  c10
-    alias fast_shift_left_2,  c11
-    alias fast_shift_left_3,  c12
-    alias fast_shift_left_4,  c13
-    alias fast_shift_left_5,  c14
-    alias fast_shift_right_1, c15
-    alias fast_shift_right_2, c16
-    alias fast_shift_right_3, c17
-    alias fast_shift_right_4, c18
+    alias fast_shift_left_1,        c10
+    alias fast_shift_left_2,        c11
+    alias fast_shift_left_3,        c12
+    alias fast_shift_left_4,        c13
+    alias fast_shift_left_5,        c14
+    alias fast_shift_right_1,       c15
+    alias fast_shift_right_2,       c16
+    alias fast_shift_right_3,       c17
+    alias fast_shift_right_4,       c18
+    alias raw_shift_left_1,         c19
+    alias raw_shift_left_2,         c20
+    alias raw_shift_left_3,         c21
+    alias raw_shift_left_4,         c22
+    alias raw_shift_right_1,        c23
+    alias raw_shift_right_2,        c24
+    alias raw_shift_right_3,        c25
+    alias raw_shift_right_signed_1, c26
+    alias raw_shift_right_signed_2, c27
 
-    display fast_shift_left_1     ; expected: 131072   (fast_shift_left(2, 16))
-    display fast_shift_left_2     ; expected: -48   (fast_shift_left(-3, 4))
-    display fast_shift_left_3     ; expected: 1073741824   (3 << 30: bit 31 is dropped)
-    display fast_shift_left_4     ; expected: 5   (fast_shift_left(5, 0))
-    display fast_shift_left_5     ; expected: 0   (1 << 31: shifted out)
-    display fast_shift_right_1    ; expected: 73429   (fast_shift_right(587432, 3))
-    display fast_shift_right_2    ; expected: 0   (fast_shift_right(3, 2))
-    display fast_shift_right_3    ; expected: -2   (-5 >> 1: the sign is kept, the magnitude shifted)
-    display fast_shift_right_4    ; expected: 0   (100 >> 40: shifted out)
+    display fast_shift_left_1           ; expected: 131072   (fast_shift_left(2, 16))
+    display fast_shift_left_2           ; expected: -48   (fast_shift_left(-3, 4))
+    display fast_shift_left_3           ; expected: 1073741824   (3 << 30: bit 31 is dropped)
+    display fast_shift_left_4           ; expected: 5   (fast_shift_left(5, 0))
+    display fast_shift_left_5           ; expected: 0   (1 << 31: shifted out)
+    display fast_shift_right_1          ; expected: 73429   (fast_shift_right(587432, 3))
+    display fast_shift_right_2          ; expected: 0   (fast_shift_right(3, 2))
+    display fast_shift_right_3          ; expected: -2   (-5 >> 1: the sign is kept, the magnitude shifted)
+    display fast_shift_right_4          ; expected: 0   (100 >> 40: shifted out)
+    display raw_shift_left_1            ; expected: 40   (raw_shift_left(5, 3))
+    display raw_shift_left_2            ; expected: -2147483648   (1 << 31: lands on the sign bit)
+    display raw_shift_left_3            ; expected: -536870912   (7 << 29: the top bit wraps around into the sign)
+    display raw_shift_left_4            ; expected: -24   (-3 << 3)
+    display raw_shift_right_1           ; expected: 73429   (raw_shift_right(587432, 3))
+    display raw_shift_right_2           ; expected: 2147483647   (-1 >>> 1: zeros come in from the top)
+    display raw_shift_right_3           ; expected: 1   (-1 >>> 31: only the sign bit is left)
+    display raw_shift_right_signed_1    ; expected: -3   (-5 >> 1: rounds down)
+    display raw_shift_right_signed_2    ; expected: -1   (-1000 >> 50: only copies of the sign bit are left)
 
 
 _start:
@@ -51,3 +69,30 @@ _start:
     mov c1, 100
     mov c2, 40
     spawn bits::fast_shift_right| ordered:false delay:0 remap: {c3 = fast_shift_right_4}
+    mov c1, 5
+    mov c2, 3
+    spawn bits::raw_shift_left  | ordered:false delay:0 remap: {c3 = raw_shift_left_1}
+    mov c1, 1
+    mov c2, 31
+    spawn bits::raw_shift_left  | ordered:false delay:0 remap: {c3 = raw_shift_left_2}
+    mov c1, 7
+    mov c2, 29
+    spawn bits::raw_shift_left  | ordered:false delay:0 remap: {c3 = raw_shift_left_3}
+    mov c1, -3
+    mov c2, 3
+    spawn bits::raw_shift_left  | ordered:false delay:0 remap: {c3 = raw_shift_left_4}
+    mov c1, 587432
+    mov c2, 3
+    spawn bits::raw_shift_right | ordered:false delay:0 remap: {c3 = raw_shift_right_1}
+    mov c1, -1
+    mov c2, 1
+    spawn bits::raw_shift_right | ordered:false delay:0 remap: {c3 = raw_shift_right_2}
+    mov c1, -1
+    mov c2, 31
+    spawn bits::raw_shift_right | ordered:false delay:0 remap: {c3 = raw_shift_right_3}
+    mov c1, -5
+    mov c2, 1
+    spawn bits::raw_shift_right_signed| ordered:false delay:0 remap: {c3 = raw_shift_right_signed_1}
+    mov c1, -1000
+    mov c2, 50
+    spawn bits::raw_shift_right_signed| ordered:false delay:0 remap: {c3 = raw_shift_right_signed_2}

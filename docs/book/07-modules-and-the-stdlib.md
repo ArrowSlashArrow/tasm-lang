@@ -81,7 +81,7 @@ Imports can be nested: `shapes` imports `consts`, and `use_shapes` doesn't need 
 | `math` | Real-number functions on timers (`exp`, `ln`, `sqrt`, `pow`, `sin`, `atan2`, `tanh`, ...), integer functions on counters (`modulo`, `gcd`, `ipow`, `isqrt`, ...), and `min`/`max`/`clamp`/`lerp` for both. |
 | `compare` | Branchless comparisons (`greater`, `less`, `less_eq`) and boolean gates (`and`, `or`, `not`, `xor`, ...) that write `1` or `0` to `c3`. |
 | `debug` | Assertions that flash the background green or red. |
-| `bits` | Bitwise operations on integers (`bitwise_and`, `bitwise_or`, `bitwise_xor`, `bitwise_not`) and bit shifts. |
+| `bits` | Bitwise operations on integers (`bitwise_and`, `bitwise_or`, `bitwise_xor`, `bitwise_not`) and bit shifts, with (`raw_shift_*`) or without (`fast_shift_*`) the sign bit. |
 | `core` | Helpers for returning early and waiting for a signal. |
 | `mem_8bit`, `mem_14bit` | Reading and writing items by address. See [chapter 9](09-memory.md). |
 | `vec` | A list built on `mem_8bit`. Still in development. |
@@ -148,7 +148,7 @@ sign:
 This uses three groups. [Chapter 5](05-fast-code.md#53-branchless-logic) showed a one-group version that uses division by zero instead.
 
 ## 7.4. Example: big numbers
-Counters can't hold numbers beyond about 2 billion, and arithmetic is only exact up to 16,777,216. [`example_programs/bigint.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/bigint.tasm) stores a big number in four counters called **limbs**, each holding three decimal digits:
+Counters can't hold numbers beyond about 2 billion. [`example_programs/bigint.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/bigint.tasm) stores a big number in four counters called **limbs**, each holding three decimal digits:
 
 ```text
 x = x0 + x1 * 1000 + x2 * 1000² + x3 * 1000³

@@ -103,13 +103,13 @@ So:
 **Problem:** E0012 is pushed when the argument count is wrong, but execution continues and indexes `trimmed[1]`. The input `ALIAS foo` crashes with `index out of bounds`. The same pattern exists for `IMPORT` (`lexer.rs:135-148`), which keeps using `trimmed[0]` after the error.
 
 **Potential fixes:** `continue` after pushing the error. -->
-
+<!-- 
 ### 2.2 🔴 Panic on a non-ASCII character after `C`/`T`/`G`/`b` (verified)
 **File:** `rtasm/src/core/structs.rs:167-177`
 
 **Problem:** `&remaining[0..1]` and `&remaining[1..]` slice by byte. Any token whose first character is `c`, `t`, `g` or `b` and whose second character is multi-byte panics. For example, the IOBlock label `té` gives `byte index 1 is not a char boundary`. These slices are computed eagerly for every token.
 
-**Potential fixes:** Use `remaining.chars().next()` and `char_indices`, or only compute the hex path when `remaining.starts_with('x')`.
+**Potential fixes:** Use `remaining.chars().next()` and `char_indices`, or only compute the hex path when `remaining.starts_with('x')`. -->
 
 ### 2.3 🔴 Instructions with no arguments can't take flags (verified)
 **File:** `rtasm/src/lexer.rs:378, 471-480`
