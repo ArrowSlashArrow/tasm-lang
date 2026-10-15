@@ -24,7 +24,7 @@ GD also has three built-in items, written in uppercase:
 Writing to `ATTEMPTS` or `MAINTIME` is a compile error (E0004).
 
 > [!NOTE]
-> Arithmetic on items is exact. Only the constant in an instruction (the `5` in `add c1, 5`) is stored as a 32-bit float, so constants above 16,777,216 (2<sup>24</sup>) may be rounded: `mov c1, 16777217` sets `c1` to 16777216. Build bigger values from smaller constants instead, e.g. `mov c1, 16777216` then `add c1, 1`.
+> Arithmetic on items is exact. Only the constant in an instruction (the `5` in `add c1, 5`) is limited: GD stores it as a 32-bit float and saves it with only 6 significant digits. A constant outside -999,999 to 999,999 may work at first and then change once the level is saved: `mov c1, 16777217` comes back as `mov c1, 16777200`. Build bigger values from smaller constants instead, e.g. `mov c1, 16777000` then `add c1, 217`. The [reference](../index.md#31211-caveats-with-using-largeprecise-numbers) has the exact rules.
 
 ## 2.2. Arithmetic instructions
 | Instruction | Does |
@@ -335,7 +335,7 @@ _start:
     mul answer, sum, sum
     sub answer, square_sums         ; 1582700
 ```
-For *n* = 100, `sum²` is 25,502,500, which is above 2<sup>24</sup> and may not be exact.
+For *n* = 100, `sum²` is 25,502,500. That's fine: it's computed from items, and arithmetic on items is exact. Only a constant that large would be a problem.
 
 
 So far every program has run from top to bottom once. In the next chapter, you will make routines run each other, wait, and run side by side.

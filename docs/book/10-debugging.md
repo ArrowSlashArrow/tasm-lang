@@ -138,7 +138,7 @@ Use it to check that an alias means what you think, that a module routine was fo
 | A routine works on its own, but not when called with a remap. | The remap hits one of the program's groups. Move the parameters to high IDs ([chapter 6](06-functions-and-remaps.md#63-remaps-change-every-kind-of-id)). |
 | A branch runs the wrong routine. | The target routine is empty; give it a `nop` ([chapter 4](04-branching.md#47-branches-that-do-nothing)). |
 | A comparison with a number ignores the number. | `rmod` replaces the number on the right side ([chapter 4](04-branching.md#44-comparing-modified-values)). |
-| Large constants come out slightly wrong. | Constants in instructions are 32-bit floats, so above 16,777,216 they may be rounded ([chapter 2](02-items-and-arithmetic.md)). |
+| Large constants come out slightly wrong, possibly only after saving the level. | GD saves constants in instructions with 6 significant digits, and stores them as 32-bit floats. Keep them between -999,999 and 999,999, and build bigger values in parts ([chapter 2](02-items-and-arithmetic.md)). |
 | Two routines that run at the same time give different results each run. | A race condition: both read or write the same item on the same tick. Give each its own items, or make one wait for the other. |
 | `div` or `fldiv` with three arguments, the last one a number, multiplies. | A bug in TASM v0.3.2, fixed in later versions. Use `mov x, a` followed by `div x, number` instead. |
 | Nothing happens when the **start** block is touched. | In debug mode, the first changes may take a while. Check the displays, and check that the level was saved before GD was closed ([chapter 1](01-getting-started.md#13-compiling-and-running)). |

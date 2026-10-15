@@ -4,8 +4,6 @@
 ; Bit operations. The bitwise_* routines use c9850-c9877 internally.
 
 _init:
-    import ../../stdlib/core
-
     alias __cs1,        c9850               ; scratch
     alias __cs2,        c9851               ; scratch
     alias __cs3,        c9852               ; scratch

@@ -346,21 +346,3 @@ fn aux_groups_are_unique() {
         );
     }
 }
-
-#[test]
-#[ignore]
-fn diff() {
-    let l1 = GDLevel::from_gmd("../tests/sha256_steps/step1_min.tasm.gmd").unwrap();
-    let l2 = GDLevel::from_gmd("../tests/sha256_steps/step1_min_modified.gmd").unwrap();
-
-    for (obj1, obj2) in zip(
-        l1.get_decrypted_data().unwrap().objects,
-        l2.get_decrypted_data().unwrap().objects,
-    ) {
-        if obj1 != obj2 {
-            println!("different objects: ");
-            println!("    {obj1:#?}");
-            println!("    {obj2:#?}");
-        }
-    }
-}

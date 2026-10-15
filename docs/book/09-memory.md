@@ -130,7 +130,7 @@ next_number:
     sle next_number, ptr, LAST_PAIR
 ```
 
-The original program goes up to address 51. This version stops at address 32, which holds 1,346,269. Going much further would run into the limit from [chapter 2](02-items-and-arithmetic.md): from 24,157,817 (address 38) onwards, the numbers are above 2<sup>24</sup> and may not be exact.
+The original program goes up to address 51. This version stops at address 32, which holds 1,346,269. Going much further would run into the largest value a counter can hold, 2,147,483,647: address 48 would need 2,971,215,073.
 
 ## 9.5. Example: searching a list
 A list is a run of consecutive addresses. This program looks for a value in a list and reports the address where it is first found, based on [`example_programs/list_search.tasm`](https://github.com/ArrowSlashArrow/tasm-lang/blob/master/example_programs/list_search.tasm):
