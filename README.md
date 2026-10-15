@@ -5,14 +5,14 @@ A computational language that compiles to Geometry Dash trigger objects. Allows 
 Not to be confused with the [Borland Turbo Assembler](https://en.wikipedia.org/wiki/Turbo_Assembler).  
   
 TASM is currently in **version v0.3.2**.  
-The working compiler is in the `rtasm/` directory. Note that the compiler is not a standalone executable, and must be executed from source.
+The working compiler is in the `rtasm/` directory.
 
 Documentation can be found [here](https://tasm.mntpoint.org/docs/).  
 Join the TASM community on Discord [here](https://discord.gg/spqKPeFvYf).
 This language has [VS Code support](https://marketplace.visualstudio.com/items?itemName=ArrowSlashArrow.tasm-lang-gd).
 
 # Overview
-TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of complex programs. 
+TASM (Trigger Assembly) is a language with assembly-like syntax made specifically for working with the trigger system in Geometry Dash. The language's instruction set features many instructions that, when combined, allow for the creation of [complex programs](example_programs). 
 
 > [!NOTE]
 > Currently, the language is geared more towards traditional programming, which means that the instruction set is currently made mostly of arithmetic, control flow, and memory. There are plans to expand it in the future to a broader instruction set which covers more of the triggers available in the level editor.
@@ -28,7 +28,7 @@ Features:
 
 # Quick Start and Tutorial
 ## Quick Install
-The TASM compiler (tasmc) now has an installer script for windows [here](https://tasm.mntpoint.org/install.ps1). This is a powershell script that must be ran from the command line.
+The TASM compiler (tasmc) now has an installer script for windows [here](https://tasm.mntpoint.org/install.ps1) and for linux [here](https://tasm.mntpoint.org/linux.sh). This is a powershell script that must be ran from the command line.
 ## SDK Usage Instructions
 To use the current up-to-date SDK, you may do the following:
 1. Refer to the releases in this repo for pre-built executables
@@ -48,7 +48,7 @@ Note that running from source requires Rust v1.88.0.
 
 ## Which Windows build should I use?
 - Use MSVC if you are unsure.
-- Use GNU if you are not able to use MSVC.
+- Use GNU if you are not able to use MSVC or if your machine does not use MSVC in favor of something like MinGW.
 
 ## Useful compiler flags
 Below is a list of commonly used compiler flags. This is not the full list of compiler flags, which can be accessed by running `tasmc --help`.

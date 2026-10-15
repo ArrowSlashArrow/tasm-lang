@@ -13,6 +13,7 @@ use gdlib::cclocallevels::gdlevel::{CCLocalLevels, GDLevel};
 use gdlib::cclocallevels::gdobj::ids::level_header;
 use gdlib::cclocallevels::gdobj::serialise_objects;
 use gdlib::core::get_cclocallevels_path;
+use tasmc::core::consts::GROUP_LIMIT;
 use tungstenite::{Message, connect};
 
 use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
@@ -146,7 +147,19 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
     // relative path qualifier: (module, is done)
     let mut module_cache: HashMap<PathBuf, (Tasm, bool, Vec<usize>)> = HashMap::new();
     let mut dependency_map: HashMap<String, PathBuf> = HashMap::new(); // module ident => module path
-    let mut start_using_this_group = args.group_offset;
+    let mut start_using_this_group = match args.group_offset {
+        g if g < 0 => {
+            return Err(anyhow!(
+                "Invalid group offset {g}: group offset is negative."
+            ));
+        }
+        g if g > GROUP_LIMIT => {
+            return Err(anyhow!(
+                "Invalid group offset {g}: group offset is above GROUP_LIMIT."
+            ));
+        }
+        g => g,
+    };
     let (mut main_module, curr_group, _) = match parse_module(
         main_path.clone(),
         &args,

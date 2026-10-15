@@ -90,16 +90,6 @@ impl Tasm {
             } else {
                 75.0
             };
-            if self.curr_group > GROUP_LIMIT {
-                push_error_lineless(
-                    &mut self.errors,
-                    &self.fname,
-                    TasmErrorType::ExceedsGroupLimit,
-                    format!("Program uses more than {GROUP_LIMIT} groups."),
-                    1,
-                );
-                break;
-            }
 
             // keep track of entry group
             if routine.ident == ENTRY_POINT {
@@ -130,6 +120,16 @@ impl Tasm {
                     spacing,
                     &mut level,
                 );
+                if self.curr_group > GROUP_LIMIT {
+                    push_error_lineless(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::ExceedsGroupLimit,
+                        format!("Program uses more than {GROUP_LIMIT} groups."),
+                        1,
+                    );
+                    break;
+                }
             }
         }
         self.routines = routines;

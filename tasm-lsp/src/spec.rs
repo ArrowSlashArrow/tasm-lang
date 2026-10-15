@@ -239,7 +239,7 @@ pub fn value_kind(v: &TasmValue) -> String {
         TasmValue::Group(g) => format!("group {g}"),
         TasmValue::RoutineRef(_) => "routine".into(),
         TasmValue::ModulePath(_) => "module path".into(),
-        TasmValue::String(_) | TasmValue::UnresolvedAlias(_) => "string".into(),
+        TasmValue::String(_) => "string".into(),
     }
 }
 

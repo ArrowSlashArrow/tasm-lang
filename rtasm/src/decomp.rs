@@ -1,19 +1,19 @@
 use std::{collections::HashMap, fs::read_to_string};
 
 use crate::{
-    core::structs::{Instruction, Routine},
     Args,
+    core::structs::{Instruction, Routine},
 };
 
 use gdlib::{
     cclocallevels::{
-        gdlevel::{leveldata::parse_objects, GDLevel},
+        gdlevel::{GDLevel, leveldata::parse_objects},
         gdobj::{
+            GDObject, ItemCompareTrigger, ItemEditTrigger, ObjectProperties, SpawnTrigger,
             ids::{objects::*, properties::*},
             structs::{
                 CompareOp, CompareOperand, GDValue, Group, Item, ItemType, Op, RoundMode, SignMode,
             },
-            GDObject, ItemCompareTrigger, ItemEditTrigger, ObjectProperties, SpawnTrigger,
         },
     },
     core::b64_decode,
@@ -104,7 +104,7 @@ fn decomp(objects: &Vec<GDObject>) {
     // convert to instructions
     let mut parsed_instructions = vec![];
     for (gid, objects) in g.iter() {
-        let mut rtn = Routine::empty()
+        let mut rtn = Routine::default()
             .ident(&format!("{}:", group_ident(*gid, &object_name_map)))
             .group(*gid);
         for obj in objects {

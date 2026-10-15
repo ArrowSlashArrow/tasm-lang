@@ -318,7 +318,7 @@ sha256_round:
     spawn shift8            | ordered:false delay:0 remap: { c3140 = c1448, c3141 = c1449, c3142 = c1450, c3143 = c1451, c3144 = c1452, c3145 = c1453, c3146 = c1454, c3147 = c1455, c3148 = c1456 }
     spawn shift8            | ordered:false delay:0 remap: { c3140 = c1456, c3141 = c1457, c3142 = c1458, c3143 = c1459, c3144 = c1460, c3145 = c1461, c3146 = c1462, c3147 = c1463, c3148 = c1464 }
     add c3029, 1
-    fl sha256_round, sha256_finish, c3029, 64 | ordered:false
+    fl sha256_round, sha256_finish, c3029, 64 | ordered:false   ; loop :(
 
 ; hash = initial hash values + a..h
 ; @0tick
