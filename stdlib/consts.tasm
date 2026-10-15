@@ -1,15 +1,15 @@
 ; useful numbers
 ;
 ; The aliases below are for use as modifiers, e.g. `mul t2, consts::PI`. GD keeps only 3 decimals of
-; a modifier, and saves it with only 6 significant digits, so `consts::PI` acts as 3.141 there. For the
-; precise value, spawn the matching load_const_* routine (0-tickable), which writes the constant into
-; t1 as precisely as a timer can hold it.
+; a modifier (and changes some large ones, see docs section 3.1.2.1.1), so `consts::PI` acts as 3.141
+; there. For the precise value, spawn the matching load_const_* routine (0-tickable), which writes the
+; constant into t1 as precisely as a timer can hold it.
 
 _init:
     ; tasm-specific numbers
     alias MAX_GROUP,        g9999
-    alias MAX_SAFE_INT,     999999          ; largest integer that survives as a modifier, along with every integer below it
-    alias MIN_SAFE_INT,     -999999         ; smallest integer that survives as a modifier, along with every integer above it
+    alias MAX_SAFE_INT,     134217          ; every integer up to this survives as a modifier (docs section 3.1.2.1.1)
+    alias MIN_SAFE_INT,     -134217         ; every integer down to this survives as a modifier
     alias INT_LIMIT,        2147483647      ; largest counter value. Too long for a modifier (GD saves it as 2147480064)
     alias NEG_INT_LIMIT,    -2147483648     ; smallest counter value. Too long for a modifier (GD saves it as -2147480064)
     alias MAX_TIMER_VALUE,  9999999.0       ; largest value a timer will accept from an item edit trigger. Too long for a
@@ -38,248 +38,286 @@ _init:
     alias LN_10,            2.30258509299404568401799145468436421
 
 ; Loads `PI` into t1: the closest value a timer can hold to 3.141592653589793238...
-; It's built as ((184708 / 2^19 - 87928) / 2^19 + 411775) / 2^17, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((9036 / 2^17 - 62650) / 2^17 - 38263) / 2^17 + 102944) / 2^15: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_PI:
-    mov t1, 184708
-    div t1, 524288
-    add t1, -87928
-    div t1, 524288
-    add t1, 411775
+    mov t1, 9036
     div t1, 131072
+    add t1, -62650
+    div t1, 131072
+    add t1, -38263
+    div t1, 131072
+    add t1, 102944
+    div t1, 32768
 
 ; Loads `TAU` into t1: the closest value a timer can hold to 6.283185307179586476...
-; It's built as ((184708 / 2^19 - 87928) / 2^19 + 411775) / 2^16, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((9036 / 2^17 - 62650) / 2^17 - 38263) / 2^17 + 102944) / 2^14: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_TAU:
-    mov t1, 184708
-    div t1, 524288
-    add t1, -87928
-    div t1, 524288
-    add t1, 411775
-    div t1, 65536
+    mov t1, 9036
+    div t1, 131072
+    add t1, -62650
+    div t1, 131072
+    add t1, -38263
+    div t1, 131072
+    add t1, 102944
+    div t1, 16384
 
 ; Loads `E` into t1: the closest value a timer can hold to 2.718281828459045235...
-; It's built as ((-166251 / 2^19 - 190935) / 2^19 + 356291) / 2^17, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((43435 / 2^17 - 59942) / 2^17 - 44701) / 2^17 + 89073) / 2^15: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_E:
-    mov t1, -166251
-    div t1, 524288
-    add t1, -190935
-    div t1, 524288
-    add t1, 356291
+    mov t1, 43435
     div t1, 131072
+    add t1, -59942
+    div t1, 131072
+    add t1, -44701
+    div t1, 131072
+    add t1, 89073
+    div t1, 32768
 
 ; Loads `GOLDEN_RATIO` into t1: the closest value a timer can hold to 1.618033988749894848...
-; It's built as ((-46468 / 2^19 - 51408) / 2^19 + 424158) / 2^18, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((-8016 / 2^17 - 726) / 2^17 + 62323) / 2^17 + 106039) / 2^16: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_GOLDEN_RATIO:
-    mov t1, -46468
-    div t1, 524288
-    add t1, -51408
-    div t1, 524288
-    add t1, 424158
-    div t1, 262144
+    mov t1, -8016
+    div t1, 131072
+    add t1, -726
+    div t1, 131072
+    add t1, 62323
+    div t1, 131072
+    add t1, 106039
+    div t1, 65536
 
 ; Loads `EULER_GAMMA` (The Euler-Mascheroni constant (γ)) into t1: the closest value a timer can hold to 0.577215664901532860...
-; It's built as ((221583 / 2^19 + 129247) / 2^19 + 302627) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((31309 / 2^17 - 4730) / 2^17 - 24690) / 2^17 + 75657) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_EULER_GAMMA:
-    mov t1, 221583
-    div t1, 524288
-    add t1, 129247
-    div t1, 524288
-    add t1, 302627
-    div t1, 524288
+    mov t1, 31309
+    div t1, 131072
+    add t1, -4730
+    div t1, 131072
+    add t1, -24690
+    div t1, 131072
+    add t1, 75657
+    div t1, 131072
 
 ; Loads `HALF_PI` into t1: the closest value a timer can hold to 1.570796326794896619...
-; It's built as ((184708 / 2^19 - 87928) / 2^19 + 411775) / 2^18, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((9036 / 2^17 - 62650) / 2^17 - 38263) / 2^17 + 102944) / 2^16: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_HALF_PI:
-    mov t1, 184708
-    div t1, 524288
-    add t1, -87928
-    div t1, 524288
-    add t1, 411775
-    div t1, 262144
+    mov t1, 9036
+    div t1, 131072
+    add t1, -62650
+    div t1, 131072
+    add t1, -38263
+    div t1, 131072
+    add t1, 102944
+    div t1, 65536
 
 ; Loads `FRAC_PI_3` (pi/3) into t1: the closest value a timer can hold to 1.047197551196597746...
-; It's built as ((-51624 / 2^19 - 233381) / 2^19 + 274517) / 2^18, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((49715 / 2^17 - 41767) / 2^17 + 18182) / 2^17 + 68629) / 2^16: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_3:
-    mov t1, -51624
-    div t1, 524288
-    add t1, -233381
-    div t1, 524288
-    add t1, 274517
-    div t1, 262144
+    mov t1, 49715
+    div t1, 131072
+    add t1, -41767
+    div t1, 131072
+    add t1, 18182
+    div t1, 131072
+    add t1, 68629
+    div t1, 65536
 
 ; Loads `FRAC_PI_4` (pi/4) into t1: the closest value a timer can hold to 0.785398163397448309...
-; It's built as ((184708 / 2^19 - 87928) / 2^19 + 411775) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((9036 / 2^17 - 62650) / 2^17 - 38263) / 2^17 + 102944) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_4:
-    mov t1, 184708
-    div t1, 524288
-    add t1, -87928
-    div t1, 524288
-    add t1, 411775
-    div t1, 524288
+    mov t1, 9036
+    div t1, 131072
+    add t1, -62650
+    div t1, 131072
+    add t1, -38263
+    div t1, 131072
+    add t1, 102944
+    div t1, 131072
 
 ; Loads `FRAC_PI_6` (pi/6) into t1: the closest value a timer can hold to 0.523598775598298873...
-; It's built as ((-51624 / 2^19 - 233381) / 2^19 + 274517) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((49715 / 2^17 - 41767) / 2^17 + 18182) / 2^17 + 68629) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_6:
-    mov t1, -51624
-    div t1, 524288
-    add t1, -233381
-    div t1, 524288
-    add t1, 274517
-    div t1, 524288
+    mov t1, 49715
+    div t1, 131072
+    add t1, -41767
+    div t1, 131072
+    add t1, 18182
+    div t1, 131072
+    add t1, 68629
+    div t1, 131072
 
 ; Loads `FRAC_PI_8` (pi/8) into t1: the closest value a timer can hold to 0.392699081698724154...
-; It's built as ((92354 / 2^19 + 218180) / 2^19 + 205887) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((4518 / 2^17 + 34211) / 2^17 - 19132) / 2^17 + 51472) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_PI_8:
-    mov t1, 92354
-    div t1, 524288
-    add t1, 218180
-    div t1, 524288
-    add t1, 205887
-    div t1, 524288
+    mov t1, 4518
+    div t1, 131072
+    add t1, 34211
+    div t1, 131072
+    add t1, -19132
+    div t1, 131072
+    add t1, 51472
+    div t1, 131072
 
 ; Loads `FRAC_1_PI` (1/pi) into t1: the closest value a timer can hold to 0.318309886183790671...
-; It's built as ((-113643 / 2^19 + 28106) / 2^19 + 166886) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((43344 / 2^17 - 50928) / 2^17 - 63779) / 2^17 + 41722) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_1_PI:
-    mov t1, -113643
-    div t1, 524288
-    add t1, 28106
-    div t1, 524288
-    add t1, 166886
-    div t1, 524288
+    mov t1, 43344
+    div t1, 131072
+    add t1, -50928
+    div t1, 131072
+    add t1, -63779
+    div t1, 131072
+    add t1, 41722
+    div t1, 131072
 
 ; Loads `SQRT_2` into t1: the closest value a timer can hold to 1.414213562373095048...
-; It's built as ((244937 / 2^19 - 209666) / 2^19 + 370728) / 2^18, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((18502 / 2^17 - 12557) / 2^17 - 13104) / 2^17 + 92682) / 2^16: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_SQRT_2:
-    mov t1, 244937
-    div t1, 524288
-    add t1, -209666
-    div t1, 524288
-    add t1, 370728
-    div t1, 262144
+    mov t1, 18502
+    div t1, 131072
+    add t1, -12557
+    div t1, 131072
+    add t1, -13104
+    div t1, 131072
+    add t1, 92682
+    div t1, 65536
 
 ; Loads `FRAC_1_SQRT_2` (1 / sqrt2) into t1: the closest value a timer can hold to 0.707106781186547524...
-; It's built as ((244937 / 2^19 - 209666) / 2^19 + 370728) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((18502 / 2^17 - 12557) / 2^17 - 13104) / 2^17 + 92682) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_FRAC_1_SQRT_2:
-    mov t1, 244937
-    div t1, 524288
-    add t1, -209666
-    div t1, 524288
-    add t1, 370728
-    div t1, 524288
+    mov t1, 18502
+    div t1, 131072
+    add t1, -12557
+    div t1, 131072
+    add t1, -13104
+    div t1, 131072
+    add t1, 92682
+    div t1, 131072
 
 ; Loads `LOG2_E` into t1: the closest value a timer can hold to 1.442695040888963407...
-; It's built as ((12257 / 2^19 - 79273) / 2^19 + 378194) / 2^18, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((-62532 / 2^17 + 57536) / 2^17 + 60581) / 2^17 + 94548) / 2^16: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG2_E:
-    mov t1, 12257
-    div t1, 524288
-    add t1, -79273
-    div t1, 524288
-    add t1, 378194
-    div t1, 262144
+    mov t1, -62532
+    div t1, 131072
+    add t1, 57536
+    div t1, 131072
+    add t1, 60581
+    div t1, 131072
+    add t1, 94548
+    div t1, 65536
 
 ; Loads `LOG2_10` into t1: the closest value a timer can hold to 3.321928094887362347...
-; It's built as ((145174 / 2^19 - 126221) / 2^19 + 435412) / 2^17, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((45029 / 2^17 + 26844) / 2^17 - 7889) / 2^17 + 108853) / 2^15: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG2_10:
-    mov t1, 145174
-    div t1, 524288
-    add t1, -126221
-    div t1, 524288
-    add t1, 435412
+    mov t1, 45029
     div t1, 131072
+    add t1, 26844
+    div t1, 131072
+    add t1, -7889
+    div t1, 131072
+    add t1, 108853
+    div t1, 32768
 
 ; Loads `LOG10_E` into t1: the closest value a timer can hold to 0.434294481903251827...
-; It's built as ((-55182 / 2^19 + 202023) / 2^19 + 227695) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((-29526 / 2^17 + 56482) / 2^17 - 20142) / 2^17 + 56924) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG10_E:
-    mov t1, -55182
-    div t1, 524288
-    add t1, 202023
-    div t1, 524288
-    add t1, 227695
-    div t1, 524288
+    mov t1, -29526
+    div t1, 131072
+    add t1, 56482
+    div t1, 131072
+    add t1, -20142
+    div t1, 131072
+    add t1, 56924
+    div t1, 131072
 
 ; Loads `LOG10_2` into t1: the closest value a timer can hold to 0.301029995663981195...
-; It's built as ((249848 / 2^19 + 217247) / 2^19 + 157826) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((-17212 / 2^17 - 4288) / 2^17 - 51958) / 2^17 + 39457) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LOG10_2:
-    mov t1, 249848
-    div t1, 524288
-    add t1, 217247
-    div t1, 524288
-    add t1, 157826
-    div t1, 524288
+    mov t1, -17212
+    div t1, 131072
+    add t1, -4288
+    div t1, 131072
+    add t1, -51958
+    div t1, 131072
+    add t1, 39457
+    div t1, 131072
 
 ; Loads `LN_2` into t1: the closest value a timer can hold to 0.693147180559945309...
-; It's built as ((237299 / 2^19 - 131596) / 2^19 + 363409) / 2^19, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((-25923 / 2^17 + 36476) / 2^17 + 24543) / 2^17 + 90852) / 2^17: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LN_2:
-    mov t1, 237299
-    div t1, 524288
-    add t1, -131596
-    div t1, 524288
-    add t1, 363409
-    div t1, 524288
+    mov t1, -25923
+    div t1, 131072
+    add t1, 36476
+    div t1, 131072
+    add t1, 24543
+    div t1, 131072
+    add t1, 90852
+    div t1, 131072
 
 ; Loads `LN_10` into t1: the closest value a timer can hold to 2.302585092994045684...
-; It's built as ((-175784 / 2^19 + 227179) / 2^19 + 301804) / 2^17, so that no number in the
-; routine has more than 6 significant digits (GD saves numbers in instructions with 6 significant digits).
+; It's built as (((49519 / 2^17 - 43707) / 2^17 + 14199) / 2^17 + 75451) / 2^15: every number in the
+; routine is an integer of at most 2^17, which GD stores exactly (see docs section 3.1.2.1.1).
 ; @param t1 Where the constant will be written
 ; @0tick
 load_const_LN_10:
-    mov t1, -175784
-    div t1, 524288
-    add t1, 227179
-    div t1, 524288
-    add t1, 301804
+    mov t1, 49519
     div t1, 131072
+    add t1, -43707
+    div t1, 131072
+    add t1, 14199
+    div t1, 131072
+    add t1, 75451
+    div t1, 32768

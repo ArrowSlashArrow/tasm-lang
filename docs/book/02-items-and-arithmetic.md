@@ -24,7 +24,7 @@ GD also has three built-in items, written in uppercase:
 Writing to `ATTEMPTS` or `MAINTIME` is a compile error (E0004).
 
 > [!NOTE]
-> Arithmetic on items is exact. Only the constant in an instruction (the `5` in `add c1, 5`) is limited: GD stores it as a 32-bit float and saves it with only 6 significant digits. A constant outside -999,999 to 999,999 may work at first and then change once the level is saved: `mov c1, 16777217` comes back as `mov c1, 16777200`. Build bigger values from smaller constants instead, e.g. `mov c1, 16777000` then `add c1, 217`. The [reference](../index.md#31211-caveats-with-using-largeprecise-numbers) has the exact rules.
+> Arithmetic on items is exact. Only the constant in an instruction (the `5` in `add c1, 5`) is limited: GD stores it as a 32-bit float, rounds it to 3 decimals, and saves it with only 6 significant digits. A constant outside -134,217 to 134,217 may come out slightly wrong, sometimes only after the level is saved: `mov c1, 16777217` comes back as `mov c1, 16777200`. Build bigger values from smaller constants instead, e.g. `mov c1, 256`, `mul c1, 65536`, `add c1, 1` for 16,777,217. The [reference](../index.md#31211-caveats-with-using-largeprecise-numbers) has the exact rules.
 
 ## 2.2. Arithmetic instructions
 | Instruction | Does |

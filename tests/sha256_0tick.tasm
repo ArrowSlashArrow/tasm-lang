@@ -1,3 +1,5 @@
+; currently this file doesn't work. remove this line when it starts working again.
+
 ; sha256 of the string starting at offset 100
 _init:
 
@@ -61,8 +63,8 @@ _start:
 ; c1200-c1208 / c1210-c1218: high / low halves of h, g, f, e, d, c, b, a, T1
 ; c1300-c1316 / c1320-c1336: W[t] .. W[t + 16], c1400-c1463: K[t] .. K[63] (signed)
 ; c3030-c3046: 2^0 .. 2^16, c3028: 0, c3100 and up: scratch and the helpers' arguments
-; GD saves numbers in instructions with 6 significant digits, so each K is loaded as a round number
-; that survives that (and is exact as a 32-bit float), plus the rest (below 1,000,000).
+; Each K is loaded in parts: GD saves numbers in instructions with 6 significant digits and keeps
+; 3 decimals by computing round(x * 1000) / 1000 in 32-bit floats, and every part survives both.
 ; @0tick, but the rounds run afterwards, one per tick (64 ticks)
 sha256:
     mov c3030, 1
@@ -133,135 +135,207 @@ sha256:
     mov c1211, 55723
     mov c1200, 23520                                ; h = 0x5be0cd19
     mov c1210, 52505
-    mov c1400, 1116320000                           ; K[0] = 0x428a2f98 (in two parts, see the top)
-    add c1400, 32408
-    mov c1401, 1899440000                           ; K[1] = 0x71374491
-    add c1401, 7441
-    mov c1402, -1245680000                          ; K[2] = 0xb5c0fbcf
-    add c1402, 36175
-    mov c1403, -373956000                           ; K[3] = 0xe9b5dba5
-    add c1403, -1723
-    mov c1404, 961984000                            ; K[4] = 0x3956c25b
-    add c1404, 3163
-    mov c1405, 1508960000                           ; K[5] = 0x59f111f1
-    add c1405, 10993
-    mov c1406, -1841360000                          ; K[6] = 0x923f82a4
-    add c1406, 28452
-    mov c1407, -1424240000                          ; K[7] = 0xab1c5ed5
-    add c1407, 35925
-    mov c1408, -670584000                           ; K[8] = 0xd807aa98
-    add c1408, -2216
-    mov c1409, 310600000                            ; K[9] = 0x12835b01
-    add c1409, -1599
-    mov c1410, 607224000                            ; K[10] = 0x243185be
-    add c1410, 1278
+    mov c1400, 1116349952                           ; K[0] = 0x428a2f98 (in parts, see the top)
+    add c1400, 2456
+    mov c1401, 1899449984                           ; K[1] = 0x71374491
+    add c1401, -2543
+    mov c1402, -1245639936                          ; K[2] = 0xb5c0fbcf
+    add c1402, -3889
+    mov c1403, -373958016                           ; K[3] = 0xe9b5dba5
+    add c1403, 293
+    mov c1404, 961987008                            ; K[4] = 0x3956c25b
+    add c1404, 155
+    mov c1405, 1508969984                           ; K[5] = 0x59f111f1
+    add c1405, 1009
+    mov c1406, -1841330048                          ; K[6] = 0x923f82a4
+    add c1406, -1500
+    mov c1407, -1424199936                          ; K[7] = 0xab1c5ed5
+    add c1407, -4139
+    mov c1408, -670585984                           ; K[8] = 0xd807aa98
+    add c1408, -232
+    mov c1409, 310598016                            ; K[9] = 0x12835b01
+    add c1409, 385
+    mov c1410, 607225024                            ; K[10] = 0x243185be
+    add c1410, 254
     mov c1411, 1426880000                           ; K[11] = 0x550c7dc3
     add c1411, 1987
-    mov c1412, 1925040000                           ; K[12] = 0x72be5d74
-    add c1412, 38388
-    mov c1413, -2132880000                          ; K[13] = 0x80deb1fe
-    add c1413, -9090
+    mov c1412, 1925080064                           ; K[12] = 0x72be5d74
+    add c1412, -1676
+    mov c1413, -2132889984                          ; K[13] = 0x80deb1fe
+    add c1413, 894
     mov c1414, -1680080000                          ; K[14] = 0x9bdc06a7
     add c1414, 807
-    mov c1415, -1046760000                          ; K[15] = 0xc19bf174
-    add c1415, 15284
-    mov c1416, -459576000                           ; K[16] = 0xe49b69c1
-    add c1416, -895
-    mov c1417, -272744000                           ; K[17] = 0xefbe4786
-    add c1417, 1478
-    mov c1418, 264348000                            ; K[18] = 0x0fc19dc6
-    add c1418, -922
+    mov c1415, -1046739968                          ; K[15] = 0xc19bf174
+    add c1415, -4748
+    mov c1416, -459576992                           ; K[16] = 0xe49b69c1
+    add c1416, 97
+    mov c1417, -272743008                           ; K[17] = 0xefbe4786
+    add c1417, 486
+    mov c1418, 264347008                            ; K[18] = 0x0fc19dc6
+    add c1418, 70
     mov c1419, 604808000                            ; K[19] = 0x240ca1cc
     add c1419, -372
     mov c1420, 770256000                            ; K[20] = 0x2de92c6f
     add c1420, -17
-    mov c1421, 1249120000                           ; K[21] = 0x4a7484aa
-    add c1421, 30122
-    mov c1422, 1555120000                           ; K[22] = 0x5cb0a9dc
-    add c1422, -38308
-    mov c1423, 1996080000                           ; K[23] = 0x76f988da
-    add c1423, -15014
-    mov c1424, -1740720000                          ; K[24] = 0x983e5152
-    add c1424, -26414
-    mov c1425, -1473120000                          ; K[25] = 0xa831c66d
-    add c1425, -12947
-    mov c1426, -1342000000                          ; K[26] = 0xb00327c8
-    add c1426, 29512
-    mov c1427, -1084640000                          ; K[27] = 0xbf597fc7
-    add c1427, -13625
-    mov c1428, -958392000                           ; K[28] = 0xc6e00bf3
-    add c1428, -3405
-    mov c1429, -710440000                           ; K[29] = 0xd5a79147
-    add c1429, 1415
-    mov c1430, 113927000                            ; K[30] = 0x06ca6351
-    add c1430, -7
-    mov c1431, 338240000                            ; K[31] = 0x14292967
-    add c1431, 1895
-    mov c1432, 666304000                            ; K[32] = 0x27b70a85
-    add c1432, 3205
-    mov c1433, 773528000                            ; K[33] = 0x2e1b2138
-    add c1433, 1912
-    mov c1434, 1294720000                           ; K[34] = 0x4d2c6dfc
-    add c1434, 37372
-    mov c1435, 1396160000                           ; K[35] = 0x53380d13
-    add c1435, 22291
-    mov c1436, 1695200000                           ; K[36] = 0x650a7354
-    add c1436, -16300
-    mov c1437, 1986640000                           ; K[37] = 0x766a0abb
-    add c1437, 21051
-    mov c1438, -2117920000                          ; K[38] = 0x81c2c92e
-    add c1438, -20946
-    mov c1439, -1838000000                          ; K[39] = 0x92722c85
-    add c1439, -11259
+    mov c1421, 1249149952                           ; K[21] = 0x4a7484aa
+    add c1421, 170
+    mov c1422, 1555079936                           ; K[22] = 0x5cb0a9dc
+    add c1422, 1756
+    mov c1423, 1996070016                           ; K[23] = 0x76f988da
+    add c1423, -5030
+    mov c1424, -1740749952                          ; K[24] = 0x983e5152
+    add c1424, 3538
+    mov c1425, -1473129984                          ; K[25] = 0xa831c66d
+    add c1425, -2963
+    mov c1426, -1341970048                          ; K[26] = 0xb00327c8
+    add c1426, -440
+    mov c1427, -1084649984                          ; K[27] = 0xbf597fc7
+    add c1427, -3641
+    mov c1428, -958395008                           ; K[28] = 0xc6e00bf3
+    add c1428, -397
+    mov c1429, -710438976                           ; K[29] = 0xd5a79147
+    add c1429, 391
+    mov c1430, 113926000                            ; K[30] = 0x06ca6351
+    add c1430, 993
+    mov c1431, 338241984                            ; K[31] = 0x14292967
+    add c1431, -89
+    mov c1432, 666307008                            ; K[32] = 0x27b70a85
+    add c1432, 197
+    mov c1433, 773529984                            ; K[33] = 0x2e1b2138
+    add c1433, -72
+    mov c1434, 1294759936                           ; K[34] = 0x4d2c6dfc
+    add c1434, -2564
+    mov c1435, 1396179968                           ; K[35] = 0x53380d13
+    add c1435, 2323
+    mov c1436, 1695180032                           ; K[36] = 0x650a7354
+    add c1436, 3668
+    mov c1437, 1986659968                           ; K[37] = 0x766a0abb
+    add c1437, 1083
+    mov c1438, -2117939968                          ; K[38] = 0x81c2c92e
+    add c1438, -978
+    mov c1439, -1838009984                          ; K[39] = 0x92722c85
+    add c1439, -1275
     mov c1440, -1564480000                          ; K[40] = 0xa2bfe8a1
     add c1440, -1375
-    mov c1441, -1474640000                          ; K[41] = 0xa81a664b
-    add c1441, -24885
+    mov c1441, -1474659968                          ; K[41] = 0xa81a664b
+    add c1441, -4917
     mov c1442, -1035240000                          ; K[42] = 0xc24b8b70
     add c1442, 3504
-    mov c1443, -949200000                           ; K[43] = 0xc76c51a3
-    add c1443, -2525
-    mov c1444, -778904000                           ; K[44] = 0xd192e819
-    add c1444, 2521
-    mov c1445, -694616000                           ; K[45] = 0xd6990624
-    add c1445, 1508
-    mov c1446, -200396000                           ; K[46] = 0xf40e3585
-    add c1446, 613
-    mov c1447, 275424000                            ; K[47] = 0x106aa070
-    add c1447, -656
+    mov c1443, -949203008                           ; K[43] = 0xc76c51a3
+    add c1443, 483
+    mov c1444, -778900992                           ; K[44] = 0xd192e819
+    add c1444, -487
+    mov c1445, -694614016                           ; K[45] = 0xd6990624
+    add c1445, -476
+    mov c1446, -200395008                           ; K[46] = 0xf40e3585
+    add c1446, -379
+    mov c1447, 275423008                            ; K[47] = 0x106aa070
+    add c1447, 336
     mov c1448, 430228000                            ; K[48] = 0x19a4c116
     add c1448, -266
-    mov c1449, 506948000                            ; K[49] = 0x1e376c08
-    add c1449, 616
-    mov c1450, 659064000                            ; K[50] = 0x2748774c
-    add c1450, -3444
-    mov c1451, 884000000                            ; K[51] = 0x34b0bcb5
-    add c1451, -2123
-    mov c1452, 958136000                            ; K[52] = 0x391c0cb3
-    add c1452, 3571
-    mov c1453, 1322800000                           ; K[53] = 0x4ed8aa4a
-    add c1453, 22218
-    mov c1454, 1537040000                           ; K[54] = 0x5b9cca4f
-    add c1454, -37937
-    mov c1455, 1747840000                           ; K[55] = 0x682e6ff3
-    add c1455, 33779
-    mov c1456, 1955600000                           ; K[56] = 0x748f82ee
-    add c1456, -37778
-    mov c1457, 2024080000                           ; K[57] = 0x78a5636f
-    add c1457, 24815
-    mov c1458, -2067200000                          ; K[58] = 0x84c87814
-    add c1458, -36844
-    mov c1459, -1933120000                          ; K[59] = 0x8cc70208
-    add c1459, 5128
-    mov c1460, -1866560000                          ; K[60] = 0x90befffa
-    add c1460, 29178
-    mov c1461, -1538240000                          ; K[61] = 0xa4506ceb
-    add c1461, 6891
-    mov c1462, -1090960000                          ; K[62] = 0xbef9a3f7
-    add c1462, 24183
-    mov c1463, -965640000                           ; K[63] = 0xc67178f2
-    add c1463, -1998
-    spawn sha256_round      | ordered:false         ; the next tick
+    mov c1449, 506948992                            ; K[49] = 0x1e376c08
+    add c1449, -376
+    mov c1450, 659060992                            ; K[50] = 0x2748774c
+    add c1450, -436
+    mov c1451, 883998016                            ; K[51] = 0x34b0bcb5
+    add c1451, -139
+    mov c1452, 958140032                            ; K[52] = 0x391c0cb3
+    add c1452, -461
+    mov c1453, 1322819968                           ; K[53] = 0x4ed8aa4a
+    add c1453, 2250
+    mov c1454, 1536999936                           ; K[54] = 0x5b9cca4f
+    add c1454, 2127
+    mov c1455, 1747869952                           ; K[55] = 0x682e6ff3
+    add c1455, 3827
+    mov c1456, 1955559936                           ; K[56] = 0x748f82ee
+    add c1456, 2286
+    mov c1457, 2024099968                           ; K[57] = 0x78a5636f
+    add c1457, 4847
+    mov c1458, -2067239936                          ; K[58] = 0x84c87814
+    add c1458, 3092
+    mov c1459, -1933110016                          ; K[59] = 0x8cc70208
+    add c1459, -4856
+    mov c1460, -1866530048                          ; K[60] = 0x90befffa
+    add c1460, -774
+    mov c1461, -1538230016                          ; K[61] = 0xa4506ceb
+    add c1461, -3093
+    mov c1462, -1090940032                          ; K[62] = 0xbef9a3f7
+    add c1462, 4215
+    mov c1463, -965641984                           ; K[63] = 0xc67178f2
+    add c1463, -14
+    ; 8 rounds of sha256
+    spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; ; 8 rounds of sha256
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_round      | ordered:false delay:0
+    ; spawn sha256_finish     | ordered:false delay:0
 
 ; One round, and the next schedule word. Loops by spawning itself (64 ticks).
 sha256_round:

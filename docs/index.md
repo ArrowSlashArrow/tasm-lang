@@ -154,10 +154,12 @@ abs_value:
 ```
 
 ##### 3.1.2.1.1. Caveats with using large/precise numbers
-A modifier (the number literal in an instruction, like the `5` in `add c1, 5`, or an `itemmod`) has three limits:
-- **At most 3 decimals.** GD truncates the rest, so `0.1234` acts as `0.123`.
-- **At most 6 significant digits.** GD writes modifiers to the level's save data with 6 significant digits. A longer number works when the level is first loaded from `tasmc`, but changes as soon as the level is saved and loaded again: `-965672960` is saved as `-9.65673e+08` and comes back as `-965673024`. Every integer from -999,999 to 999,999 is safe (`consts::MAX_SAFE_INT`), and so is a larger number with at most 6 significant digits, like `16000000`, if a 32-bit float holds it exactly (see the next point). Powers of two above 2^19 (524,288) are **not** safe: `1048576` comes back as `1048580`.
-- **It is a 32-bit float.** A modifier above 2^24 (16,777,216) that a 32-bit float can't hold exactly is rounded even before the level is saved.
+A modifier (the number literal in an instruction, like the `5` in `add c1, 5`, or an `itemmod`) has these limits:
+- **It is a 32-bit float.** A modifier above 2^24 (16,777,216) that a 32-bit float can't hold exactly is rounded.
+- **At most 3 decimals.** GD drops the rest, so `0.1234` acts as `0.123`. It does this with 32-bit floats (in effect `round(x * 1000) / 1000`), so `x * 1000` gets rounded too, and large integers can change: `113927000` acts as `113926992`, and `166251` as `166251.015625`.
+- **At most 6 significant digits.** GD writes modifiers to the level's save data with 6 significant digits. A longer number works when the level is first loaded from `tasmc`, but changes as soon as the level is saved and loaded again: `-965672960` is saved as `-9.65673e+08` and comes back as `-965673024`.
+
+Together, these leave every integer from -134,217 to 134,217 safe (`consts::MAX_SAFE_INT`), and all powers of two up to 2^17 (131,072). Some larger numbers are safe too, but it's easier to stay in that range.
 
 Timers do not accept assignment above 9,999,999.00 from item edit triggers.
 
@@ -165,17 +167,20 @@ Arithmetic on the values stored in items is not affected by any of this: counter
 
 ```x86asm
 _start:
-    ; 2147483647 (too many digits to be a modifier itself)
-    mov c1, 2147440000          ; 6 significant digits, held exactly by a 32-bit float
-    add c1, 43647
+    ; 2147483647 = 32767 * 65536 + 65535
+    mov c1, 32767
+    mul c1, 65536
+    add c1, 65535
 
-    ; pi, as precisely as a timer can hold it: ((184708 / 2^19 - 87928) / 2^19 + 411775) / 2^17
-    mov t1, 184708
-    div t1, 524288
-    add t1, -87928
-    div t1, 524288
-    add t1, 411775
+    ; pi, as precisely as a timer can hold it: (((9036 / 2^17 - 62650) / 2^17 - 38263) / 2^17 + 102944) / 2^15
+    mov t1, 9036
     div t1, 131072
+    add t1, -62650
+    div t1, 131072
+    add t1, -38263
+    div t1, 131072
+    add t1, 102944
+    div t1, 32768
 ```
 
 Loading a number like this is 0-tickable, since there are no spawns. The standard library has a routine that loads each of the values in `consts.tasm` this way: `load_const_<CONST_NAME>`.
@@ -943,7 +948,7 @@ User-defined [aliases](#3128-the-alias-instruction) are substituted before any o
 ### 3.3.1. Number literals
 A number literal is any string that may be parsed as a float. Unless specified to be strictly an integer, all numbers are parsed as double-precision floats (f64).  
 It is important to make the distinction between number literals and numbers stored in items. While both are numbers, number literals are used more as specific values, while items represent containers for values in the actual program/level.  
-It is also important to recognize that GD stores the modifier of an item edit trigger (the number literal in instructions like `add c1, 5`) as a 32-bit float, and saves it with only 6 significant digits. This means that integer literals outside -999,999 to 999,999, while correctly parsed by the compiler, may be changed by GD itself, either right away or when the level is saved. See [caveats with using large/precise numbers](#31211-caveats-with-using-largeprecise-numbers). Arithmetic on the values stored in items is not affected.
+It is also important to recognize that GD stores the modifier of an item edit trigger (the number literal in instructions like `add c1, 5`) as a 32-bit float, rounds it to 3 decimals using 32-bit floats, and saves it with only 6 significant digits. This means that integer literals outside -134,217 to 134,217, while correctly parsed by the compiler, may be changed by GD itself, either right away or when the level is saved. See [caveats with using large/precise numbers](#31211-caveats-with-using-largeprecise-numbers). Arithmetic on the values stored in items is not affected.
 
 Where an instruction requires an `<int>`, the number must have no fractional part (`5` and `5.0` are both accepted, `5.5` is not).
 
