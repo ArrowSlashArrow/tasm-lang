@@ -1,0 +1,83 @@
+; A palindromic number reads the same both ways. 
+; The largest palindrome made from the product of two 2-digit numbers is 9009 = 91 * 99
+
+; Find the largest palindrome made from the product of two 3-digit numbers.
+
+_init:
+    import ../stdlib/math
+    import ../stdlib/compare
+
+    alias x, c1
+    alias y, c2
+    alias return, c3
+    alias k, c4
+    alias modulus, c7
+
+    display x
+    display y
+    display return
+
+_start:
+    ; 100 <= x, y <= 999
+    ; 10^4 < x * y < 10^6  
+    mov x, 100
+    mov y, 100
+    mov modulus, 10 ; const val
+    spawn x_loop
+
+x_loop:
+    mov y, 100
+    spawn y_loop
+    ; loop through all x such that 100 <= x <= 999
+    ; same for y, check palindrome
+    add x, 1
+    sle x_loop, x, 999 | delay:0
+
+y_loop:
+    mul k, x, y
+
+    spawn set_palindrome  | delay:0 ordered:false
+
+    add y, 1
+    sle y_loop, y, 999 | delay:0
+
+set_palindrome:
+    ; c5 is temp bool reg for return
+    mov c5, 0
+    ; k is input
+    spawn check_palindrome | delay:0 ordered:false
+
+    ise set_new_largest_check1, c5, 1
+
+set_new_largest_check1:
+    isg set_new_largest, return, k
+
+set_new_largest:
+    mov return, k
+
+check_palindrome:
+    ; todo: check palindrome impl
+    ifl check_pd_5digits, check_pd_6digits, k, 100000
+
+check_pd_5digits:
+    ; first: c6
+    spawn math::modulo  | delay:0 ordered:false remap:{ c1 = k, c2 = modulus, c3 = c6 }
+    div c8, k, 10000    ; fifth
+
+    ; return false if c6 != c8
+    ; actually, it would be splendid if we could compute this branchlessly (todo)
+    ise __check_pd_5digits_cont1, c6, c8
+
+__check_pd_5digits_cont1:
+    ; second: c6
+    ; fourth: c8
+    div c9, k, 10
+    spawn math::modulo  | delay:0 ordered:false remap:{ c1 = c9, c2 = modulus, c3 = c6 }
+    div c9, k, 1000
+    spawn math::modulo  | delay:0 ordered:false remap:{ c1 = c9, c2 = modulus, c3 = c8 }
+    
+    ; return c5 as c6 == c8
+    ; <todo>    
+    
+check_pd_6digits:
+    ; <todo>

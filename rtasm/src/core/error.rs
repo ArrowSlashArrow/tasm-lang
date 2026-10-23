@@ -24,7 +24,10 @@ of consistent in-level variables.",
 
 This error is emitted if the argument is negative for any of the wait instructions, excluding NOP.",
     "E0007: ---",
-    "E0008: ---",
+    "E0008: Routine cannot be named ...: not a string
+
+This routine has an invalid name and cannot be called it. If this were allowed,
+routines with bad identifiers could never be referenced.",
     "E0009: ---",
     "E0010: ---",
     "E0011: No entry point found in file.
@@ -198,6 +201,7 @@ pub enum TasmErrorType {
     InvalidInstruction,
     InvalidAssignment,
     InvalidWaitAmount,
+    InvalidIdentifier,
     BadID,
     BadToken,
     BadFlag,

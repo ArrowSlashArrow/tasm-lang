@@ -1,5 +1,5 @@
 # Contributing
-Thanks for wanting to contribute! All contribution must be made through a pull request. Please see the respective section below for your type of contribution.
+Thanks for wanting to contribute! All contributions must be made through a pull request. Please see the respective section below for your type of contribution.
 
 ## Bug report
 - Include a short title, preferably one sentence long, that is informative of the core issue.

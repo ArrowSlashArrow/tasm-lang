@@ -607,6 +607,25 @@ impl Tasm {
                         );
                     }
 
+                    // check that the routine identifier is good
+                    if let Ok(TasmValue::String(s)) = TasmValue::to_value(&routine_ident) {
+                        {}; // do nothing, it's all good here
+                    } else {
+                        verbose_log!(self, "Invalid routine name: {routine_ident}");
+                        push_error(
+                            &mut self.errors,
+                            &self.fname,
+                            TasmErrorType::InvalidIdentifier,
+                            line_idx,
+                            routine_ident.clone(),
+                            format!(
+                                "Routine cannot be named {}: name is not a string.",
+                                routine_ident.clone(),
+                            ),
+                            8,
+                        );
+                    }
+
                     // clear out bad data
                     curr_routine_data = RoutineData {
                         _line_idx: line_idx,
