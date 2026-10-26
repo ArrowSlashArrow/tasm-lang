@@ -167,12 +167,12 @@ impl TasmValue {
         let remaining_i16 = remaining.parse::<i16>();
         // this one is used to capture an int that is too large to fit into an i16
         let remaining_i128 = remaining.parse::<i128>();
-        let remaining_i16_hex = if remaining.len() == 0 {
+        let remaining_i128_hex = if remaining.len() == 0 {
             "fail".parse()
         } else {
             let mut chars = remaining.chars();
             let _ = chars.next();
-            i16::from_str_radix(&chars.collect::<String>(), 16)
+            i128::from_str_radix(&chars.collect::<String>(), 16)
         };
 
         // string escapes are checked first
@@ -203,10 +203,18 @@ impl TasmValue {
             // the only possible value here is an item or a string
             let id = if let Ok(id) = remaining_i16 {
                 id
-            } else if second_char == 'x'
-                && let Ok(id) = remaining_i16_hex
+            } else if second_char.to_ascii_lowercase() == 'x'
+                && let Ok(id) = remaining_i128_hex
             {
-                id
+                // check that the id is good
+                if id > GROUP_LIMIT as i128 {
+                    return Err((
+                        ParseErrorType::BadID,
+                        format!("Item/group must be within the range [1, {GROUP_LIMIT}]"),
+                        17,
+                    ));
+                }
+                id as i16
             } else if let Ok(_big) = remaining_i128 {
                 // if there's an integer ID after an item/counter specifier
                 // but the id is invalid
@@ -241,7 +249,7 @@ impl TasmValue {
         } else if let Ok(n) = s.parse::<f64>() {
             /* errcode 18 and 19 are defunct */
             Ok(Self::Number(n))
-        } else if s.len() > 2 && s.starts_with("0x") {
+        } else if s.len() > 2 && (s.starts_with("0x") || s.starts_with("0X")) {
             // check for hex int literal
             if let Ok(h) = i32::from_str_radix(&s[2..], 16) {
                 Ok(Self::Number(h as f64))

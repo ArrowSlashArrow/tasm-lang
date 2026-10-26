@@ -8,7 +8,7 @@ pub const ERROR_DOCS: &[&str] = &[
 If the program exceeds this limit due to too many routines or instructions with overhead, 
 this error will be tripped.
 
-As of GD 2.208, this limit is 9,999 groups.",
+As of GD 2.2091, this limit is 9,999 groups.",
     // deprecated
     "E0002: ---",
     "E0003: ---",
@@ -27,7 +27,7 @@ The following code will throw an error:
 
 routine:
     WAIT -10    ; error: cannot wait -10 ticks
-    WAITS -10   ; error: cannot wait -10 seconds.",
+    WAITS -10   ; error: cannot wait -10 seconds",
     "E0007: ---",
     "E0008: Routine cannot be named ...: not a string
 
