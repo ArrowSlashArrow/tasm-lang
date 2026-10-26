@@ -174,6 +174,7 @@ tasm_test!("hex_identifiers", true);
 tasm_test!("init_rtn_mem", false);
 tasm_test!("init_spawn", false);
 tasm_test!("link_test", true);
+tasm_test!("literal", true);
 tasm_test!("lowercase", true);
 tasm_test!("memory", true);
 // this benchmark is no longer valid because the file uses deprecated syntax which is no longer supported by the compiler

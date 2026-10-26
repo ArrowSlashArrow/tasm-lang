@@ -34,6 +34,7 @@ pub enum TasmValue {
     Group(i16),
     RoutineRef(SymbolPath),
     ModulePath(PathBuf), // PathBuf serves the same function here
+    Literal(String),     // explicitly-marked string literal with \
     /// Default
     String(String),
 }
@@ -177,7 +178,7 @@ impl TasmValue {
 
         // string escapes are checked first
         if pref == '\\' {
-            Ok(Self::String(s[1..].to_string()))
+            Ok(Self::Literal(s[1..].to_string()))
         } else if s.contains("::")
             && let Some((left, right)) = split_at_str_once(s, "::")
         {
@@ -280,7 +281,7 @@ impl TasmValue {
             Self::Counter(_) | Self::Timer(_) | Self::GDItem(_) => TasmPrimitive::Item,
             Self::Number(_) => TasmPrimitive::Number,
             Self::Group(_) => TasmPrimitive::Group,
-            Self::String(_) => TasmPrimitive::String,
+            Self::String(_) | Self::Literal(_) => TasmPrimitive::String,
             Self::RoutineRef(_) => TasmPrimitive::RoutineRef,
             Self::ModulePath(_) => TasmPrimitive::ModulePath,
             Self::CollBlock(_) => TasmPrimitive::CollBlock,
@@ -353,6 +354,7 @@ impl TasmValue {
     pub fn to_string(&self) -> Option<String> {
         match self {
             Self::String(s) => Some(s.to_owned()),
+            Self::Literal(s) => Some(s.to_owned()),
             _ => None,
         }
     }
