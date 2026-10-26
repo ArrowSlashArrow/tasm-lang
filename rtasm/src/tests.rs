@@ -161,6 +161,7 @@ tasm_test!("all_instructions", true);
 tasm_test!("bad_args", false);
 tasm_test!("bad_assignment", false, compile);
 tasm_test!("bad_instruction", false);
+tasm_test!("bad_routine_ident", false);
 tasm_test!("bad_token", false);
 tasm_test!("circular_import", false);
 tasm_test!("concurrent", true);

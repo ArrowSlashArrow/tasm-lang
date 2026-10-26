@@ -22,12 +22,31 @@ of consistent in-level variables.",
     "E0005: ---",
 "E0006: Cannot wait a negative number of ticks.
 
-This error is emitted if the argument is negative for any of the wait instructions, excluding NOP.",
+This error is emitted if the argument is negative for either WAIT or WAITS.
+The following code will throw an error:
+
+routine:
+    WAIT -10    ; error: cannot wait -10 ticks
+    WAITS -10   ; error: cannot wait -10 seconds.",
     "E0007: ---",
     "E0008: Routine cannot be named ...: not a string
 
 This routine has an invalid name and cannot be called it. If this were allowed,
-routines with bad identifiers could never be referenced.",
+routines with bad identifiers could never be referenced.
+
+For example, a routine called `t1` can never be called, because `t1` is always
+parsed as Timer(1). The following code, though it looks like it should work,
+will throw an error:
+
+_start:
+    spawn t1        ; error: cannot spawn a timer
+    
+t1:
+    ; do something
+    add c1, 1
+
+To avoid any confusion, a routine will cause an error to be thrown if it cannot 
+be parsed as a string, which means it does not get parsed to any other type.",
     "E0009: ---",
     "E0010: ---",
     "E0011: No entry point found in file.
