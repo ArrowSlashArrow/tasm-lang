@@ -202,6 +202,7 @@ _init:
     alias __isqrt_res,      c9567
     alias __isqrt_cand,     c9568
     alias __isqrt_q,        c9569
+    alias __mod_res,        c9570
 
 ; Returns a mod b.
 ; @param C1 a
@@ -220,12 +221,11 @@ modulo:
 ; @param g4 spawned if a mod b != 0
 ; @0tick
 modulo_fork:
-    div c3, c1, c2  | resmode:f
-    mul c3, c2  ; c1 == c3 is equivalent to c1 - c3 == 0 (c1 - c3 is a mod b)
-    fe g1, g2, c1, c3
+    div __mod_res, c1, c2  | resmode:f
+    mul __mod_res, c2  ; c1 == __mod_res is equivalent to c1 - __mod_res == 0 (c1 - c3 is a mod b)
+    fe g3, g4, c1, __mod_res
 
 
-; TODO: implement these in branchless
 ; Returns the sign of `C1`. This function is branchless and uses 0 extra groups.
 ; @param C1 the value to get the sign of
 ; @returns The sign is returned in C2.

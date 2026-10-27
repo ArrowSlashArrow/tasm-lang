@@ -27,7 +27,7 @@ Note: stdlib contributions have stricter requirements due to being a central par
 - All contributions to the TASM stdlib *must* be thoroughly documented. Refer to `stdlib/mem_8bit.tasm` as an example.
 - Do not use magic group IDs, item IDs, or numeric values in any stdlib file. Any such values must be aliased.
 - Do not use any deprecated instructions. Furthermore, do not use `PERS`, `DISPLAY`, or `IOBLOCK`.
-- Prefix all internal routine - that is, routines not meant to be used outside of the file - with `_std_{filename}_` to prevent name collisions. This is recommended for aliases too, but is not necessary. 
+- Prefix all internal symbols - that is, routines and aliases not meant to be used outside of the file - with `__`. 
 - If you are unsure whether your contribution fits the criteria, open a PR anyways and a maintainer will help integrate your code into the codebase, provided that it is functional.
 
 ## Other

@@ -1,0 +1,5 @@
+_init:
+    ioblock _start, 10, \_start
+
+_start:
+    nop

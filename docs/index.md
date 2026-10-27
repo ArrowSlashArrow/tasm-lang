@@ -159,9 +159,13 @@ A modifier (the number literal in an instruction, like the `5` in `add c1, 5`, o
 - **At most 3 decimals.** GD drops the rest, so `0.1234` acts as `0.123`. It does this with 32-bit floats (in effect `round(x * 1000) / 1000`), so `x * 1000` gets rounded too, and large integers can change: `113927000` acts as `113926992`, and `166251` as `166251.015625`.
 - **At most 6 significant digits.** GD writes modifiers to the level's save data with 6 significant digits. A longer number works when the level is first loaded from `tasmc`, but changes as soon as the level is saved and loaded again: `-965672960` is saved as `-9.65673e+08` and comes back as `-965673024`.
 
-Together, these leave every integer from -134,217 to 134,217 safe (`consts::MAX_SAFE_INT`), and all powers of two up to 2^17 (131,072). Some larger numbers are safe too, but it's easier to stay in that range.
+Limits for modifiers:
+- Integers in the range ±1,000,000 (`stdlib/consts::MAX_SAFE_INT`) are preserved correctly.
+- Integers `n` such that `1 000 000 < |n| < 16 777 216` are preserved with only 6 significant digits but with no accuracy loss -- that is, integers like 12,345,678 will be truncated to 6 signification digits, but the remaining digits will be filled with zeros, and it will be saved as 12,345,700.
+- Integers `n` such that `|n| > 16,777,216` will not be saved at full precision and will be decreasingly precise the larger the modifier. Numbers such as 1,234,500,000 will not be saved as 1.2345 billion; they will be saved as `1.23450e+9` with a little bit of precision loss. This example value will be read back as `1234499968`, 32 less than the original value.
+- Modifiers outside of the range ±9,999,999 will assign their value clamped to that range if the target of the operation is a timer. 
 
-Timers do not accept assignment above 9,999,999.00 from item edit triggers.
+Together, these leave every integer from -134,217 to 134,217 safe (`consts::MAX_SAFE_INT`), and all powers of two up to 2^17 (131,072). Some larger numbers are safe too, but it's easier to stay in that range.
 
 Arithmetic on the values stored in items is not affected by any of this: counters hold exact 32-bit integers, and timers hold exact values. So large or precise numbers can be built from small modifiers:
 
@@ -993,9 +997,10 @@ If the `--group-offset` argument is specified, the groups of each routine will c
 Routines from imported modules are referenced with `module::routine`.
 ### 3.3.4. Hitboxes
 Used for collision block instructions.
-There are two ways to declare a hitbox:
+There are three ways to declare a hitbox:
 1. `b{id}` where `id` is the decimal ID of a collision block (e.g. `b12`)
-2. [Using a built-in alias](#335-aliases) for the player(s).
+2. `bx{id}` where `id` is the hexadecimal ID of a collision block (e.g. `bx0b`)
+3. [Using a built-in alias](#335-aliases) for the player(s).
 
 #### 3.3.4.1. Valid hitbox combinations
 When using a collision instruction, the two hitboxes can only be one of the below pairs, in this order.

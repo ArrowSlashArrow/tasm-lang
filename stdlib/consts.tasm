@@ -8,8 +8,10 @@
 _init:
     ; tasm-specific numbers
     alias MAX_GROUP,        g9999
-    alias MAX_SAFE_INT,     134217          ; every integer up to this survives as a modifier (docs section 3.1.2.1.1)
-    alias MIN_SAFE_INT,     -134217         ; every integer down to this survives as a modifier
+    alias MAX_SAFE_INT,     1000000         ; every integer up to this survives as a modifier for all 6 digits (docs section 3.1.2.1.1)
+    alias MIN_SAFE_INT,     -1000000        ; every integer down to this survives as a modifier for all 6 digits
+    alias MAX_INT_MODIFIER, 16777216        ; every integer up to this survives as a modifier (docs section 3.1.2.1.1)
+    alias MIN_INT_MODIFIER, -16777216       ; every integer down to this survives as a modifier 
     alias INT_LIMIT,        2147483647      ; largest counter value. Too long for a modifier (GD saves it as 2147480064)
     alias NEG_INT_LIMIT,    -2147483648     ; smallest counter value. Too long for a modifier (GD saves it as -2147480064)
     alias MAX_TIMER_VALUE,  9999999.0       ; largest value a timer will accept from an item edit trigger. Too long for a
@@ -36,6 +38,14 @@ _init:
     alias LOG10_2,          0.301029995663981195213738894724493027
     alias LN_2,             0.693147180559945309417232121458176568
     alias LN_10,            2.30258509299404568401799145468436421
+
+; Loads the maximum integer value a counter can hold in GD at full precision. (see docs section 3.1.2.1.1).
+; @param t1 Where the constant will be written
+; @0tick
+load_const_positive_int_limit:
+    mov t1, 32768
+    mul t1, 65535
+    add t1, 32767
 
 ; Loads `PI` into t1: the closest value a timer can hold to 3.141592653589793238...
 ; It's built as (((9036 / 2^17 - 62650) / 2^17 - 38263) / 2^17 + 102944) / 2^15: every number in the

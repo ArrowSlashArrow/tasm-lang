@@ -10,5 +10,5 @@ _init:
     mov C2, 9
 max:
     add C3, C1, C2
-    ~sub C3, C1, C2 | iter:+ resmode:+
+    sub C3, C1, C2 | iter:+ resmode:+
     div C3, 2

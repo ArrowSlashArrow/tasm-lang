@@ -240,6 +240,7 @@ pub fn value_kind(v: &TasmValue) -> String {
         TasmValue::RoutineRef(_) => "routine".into(),
         TasmValue::ModulePath(_) => "module path".into(),
         TasmValue::String(_) => "string".into(),
+        TasmValue::Literal(_) => "string literal".into(),
     }
 }
 

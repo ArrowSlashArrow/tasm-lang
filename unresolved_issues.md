@@ -134,14 +134,14 @@ So:
 
 **Potential fixes:** Use `strip_prefix('{')` / `strip_suffix('}')` and return a specific error.
 
-### 2.6 🟠 Routine names are not validated
+<!-- ### 2.6 🟠 Routine names are not validated
 **File:** `rtasm/src/lexer.rs:618-654`
 
 **Problem:** Any unindented token ending in `:` becomes a routine: `c5:`, `g2:`, `inf:`, `nan:`, `a::b:`, `123:`. When referenced, these names parse as a counter, group, number or external symbol instead of the routine. A label with an instruction on the same line (`loop: ADD C1, 1`) gives a bare `E0029 Bad token.` with no line number (see 6.3).
 
 **Potential fixes:**
 - Validate routine names at declaration (`[A-Za-z_][A-Za-z0-9_]*`, and not parseable as another value), with a clear error.
-- Give `label: instr` a specific error, or support it.
+- Give `label: instr` a specific error, or support it. -->
 
 ### 2.7 🟠 Aliases silently shadow routines and built-ins
 **File:** `rtasm/src/lexer.rs:184-251, 444-450`
@@ -175,20 +175,20 @@ So:
 **Problem:** `nan`, `inf` and `infinity` parse as numbers (`MOV C1, nan` compiles). Float *flags* reject non-finite values (`flags.rs:152`), so arguments and flags are inconsistent.
 
 **Potential fixes:** Reject non-finite numbers in `to_value`, or document them. -->
-
+<!-- 
 ### 2.11 🟡 Inconsistent hex syntax
 **File:** `rtasm/src/core/structs.rs:173-177, 243-253`
 
 **Problem:** Numbers use `0x1F`, but IDs use `Cx1F` (and `C0x1F` is a string). `0X1F` (uppercase X) isn't supported, negative hex isn't supported, and `bx5` isn't supported for collision blocks.
 
-**Potential fixes:** Accept `C0x1F` (and drop or deprecate `Cx1F`), and allow `0X`.
+**Potential fixes:** Accept `C0x1F` (and drop or deprecate `Cx1F`), and allow `0X`. -->
 
-### 2.12 🟡 `\` escape doesn't stop routine resolution
+<!-- ### 2.12 🟡 `\` escape doesn't stop routine resolution
 **File:** `rtasm/src/lexer.rs:817-843`
 
 **Problem:** `\foo` becomes `String("foo")`, and `validate_tasm_value` then turns any string that matches a routine name into a `RoutineRef`. An escaped IOBlock label that matches a routine name therefore fails to compile.
 
-**Potential fixes:** Add a separate `TasmValue::Literal` (or a flag) for escaped strings that skips routine resolution.
+**Potential fixes:** Add a separate `TasmValue::Literal` (or a flag) for escaped strings that skips routine resolution. -->
 
 ### 2.13 🟡 Nested `::` paths silently become strings (verified)
 **File:** `rtasm/src/core/structs.rs:182-189, 374-390`
@@ -559,19 +559,19 @@ So:
 
 **Problem:** Every level is forced into platformer mode, and the version is fixed to `GD22081`. Neither is configurable.
 
-### 7.6 🟡 WSLive payload is built by string formatting
+<!-- ### 7.6 🟡 WSLive payload is built by string formatting
 **File:** `rtasm/src/main.rs:116-123`
 
 **Problem:** The JSON is assembled with `format!` and no escaping. Object strings containing `"` or `\` (possible in text objects or `RAW` input) would produce invalid JSON.
 
-**Potential fixes:** Use `serde_json`.
+**Potential fixes:** Use `serde_json`. -->
 
-### 7.7 ⚪ `-e` short flag is ambiguous
+<!-- ### 7.7 ⚪ `-e` short flag is ambiguous
 **File:** `rtasm/src/main.rs:82-84`
 
 **Problem:** `-e` is `--error-help`, which takes a number. `rtasm/profile.ps1` passes a bare `-e`, which is a CLI error. `error_help: usize` with a default of `0` doubles as "not set".
 
-**Potential fixes:** Use `Option<usize>`, and consider a subcommand (`tasmc explain E0027`) that accepts the `E0027` form as well as `27`.
+**Potential fixes:** Use `Option<usize>`, and consider a subcommand (`tasmc explain E0027`) that accepts the `E0027` form as well as `27`. -->
 
 ---
 
@@ -623,17 +623,17 @@ So:
 
 Every file in `stdlib/`, `example_programs/` and `programs/` was compiled and read. All stdlib files compile with `--no-entry-point`.
 
-### 9.1 🟠 `math::modulo_fork` remaps collide with its own inputs
+<!-- ### 9.1 🟠 `math::modulo_fork` remaps collide with its own inputs
 **File:** `stdlib/math.tasm` (`modulo_fork`)
 
 **Problem:** The routine takes its branch targets as `g1`/`g2` (passed by remap) and its inputs as `C1`/`C2`. Remapping IDs 1 and 2 also remaps `C1` and `C2` (see 8.3). Its doc comment also names the targets `g3`/`g4`.
 
-**Potential fixes:** Use high reserved IDs for the targets (as `vec.tasm` does with 9991–9994), and fix the comment.
-
+**Potential fixes:** Use high reserved IDs for the targets (as `vec.tasm` does with 9991–9994), and fix the comment. -->
+<!-- 
 ### 9.2 🟡 `consts::NEG_INT_LIMIT` is wrong
 **File:** `stdlib/consts.tasm`
 
-**Problem:** The value is `-21247483648` and should be `-2147483648`.
+**Problem:** The value is `-21247483648` and should be `-2147483648`. -->
 
 ### 9.3 🟡 Programs that need `--group-offset` don't say so
 **Files:** `example_programs/fib_in_memory.tasm`, `example_programs/list_search.tasm`
@@ -654,12 +654,12 @@ Every file in `stdlib/`, `example_programs/` and `programs/` was compiled and re
 
 **Potential fixes:** Port them to `mem_8bit`, or move them to `old/`.
 
-### 9.6 🟡 Stdlib naming doesn't follow CONTRIBUTING.md
+<!-- ### 9.6 🟡 Stdlib naming doesn't follow CONTRIBUTING.md
 **Files:** `stdlib/*.tasm`, `CONTRIBUTING.md`
 
 **Problem:** CONTRIBUTING requires internal routines to be prefixed `_std_{filename}_`, but the stdlib uses `__name` (e.g. `__ok`, `__wait_until_other`, `__check_bounds`) or no prefix (`bit_8_on`, `temp`). Magic numbers also remain (e.g. `128`, `8200` in `mem_8bit`).
 
-**Potential fixes:** Update either the rule or the code so that they agree.
+**Potential fixes:** Update either the rule or the code so that they agree. -->
 
 ### 9.7 🟡 Unfinished stdlib modules
 **Files:** `stdlib/math.tasm` (`exponent:` has no body; "TODO: implement these in branchless"), `stdlib/compare.tasm` (todo list; only `greater`, `less`, `less_eq`), `stdlib/bits.tasm` (todo: shifts), `stdlib/vec.tasm` ("not verified to work")
