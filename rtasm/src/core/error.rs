@@ -77,7 +77,10 @@ of the line, causing the compiler to parse an extra string argument, which may t
     "E0017: Item/group must be within the range [1, 9999].
     
 This error is emitted if a counter/timer has an invalid ID.",
-    "E0018: ---",
+    "E0018: Instruction does not support flag.
+    
+A flag was passed to an instruction that does not accept it. For example, passing `remap` to
+an arithmetic instruction is not allowed, since arithmetic instructions don't take the `remap` flag.",
     "E0019: Event ID is not a valid event ID.
     
 The event ID given is a valid integer but does not correspond to a known GD event.

@@ -361,6 +361,22 @@ impl Tasm {
                 instr = instr_raw;
             }
 
+            // validate flags
+            let accepted_flags = INSTR_SPEC.get(&instr).unwrap().3;
+            for flag in flags.iter() {
+                if let None = accepted_flags.iter().find(|f| **f == flag.ident) {
+                    push_error(
+                        &mut self.errors,
+                        &self.fname,
+                        TasmErrorType::BadFlag,
+                        curr_line,
+                        curr_routine.ident.clone(),
+                        format!("{instr} does not support {}.", flag.ident),
+                        18,
+                    );
+                }
+            }
+
             // exclude alias instructions (parsed first thing after lexing)
             if instr.as_str() == "ALIAS" {
                 if curr_routine.ident.as_str() != INIT_ROUTINE {
