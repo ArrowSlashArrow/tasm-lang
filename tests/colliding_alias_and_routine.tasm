@@ -1,0 +1,8 @@
+_init:
+    alias bad, C1
+
+_start:
+    spawn bad   ; should spawn bad
+
+bad:
+    nop

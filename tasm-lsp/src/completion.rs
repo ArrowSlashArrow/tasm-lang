@@ -9,18 +9,21 @@ use lsp_types::{
     Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionTextEdit,
     Documentation, InsertTextFormat, MarkupContent, MarkupKind, Position, TextEdit, Url,
 };
-use tasmc::core::{
-    consts::{ENTRY_POINT, INIT_ROUTINE},
-    flags::{FlagValueType, get_flag_type, resolve_flag_int},
-    structs::{Hitbox, InstrType, TasmPrimitive, TasmValue},
+use tasmc::{
+    core::{
+        consts::{ENTRY_POINT, INIT_ROUTINE},
+        flags::{FlagValueType, get_flag_type, resolve_flag_int},
+        structs::{Hitbox, InstrType, TasmPrimitive, TasmValue},
+    },
+    instr::INSTR_SPEC,
 };
 
 use crate::{
     index::{AliasDef, DocIndex, safe_to_value},
     line::parse_instr_line,
     spec::{
-        self, FlagInfo, OP_VALUES, ROUNDSIGN_VALUES, all_instrs, flag_doc, flags_for, instr_doc,
-        instr_info, prim_fits, signature,
+        self, FlagInfo, OP_VALUES, ROUNDSIGN_VALUES, all_instrs, flag_doc, get_flag_info,
+        instr_doc, instr_info, prim_fits, signature,
     },
     text::{byte_of_col, enclosing_routine, is_indented, range, shorten, split_lines, utf16_col},
     world::World,
@@ -518,10 +521,14 @@ fn complete_flags(
         start: flags_start + token_start,
         end: col,
     };
-    flags_for(instr)
+
+    INSTR_SPEC
+        .get(instr)
+        .unwrap()
+        .3
         .iter()
-        .filter(|f| !used.iter().any(|u| u == f.name))
-        .map(|f| flag_item(&ctx, f))
+        .filter(|&&f| !used.iter().any(|u| u == f))
+        .map(|f| flag_item(&ctx, get_flag_info(f)))
         .collect()
 }
 

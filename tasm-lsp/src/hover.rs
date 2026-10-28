@@ -2,12 +2,15 @@
 //! Errors are shown by the editor from the diagnostics.
 
 use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind, Position, Url};
-use tasmc::core::consts::{ENTRY_POINT, INIT_ROUTINE};
+use tasmc::{
+    core::consts::{ENTRY_POINT, INIT_ROUTINE},
+    instr::INSTR_SPEC,
+};
 
 use crate::{
     index::DocIndex,
     line::{flag_word, parse_instr_line},
-    spec::{find_flag, flag_doc, flags_for, instr_doc, instr_info, value_kind},
+    spec::{flag_doc, get_flag_info, instr_doc, instr_info, value_kind},
     text::{byte_of_col, code_part, display_path, is_indented, range, split_lines, trimmed_span},
     world::{Origin, World},
 };
@@ -95,9 +98,15 @@ Use its symbols as `{}::symbol`.",
         return reply(span, describe_dict_entry(world, &index, word));
     }
     let name = word.split(':').next().unwrap_or(word);
-    match find_flag(&mnemonic, name) {
-        Some(f) => reply(span, flag_doc(f)),
-        None if flags_for(&mnemonic).is_empty() => {
+    match INSTR_SPEC
+        .get(&mnemonic)
+        .unwrap()
+        .3
+        .iter()
+        .find(|&&f| f == name)
+    {
+        Some(f) => reply(span, flag_doc(get_flag_info(f))),
+        None if INSTR_SPEC.get(&mnemonic).unwrap().3.is_empty() => {
             reply(span, format!("`{mnemonic}` does not read any flags."))
         }
         None => reply(span, format!("`{name}` is not a flag of `{mnemonic}`.")),
