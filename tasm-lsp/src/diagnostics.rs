@@ -163,7 +163,7 @@ fn check_instruction(
 
     let mut handler = instr.handler_fn;
     if handler as usize == placeholder_panic_fn as *const () as usize {
-        let (_, handlers, _) = INSTR_SPEC
+        let (_, handlers, _, _) = INSTR_SPEC
             .get(instr.ident.as_str())
             .ok_or((25, format!("Unrecognized instruction {}", instr.ident)))?;
         handler = match handlers

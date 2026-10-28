@@ -38,6 +38,11 @@ macro_rules! verbose_log {
 
 #[macro_export]
 macro_rules! log {
+    ($on:expr, err $($t:tt)*) => {
+        if $on {
+            eprintln!($($t)*);
+        }
+    };
     ($on:expr, $($t:tt)*) => {
         if $on {
             println!($($t)*);
@@ -303,8 +308,8 @@ pub fn push_error_lineless(
 }
 
 pub fn print_errors(es: Vec<TasmError>, err_msg: &str) {
-    println!("{err_msg} with {} errors:", es.len());
+    eprintln!("{err_msg} with {} errors:", es.len());
     for e in es {
-        println!("{e}");
+        eprintln!("{e}");
     }
 }

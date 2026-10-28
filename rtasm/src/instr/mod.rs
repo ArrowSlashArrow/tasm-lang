@@ -44,22 +44,23 @@ pub fn placeholder_panic_fn(args: HandlerArgs) -> HandlerReturn {
 
 pub type HandlerAssoc = (&'static [TasmPrimitive], HandlerFn);
 pub type Handlers = &'static [HandlerAssoc];
-pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_map! {
+// mnemonic => (is init, argsets, instr type, flags)
+pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType, &[&str])> = phf_map! {
     // inits
-    "PERS" => (false, &[argset!((Item) => pers)], InstrType::Misc),
-    "UNPERS" => (false, &[argset!((Item) => unpers)], InstrType::Misc),
-    "UNPERSALL" => (false, &[argset!(() => unpersall)], InstrType::Misc),
-    "RPERSALL" => (false, &[argset!(() => rpersall)], InstrType::Misc),
+    "PERS" => (false, &[argset!((Item) => pers)], InstrType::Misc, &[]),
+    "UNPERS" => (false, &[argset!((Item) => unpers)], InstrType::Misc, &[]),
+    "UNPERSALL" => (false, &[argset!(() => unpersall)], InstrType::Misc, &[]),
+    "RPERSALL" => (false, &[argset!(() => rpersall)], InstrType::Misc, &[]),
     // if an instruction can only go in the _init routine, it **MUST** be designated that.
     "DISPLAY" => (
         true,
         &[argset!((Item) => display)],
-        InstrType::Init,
+        InstrType::Init, &[]
     ),
     "IOBLOCK" => (
         true,
         &[argset!((Group, Int, String) => ioblock)],
-        InstrType::Init,
+        InstrType::Init, &[]
     ),
     "MOV" => (
         false,
@@ -67,27 +68,29 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Item, Number) => arithmetic_item_num_mov),
             argset!((Item, Item) => arithmetic_2items_mov),
         ],
-        InstrType::Arithmetic,
+        InstrType::Arithmetic, &["itemmod", "resmode", "finmode", "op", "iter", "divmod"]
     ),
     // debug
     "BREAKPOINT" => (
         false,
         &[argset!(() => skip)],
         InstrType::Debug,
+        &[]
     ),
     // Process
     "SPAWN" => (
         false,
         &[argset!((Group) => spawn)],
         InstrType::Process,
+        &["ordered", "noremap", "remap", "delay"]
     ),
     // Waits
-    "NOP" => (false, &[argset!(() => nop)], InstrType::Wait),
-    "WAIT" => (false, &[argset!((Int) => wait)], InstrType::Wait),
+    "NOP" => (false, &[argset!(() => nop)], InstrType::Wait, &[]),
+    "WAIT" => (false, &[argset!((Int) => wait)], InstrType::Wait, &[]),
     "WAITS" => (
         false,
         &[argset!((Number) => waits)],
-        InstrType::Wait,
+        InstrType::Wait, &[]
     ),
     // Arithmetic
     "ADD" => (
@@ -97,7 +100,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Item, Number) => arithmetic_item_num_add),
             argset!((Item, Item, Item) => arithmetic_3items_add),
         ],
-        InstrType::Arithmetic,
+        InstrType::Arithmetic, &["itemmod", "resmode", "finmode", "op", "iter", "divmod"]
     ),
     "SUB" => (
         false,
@@ -106,7 +109,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Item, Number) => arithmetic_item_num_sub),
             argset!((Item, Item, Item) => arithmetic_3items_sub),
         ],
-        InstrType::Arithmetic,
+        InstrType::Arithmetic, &["itemmod", "resmode", "finmode", "op", "iter", "divmod"]
     ),
     "MUL" => (
         false,
@@ -116,7 +119,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Item, Item, Item) => arithmetic_3items_mul),
             argset!((Item, Item, Number) => arithmetic_2items_num_mul),
         ],
-        InstrType::Arithmetic,
+        InstrType::Arithmetic, &["itemmod", "resmode", "finmode", "op", "iter", "divmod"]
     ),
     "DIV" => (
         false,
@@ -126,7 +129,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Item, Item, Item) => arithmetic_3items_div),
             argset!((Item, Item, Number) => arithmetic_2items_num_div),
         ],
-        InstrType::Arithmetic,
+        InstrType::Arithmetic, &["itemmod", "resmode", "finmode", "op", "iter", "divmod"]
     ),
     "FLDIV" => (
         false,
@@ -136,7 +139,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Item, Item, Item) => fldiv_3items),
             argset!((Item, Item, Number) => fldiv_2items_num),
         ],
-        InstrType::Arithmetic,
+        InstrType::Arithmetic, &["itemmod", "resmode", "finmode", "op", "iter", "divmod"]
     ),
     "SE" => (
         false,
@@ -144,7 +147,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => spawn_item_item_eq),
             argset!((Group, Item, Number) => spawn_item_num_eq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "SNE" => (
         false,
@@ -152,7 +155,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => spawn_item_item_ne),
             argset!((Group, Item, Number) => spawn_item_num_ne),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "SL" => (
         false,
@@ -160,7 +163,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => spawn_item_item_le),
             argset!((Group, Item, Number) => spawn_item_num_le),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "SLE" => (
         false,
@@ -168,7 +171,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => spawn_item_item_leq),
             argset!((Group, Item, Number) => spawn_item_num_leq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "SG" => (
         false,
@@ -176,7 +179,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => spawn_item_item_ge),
             argset!((Group, Item, Number) => spawn_item_num_ge),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "SGE" => (
         false,
@@ -184,7 +187,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => spawn_item_item_geq),
             argset!((Group, Item, Number) => spawn_item_num_geq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FE" => (
         false,
@@ -192,7 +195,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => fork_item_item_eq),
             argset!((Group, Group, Item, Number) => fork_item_num_eq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FNE" => (
         false,
@@ -200,7 +203,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => fork_item_item_ne),
             argset!((Group, Group, Item, Number) => fork_item_num_ne),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FL" => (
         false,
@@ -208,7 +211,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => fork_item_item_le),
             argset!((Group, Group, Item, Number) => fork_item_num_le),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FLE" => (
         false,
@@ -216,7 +219,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => fork_item_item_leq),
             argset!((Group, Group, Item, Number) => fork_item_num_leq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FG" => (
         false,
@@ -224,7 +227,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => fork_item_item_ge),
             argset!((Group, Group, Item, Number) => fork_item_num_ge),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FGE" => (
         false,
@@ -232,17 +235,17 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => fork_item_item_geq),
             argset!((Group, Group, Item, Number) => fork_item_num_geq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "SRAND" => (
         false,
         &[argset!((Group, Number) => spawn_random)],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "noremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "FRAND" => (
         false,
         &[argset!((Group, Group, Number) => fork_random)],
-        InstrType::Process,
+        InstrType::Process, &["ordered", "lnoremap", "rnoremap", "lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISE" => (
         false,
@@ -250,7 +253,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => instant_spawn_item_item_eq),
             argset!((Group, Item, Number) => instant_spawn_item_num_eq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISNE" => (
         false,
@@ -258,7 +261,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => instant_spawn_item_item_ne),
             argset!((Group, Item, Number) => instant_spawn_item_num_ne),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISL" => (
         false,
@@ -266,7 +269,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => instant_spawn_item_item_le),
             argset!((Group, Item, Number) => instant_spawn_item_num_le),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISLE" => (
         false,
@@ -274,7 +277,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => instant_spawn_item_item_leq),
             argset!((Group, Item, Number) => instant_spawn_item_num_leq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISG" => (
         false,
@@ -282,7 +285,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => instant_spawn_item_item_ge),
             argset!((Group, Item, Number) => instant_spawn_item_num_ge),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISGE" => (
         false,
@@ -290,7 +293,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Item, Item) => instant_spawn_item_item_geq),
             argset!((Group, Item, Number) => instant_spawn_item_num_geq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "IFE" => (
         false,
@@ -298,7 +301,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => instant_fork_item_item_eq),
             argset!((Group, Group, Item, Number) => instant_fork_item_num_eq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "IFNE" => (
         false,
@@ -306,7 +309,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => instant_fork_item_item_ne),
             argset!((Group, Group, Item, Number) => instant_fork_item_num_ne),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "IFL" => (
         false,
@@ -314,7 +317,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => instant_fork_item_item_le),
             argset!((Group, Group, Item, Number) => instant_fork_item_num_le),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "IFLE" => (
         false,
@@ -322,7 +325,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => instant_fork_item_item_leq),
             argset!((Group, Group, Item, Number) => instant_fork_item_num_leq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "IFG" => (
         false,
@@ -330,7 +333,7 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => instant_fork_item_item_ge),
             argset!((Group, Group, Item, Number) => instant_fork_item_num_ge),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "IFGE" => (
         false,
@@ -338,85 +341,85 @@ pub const INSTR_SPEC: phf::Map<&'static str, (bool, Handlers, InstrType)> = phf_
             argset!((Group, Group, Item, Item) => instant_fork_item_item_geq),
             argset!((Group, Group, Item, Number) => instant_fork_item_num_geq),
         ],
-        InstrType::Process,
+        InstrType::Process, &["lmod", "lmodop", "lmode", "rmod", "rmodop", "rmode"]
     ),
     "ISRAND" => (
         false,
         &[argset!((Group, Number) => instant_spawn_random)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "IFRAND" => (
         false,
         &[argset!((Group, Group, Number) => instant_fork_random)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "TSPAWN" => (
         false,
         &[argset!((Timer, Number, Number, Group) => tspawn)],
-        InstrType::Timer,
+        InstrType::Timer, &["tstop", "tmod", "tpaused", "nover"]
     ),
     "TSTART" => (
         false,
         &[argset!((Timer) => tstart)],
-        InstrType::Timer,
+        InstrType::Timer, &[]
     ),
     "TSTOP" => (
         false,
         &[argset!((Timer) => tstop)],
-        InstrType::Timer,
+        InstrType::Timer, &[]
     ),
     "PAUSE" => (
         false,
         &[argset!((Group) => pause)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "RESUME" => (
         false,
         &[argset!((Group) => resume)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "KILL" => (
         false,
         &[argset!((Group) => stop)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "TOGGLEON" => (
         false,
         &[argset!((Group) => ton)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "TOGGLEOFF" => (
         false,
         &[argset!((Group) => toff)],
-        InstrType::Process,
+        InstrType::Process, &[]
     ),
     "RAW" => (
         false,
         &[argset!((String) => raw_objs)],
-        InstrType::Misc,
+        InstrType::Misc, &[]
     ),
     "RAWTRG" => (
         false,
         &[argset!((String) => raw_trigger)],
-        InstrType::Misc,
+        InstrType::Misc, &[]
     ),
     // instant collision check between two hitboxes. spawns first group if colliding, spawns second if not
     "INSTCOLL" => (
         false,
         &[argset!((Group, Group, CollBlock, CollBlock) => instcoll)],
-        InstrType::Process
+        InstrType::Process, &[]
     ),
     // collision event listener
     "COLL" => (
         false,
         &[argset!((Group, CollBlock, CollBlock) => coll)],
-        InstrType::Process
+        InstrType::Process, &["nospawn", "noexit"]
     ),
     // event listener
     "EVENT" => (
         true,
         &[argset!((Group, Int) => event)],
-        InstrType::Process
+        InstrType::Process, &["extra1", "extra2"]
     )
 };
 

@@ -32,7 +32,7 @@ pub fn compile_tasm_module(
         Ok(f) => f,
         Err(e) => {
             let msg = format!("Couldn't read file {path:?}! {e}");
-            log!(silent, "{msg}");
+            log!(silent, err "{msg}");
             return Err(anyhow!("{msg}"));
         }
     };

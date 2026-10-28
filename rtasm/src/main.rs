@@ -74,7 +74,7 @@ struct Args {
     #[arg(long)]
     no_log: bool,
 
-    /// Sends the level to the clipboard instead of a file. This flag only works for users on Windows.
+    /// Sends the level to the clipboard instead of a file.
     /// The compiled objects can be pasted in via BetterEdit.
     #[arg(long, short)]
     clipboard: bool,
@@ -130,8 +130,8 @@ fn use_wslive(level: GDLevel, port: u16) -> Result<(), Error> {
 
 fn export_to_savefile(level: GDLevel, logs_enabled: bool) -> Result<(), Error> {
     if let None = get_cclocallevels_path() {
-        log!(logs_enabled, "Unable to find savefile. Please pass --gmd.");
-        return Ok(());
+        log!(logs_enabled, err "Unable to find savefile. Please pass --gmd.");
+        return Err(anyhow!("savefile not found"));
     }
 
     let mut savefile = CCLocalLevels::from_local()?;
@@ -172,7 +172,7 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         Ok(m) => m,
         Err(e) => {
             if !args.no_log {
-                println!("Unable to parse main module: {e}");
+                eprintln!("Unable to parse main module: {e}");
             }
             return Err(anyhow!(""));
         }
@@ -182,7 +182,7 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         println!("Using dependencies:");
         for k in module_cache.keys() {
             if k != &main_path {
-                println!("* {}", k.to_str().unwrap_or("Not a UTF-8 path!"));
+                println!("* {}", k.to_string_lossy());
             }
         }
     }
@@ -190,9 +190,9 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
     if let Err(e) = post_link_processing(&mut main_module, main_path, module_cache, dependency_map)
     {
         if !args.no_log {
-            println!("Unable to compile to level");
+            eprintln!("Unable to compile to level");
             for err in e {
-                println!("{err}");
+                eprintln!("{err}");
             }
         }
         return Err(anyhow!(""));
@@ -201,26 +201,26 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
     return Ok((main_module, curr_group));
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::parse();
     if args.error_help != 0 {
         match ERROR_DOCS.get(args.error_help) {
             Some(s) => println!("{s}"),
             None => println!("No documentation for E{:0>4}.", args.error_help),
         };
-        return;
+        return Ok(());
     }
 
     if args.decompile {
         decompile_gmd(&args);
-        return;
+        return Ok(());
     }
 
     log!(!args.no_log, "Parsing tasm...");
 
     let (mut main_module, curr_group) = match parse_main(&args) {
         Ok(m) => m,
-        Err(_) => return,
+        Err(e) => return anyhow::Result::Err(e),
     };
 
     if args.linker_output && !args.no_log {
@@ -268,7 +268,7 @@ fn main() {
             if !args.no_log {
                 print_errors(e, "Unable to compile to level");
             }
-            return;
+            return Err(anyhow!("compile error (see stderr)"));
         }
         Ok(l) => l,
     };
@@ -281,7 +281,7 @@ fn main() {
     );
 
     if args.no_export {
-        return;
+        return Ok(());
     }
 
     if let Some(data) = level.get_decrypted_data_ref() {
@@ -292,20 +292,26 @@ fn main() {
     }
 
     if args.clipboard {
-        let mut ctx = ClipboardContext::new().unwrap();
+        let mut ctx = match ClipboardContext::new() {
+            Ok(c) => c,
+            Err(e) => {
+                log!(!args.no_log,err "Could not get clipboard context: {e:?}");
+                return Err(anyhow!("clipboard error: {e:?}"));
+            }
+        };
         let obj_str = serialise_objects(level.get_decrypted_data().unwrap().objects);
         match ctx.set_contents(obj_str) {
             Ok(_) => log!(!args.no_log, "Sent to clipboard"),
-            Err(e) => log!(!args.no_log, "Failed to send to clipboard: {e}"),
+            Err(e) => log!(!args.no_log, err "Failed to send to clipboard: {e}"),
         };
 
-        return;
+        return Ok(());
     }
 
     match args.wslive {
         Some(port) => match use_wslive(level, port) {
             Ok(()) => log!(!args.no_log, "Sent to WSLive"),
-            Err(e) => log!(!args.no_log, "Failed to send to WSLive: {}", e),
+            Err(e) => log!(!args.no_log, err "Failed to send to WSLive: {}", e),
         },
         None => match args.gmd {
             true => {
@@ -315,9 +321,11 @@ fn main() {
             }
             false => {
                 if let Err(e) = export_to_savefile(level, !args.no_log) {
-                    log!(!args.no_log, "Unable to export to savefile: {e}")
+                    log!(!args.no_log, err "Unable to export to savefile: {e}")
                 }
             }
         },
     }
+
+    Ok(())
 }

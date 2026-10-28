@@ -254,7 +254,7 @@ pub struct InstrInfo {
 
 pub fn instr_info(name: &str) -> Option<InstrInfo> {
     let upper = name.to_ascii_uppercase();
-    if let Some((key, (init_only, handlers, itype))) = INSTR_SPEC.get_entry(upper.as_str()) {
+    if let Some((key, (init_only, handlers, itype, _))) = INSTR_SPEC.get_entry(upper.as_str()) {
         return Some(InstrInfo {
             name: key,
             init_only: *init_only,

@@ -127,8 +127,7 @@ This error is emitted if a flag does not have a value - specifically, a colon to
 flag's identifier and its value.",
     "E0031: Unrecognized flag.
     
-This error is emitted if a flag is used that is not one of the supported TASM flags.
-E0025 for flags.",
+This error is emitted if a flag is used that is not one of the supported TASM flags.",
     "E0032: Unable to parse flag with value and type.
     
 This error is emitted if a flag has a bad value",
@@ -143,7 +142,7 @@ processed more than once at the beginning, and is therefore prevented from being
 Module imports are a setup action only allowed in the _init routine.",
     "E0035: Unable to find module::symbol
     
-This errors is emitted when an external symbol is referenced with mod::symbol syntax but
+This error is emitted when an external symbol is referenced with mod::symbol syntax but
 the linker can't find the routine in the imported module. This indicates that either
 the symbol does not exist or its name was mistyped.",
     "E0036: Unable to find module::routine
@@ -191,7 +190,7 @@ tends to occur rarely and on niche edge cases.",
 The linker encountered an error while lexing an imported module.",
     "E0045: Circular dependency between modules
     
-The linker encountered a module which indirectly imports itself thorugh another module.
+The linker encountered a module which indirectly imports itself through another module.
 This happens if module A imports module B, which also imports module A.",
 ];
 
@@ -226,11 +225,10 @@ pub enum TasmErrorType {
     BadFlag,
     BadHexLiteral,
     NoEntryPoint,
-    // InvalidNumber,
     ExceedsGroupLimit,
     InitRoutineSpawnError,
     MultipleAliasDefinitions,
-    MultipleRoutineDefintions,
+    MultipleRoutineDefinitions,
     NonInitAliasDefinition,
     NonInitImport,
     TrailingComma,
@@ -271,6 +269,5 @@ impl Display for TasmError {
 pub enum ParseErrorType {
     BadID,
     TrailingComma,
-    // InvalidNumber,
     BadHexLiteral,
 }

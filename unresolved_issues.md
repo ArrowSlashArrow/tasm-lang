@@ -454,12 +454,12 @@ So:
 
 ## 6. Compiler: errors and diagnostics
 
-### 6.1 🔴 `tasmc` exits with status 0 on compile errors (verified)
+<!-- ### 6.1 🔴 `tasmc` exits with status 0 on compile errors (verified)
 **File:** `rtasm/src/main.rs:192-311`
 
 **Problem:** `main` returns `()` on every path, so scripts and CI can't detect failures.
 
-**Potential fixes:** Return `std::process::ExitCode` (1 on any error).
+**Potential fixes:** Return `std::process::ExitCode` (1 on any error). -->
 
 ### 6.2 🟠 Errors on the first line of a file lose their location (verified)
 **File:** `rtasm/src/core/error.rs:223-245`
@@ -473,7 +473,6 @@ So:
 
 **Problem:**
 - `Bad token.` (E0029) doesn't show the token or explain what was expected.
-- E0021 says "Bad flag arguments" instead of "more than one `|`".
 - E0024 doesn't name the bad argument, and is pushed *in addition to* the specific error.
 - E0027/E0032 print Rust `Debug` type names (`[Item, Number]`, `Float`).
 
@@ -499,9 +498,6 @@ So:
 
 **Problem:**
 - E0021 (a flag error) uses `InvalidInstruction`, and E0015 (bad alias) uses `InvalidInstruction`.
-- `MultipleRoutineDefintions` is misspelled.
-- `InvalidNumber` is commented out.
-- Doc typos: E0035 "This errors is", E0045 "thorugh", E0031 "E0025 for flags".
 - E0038's doc says "file can't be found", but it is emitted when a `mod::sym` names a module that was never imported.
 
 ### 6.6 🟡 Verbose and normal logging are tangled
@@ -526,19 +522,19 @@ So:
 
 ## 7. Compiler: CLI and export
 
-### 7.1 🟠 Savefile not found is reported as success
+<!-- ### 7.1 🟠 Savefile not found is reported as success
 **File:** `rtasm/src/main.rs:131-142`
 
 **Problem:** If the savefile can't be found, the compiler logs a hint and returns `Ok(())`. Combined with 6.1, scripts can't tell that nothing was exported. Writing to the savefile while GD is running is also not detected.
 
-**Potential fixes:** Return an error. Optionally detect a running GD process and refuse or warn.
+**Potential fixes:** Return an error. Optionally detect a running GD process and refuse or warn. -->
 
-### 7.2 🟠 `--clipboard` can panic
+<!-- ### 7.2 🟠 `--clipboard` can panic
 **File:** `rtasm/src/main.rs:282-291`
 
-**Problem:** `ClipboardContext::new().unwrap()` and `get_decrypted_data().unwrap()` panic on headless or unsupported systems. The docs say the flag is Windows-only, but `cli-clipboard` is cross-platform, and on musl/X11-less builds it may not link or work.
+**Problem:** `ClipboardContext::new().unwrap()` panic on headless or unsupported systems. The docs say the flag is Windows-only, but `cli-clipboard` is cross-platform, and on musl/X11-less builds it may not link or work.
 
-**Potential fixes:** Handle the errors, and clarify the platform support.
+**Potential fixes:** Handle the errors, and clarify the platform support. -->
 
 ### 7.3 🟡 Export options are mutually exclusive but not declared as such
 **File:** `rtasm/src/main.rs` (`Args`)

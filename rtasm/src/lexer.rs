@@ -301,7 +301,7 @@ impl Tasm {
                 file: self.fname.clone(),
                 routine: curr_routine.ident.clone(),
                 line: curr_line,
-                details: "Bad flag arguments".into(),
+                details: "Bad flag arguments: more than one | in line".into(),
                 errcode: 21,
             },
         ) {
@@ -444,7 +444,7 @@ impl Tasm {
         }
 
         // find the instruction spec which contains arg handlers
-        let (init_exclusive, handlers, itype) = match INSTR_SPEC.get(&instr) {
+        let (init_exclusive, handlers, itype, _) = match INSTR_SPEC.get(&instr) {
             Some(spec) => spec,
             None => {
                 push_error(
@@ -595,7 +595,7 @@ impl Tasm {
                         push_error(
                             &mut self.errors,
                             &self.fname,
-                            TasmErrorType::MultipleRoutineDefintions,
+                            TasmErrorType::MultipleRoutineDefinitions,
                             line_idx,
                             routine_ident.clone(),
                             format!(
@@ -608,7 +608,7 @@ impl Tasm {
                     }
 
                     // check that the routine identifier is good
-                    if let Ok(TasmValue::String(s)) = TasmValue::to_value(&routine_ident) {
+                    if let Ok(TasmValue::String(_)) = TasmValue::to_value(&routine_ident) {
                         {}; // do nothing, it's all good here
                     } else {
                         verbose_log!(self, "Invalid routine name: {routine_ident}");
