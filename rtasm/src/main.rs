@@ -14,6 +14,7 @@ use gdlib::cclocallevels::gdobj::ids::level_header;
 use gdlib::cclocallevels::gdobj::serialise_objects;
 use gdlib::core::get_cclocallevels_path;
 use tasmc::core::consts::GROUP_LIMIT;
+use tasmc::lexer::stdlib_dir;
 use tungstenite::{Message, connect};
 
 use crate::core::{error::ERROR_DOCS, print_errors, structs::Tasm};
@@ -102,6 +103,10 @@ struct Args {
     /// Decompiles the given .gmd file and dumps it into stdout.
     #[arg(long, short)]
     decompile: bool,
+
+    /// Directory of the standard library. By default, %APPDATA%/tasm/stdlib on windows, and ~/.local/bin/tasm/stdlib on another OS.
+    #[arg(long, short)]
+    stdlib: Option<String>,
 }
 
 fn use_wslive(level: GDLevel, port: u16) -> Result<(), Error> {
@@ -160,6 +165,18 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         }
         g => g,
     };
+
+    let stdlib_path = match args.stdlib {
+        Some(ref p) => stdlib_dir(p),
+        None => stdlib_dir(&"STDLIB_NOT_FOUND".to_string()), // let's hope this doesn't fail.
+    };
+
+    if stdlib_path == PathBuf::from("STDLIB_NOT_FOUND") {
+        return Err(anyhow!(
+            "Could not find stdlib! Please pass path to stdlib with --stdlib <path>."
+        ));
+    }
+
     let (mut main_module, curr_group, _) = match parse_module(
         main_path.clone(),
         &args,
@@ -167,6 +184,7 @@ fn parse_main(args: &Args) -> Result<(Tasm, i16)> {
         &mut dependency_map,
         &mut start_using_this_group,
         !args.no_entry_point,
+        &stdlib_path,
         !args.no_log && args.verbose_logs,
     ) {
         Ok(m) => m,

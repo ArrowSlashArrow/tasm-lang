@@ -126,7 +126,7 @@ impl Tasm {
                 let path = maybe_path.unwrap();
                 imports.push(if is_std_import {
                     // this module is in tasmdir/stdlib
-                    PathBuf::from(stdlib_dir()).join(path)
+                    self.stdlib_dir.clone().join(path)
                 } else {
                     // resolve path to be relative to pwd
                     PathBuf::from(self.fname.clone())
@@ -851,6 +851,7 @@ pub fn parse_file<T: AsRef<str>>(
     verbose_logs: bool,
     log_errs: bool,
     disable_entry_point_check: bool,
+    stdlib_path: &PathBuf,
 ) -> Result<Tasm, Vec<TasmError>> {
     let mut tasm = Tasm::default();
     let lines = in_str
@@ -864,6 +865,7 @@ pub fn parse_file<T: AsRef<str>>(
     tasm.logs_enabled = verbose_logs;
     tasm.group_offset = group_offset;
     tasm.fname = fname;
+    tasm.stdlib_dir = stdlib_path.clone();
     tasm.parse(group_offset + 1, disable_entry_point_check);
 
     if tasm.errors.is_empty() {
@@ -879,15 +881,15 @@ pub fn parse_file<T: AsRef<str>>(
 }
 
 #[cfg(target_os = "windows")]
-pub fn stdlib_dir() -> PathBuf {
-    PathBuf::from(std::env::var("APPDATA").expect("APPDATA not set"))
+pub fn stdlib_dir(fallback: &String) -> PathBuf {
+    PathBuf::from(std::env::var("APPDATA").unwrap_or(fallback.to_owned()))
         .join("tasm")
         .join("stdlib")
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn stdlib_dir() -> PathBuf {
-    PathBuf::from(std::env::var("HOME").expect("HOME not set"))
+pub fn stdlib_dir(fallback: &String) -> PathBuf {
+    PathBuf::from(std::env::var("HOME").unwrap_or(fallback.to_owned()))
         .join(".local")
         .join("bin")
         .join("tasm")

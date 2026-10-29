@@ -479,6 +479,8 @@ pub struct Tasm {
     pub fname: String,
     // list of modules that were imported here
     pub imports: Vec<PathBuf>,
+    // use this directory for the stdlib
+    pub stdlib_dir: PathBuf,
 }
 
 #[derive(Debug, Default, Clone)]

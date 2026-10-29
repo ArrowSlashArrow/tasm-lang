@@ -27,6 +27,7 @@ pub fn compile_tasm_module(
     start_using_this_group: i16,
     expect_entry_point: bool, // should always be false unless parsing from main
     silent: bool,
+    stdlib_path: &PathBuf,
 ) -> Result<Tasm> {
     let file = match fs::read_to_string(&path) {
         Ok(f) => f,
@@ -44,6 +45,7 @@ pub fn compile_tasm_module(
         args.verbose_logs && !args.no_log,
         true,
         !expect_entry_point,
+        stdlib_path,
     ) {
         Ok(t) => t,
         Err(es) => {
@@ -139,6 +141,7 @@ pub fn parse_module(
     dependency_map: &mut HashMap<String, PathBuf>,
     start_using_this_group: &mut i16,
     has_entry_point: bool,
+    stdlib_path: &PathBuf,
     silent: bool,
 ) -> Result<(Tasm, i16, Vec<usize>)> {
     log!(silent, "Parsing {}", module_path.to_str().unwrap());
@@ -150,6 +153,7 @@ pub fn parse_module(
         prev_used_groups,
         has_entry_point,
         silent,
+        stdlib_path,
     )?;
     // offsetting the starting group like this allows us to parse the routines with no group collision to begin with
     // name collision is yet to be resolved
@@ -229,6 +233,7 @@ pub fn parse_module(
                 args,
                 start_using_this_group,
                 silent,
+                stdlib_path,
             )?;
 
             // aliases will be resolved in `post_processing`
@@ -247,6 +252,7 @@ pub fn parse_module(
             args,
             start_using_this_group,
             silent,
+            stdlib_path,
         )?;
         dependency_map.insert(symbol.root.clone().unwrap(), dependency_path.clone());
 
@@ -286,6 +292,7 @@ pub fn parse_module(
                     args,
                     start_using_this_group,
                     silent,
+                    stdlib_path,
                 )?;
                 // replace existing symbol with this value
                 SymbolValue::Group(routine_cache.get(&symbol.hashable()).unwrap().0.group)
@@ -359,6 +366,7 @@ pub fn cache_module(
     args: &Args,
     start_using_this_group: &mut i16,
     silent: bool,
+    stdlib_path: &PathBuf,
 ) -> Result<(PathBuf, String)> {
     // this is the module identifier, not its path. look this up in the current module.
     log!(silent, "called cache module with symbol {symbol:?}");
@@ -383,6 +391,7 @@ pub fn cache_module(
                 dependency_map,
                 start_using_this_group,
                 false, // library files are not expected to have entry points
+                stdlib_path,
                 silent,
             )?;
 
@@ -448,6 +457,7 @@ pub fn index_routine_deps(
     args: &Args,
     start_using_this_group: &mut i16,
     silent: bool,
+    stdlib_path: &PathBuf,
 ) -> Result<()> {
     // as a rust developer, using all of these .clone()s feels like driving a stake through my heart.
     // this langauge was made to be performant and memory safe, yet here i am sacrificing the former
@@ -492,6 +502,7 @@ pub fn index_routine_deps(
                     args,
                     start_using_this_group,
                     silent,
+                    stdlib_path,
                 )?;
             }
 
@@ -512,6 +523,7 @@ pub fn index_routine_deps(
                         args,
                         start_using_this_group,
                         silent,
+                        stdlib_path,
                     )?;
                 }
                 None => {
@@ -540,6 +552,7 @@ pub fn index_routine_deps(
                         args,
                         start_using_this_group,
                         silent,
+                        stdlib_path,
                     )?;
                 }
                 None => {
